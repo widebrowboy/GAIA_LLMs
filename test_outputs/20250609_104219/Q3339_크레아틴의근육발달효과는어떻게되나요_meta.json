@@ -1,0 +1,14 @@
+{
+  "question": "크레아틴의 근육 발달 효과는 어떻게 되나요?",
+  "question_id": "Q3339",
+  "score": 0.0,
+  "feedback_loops": 1,
+  "feedback_depth": 1,
+  "feedback_width": 1,
+  "timestamp": "2025-06-09T10:53:57.927656",
+  "model": "gemma3:4b",
+  "saved_files": {
+    "markdown": "Q3339_크레아틴의근육발달효과는어떻게되나요.md",
+    "metadata": "Q3339_크레아틴의근육발달효과는어떻게되나요_meta.json"
+  }
+}

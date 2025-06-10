@@ -1,0 +1,10 @@
+FROM /home/gaia-bt/workspace/GAIA_LLMs/model/google.txgemma-9b-predict.Q8_0.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_thread 8
+PARAMETER f16_kv true
+PARAMETER mirostat 2
+
+TEMPLATE """{{ .System }}
+{{ .Prompt }}
+"""

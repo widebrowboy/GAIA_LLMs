@@ -1,0 +1,31 @@
+{
+  "python": {
+    "version": "3.13.2",
+    "virtual_environment": {
+      "enabled": true,
+      "path": ".venv",
+      "manager": "uv",
+      "auto_activate": true,
+      "dependencies": {
+        "source": "requirements.txt",
+        "auto_install": true
+      }
+    },
+    "linters": ["pylint", "flake8"],
+    "formatters": ["black", "isort"]
+  },
+  "on_save": {
+    "format_on_save": true,
+    "lint_on_save": true
+  },
+  "environment_variables": {
+    "PYTHONPATH": "${workspaceFolder}",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "exclude": [
+    "**/.venv",
+    "**/__pycache__",
+    "**/.pytest_cache",
+    "**/.mypy_cache"
+  ]
+}
