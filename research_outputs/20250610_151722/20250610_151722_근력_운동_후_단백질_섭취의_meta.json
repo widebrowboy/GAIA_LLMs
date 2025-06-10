@@ -1,0 +1,19 @@
+{
+  "timestamp": "20250610_151722",
+  "question": "근력 운동 후 단백질 섭취의 최적 타이밍과 양은 얼마인가요?",
+  "settings": {
+    "model": "Gemma3:latest",
+    "feedback_depth": 2,
+    "feedback_width": 2,
+    "min_response_length": 100,
+    "min_references": 2,
+    "temperature": 0.7,
+    "max_tokens": 4000,
+    "debug_mode": false
+  },
+  "model": "Gemma3:latest",
+  "feedback_loop": {
+    "depth": 2,
+    "width": 2
+  }
+}

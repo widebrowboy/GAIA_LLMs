@@ -275,6 +275,9 @@ GAIA_LLMs/
 
 ## cli 사용법
 
+pkill -f "python -m main"
+
+
 ## Ollama 사용법
 
 ## ollama 모델 추가 방법

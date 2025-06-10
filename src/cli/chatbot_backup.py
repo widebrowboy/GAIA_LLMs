@@ -39,12 +39,9 @@ class HealthSupplementChatbot:
     사용자 인터페이스 관리 및 AI 응답 생성을 담당합니다.
     """
     
-    def __init__(self, debug_mode=False):
+    def __init__(self):
         """
         챗봇 초기화
-        
-        Args:
-            debug_mode (bool): 디버그 모드 활성화 여부
         """
         # 설정 초기화 - 메모리에서 가져온 값을 사용하되, Gemma3를 우선 사용
         preferred_model = "Gemma3:latest"  # 바로 표준 모델로 지정
@@ -54,17 +51,14 @@ class HealthSupplementChatbot:
             "feedback_width": DEFAULT_FEEDBACK_WIDTH,
             "min_response_length": MIN_RESPONSE_LENGTH,
             "min_references": MIN_REFERENCES,
-            "temperature": 0.7,
-            "max_tokens": 4000,
-            "debug_mode": debug_mode  # 디버그 모드 설정
+            "debug_mode": False  # 디버그 모드 기본값: 끄기
         }
         
         # Ollama API 클라이언트 초기화 (설정 후 생성)
         self.client = OllamaClient(
             model=preferred_model,  # 바로 Gemma3:latest로 지정
             max_tokens=4000,
-            min_response_length=self.settings["min_response_length"],
-            debug_mode=debug_mode  # 디버그 모드 전달
+            min_response_length=self.settings["min_response_length"]
         )
         
         # 모델 가용성 초기 확인을 위한 상태 변수
@@ -221,18 +215,14 @@ class HealthSupplementChatbot:
                 if self.settings["debug_mode"]:
                     print("--- AI 응답 종료 ---\n")
                     
-                # 사용자에게 결과 저장 여부 물어보기
-                if self.interface and ask_to_save:
-                    try:
-                        save_choice = await self.interface.ask_to_save()
-                        
-                        # 사용자가 저장을 원하는 경우에만 저장
-                        if save_choice:
-                            # 평가 정보 없이 저장 (빈 딕셔너리 전달)
-                            await self.save_research_result(question, response, {})
-                    except Exception as e:
-                        if self.settings["debug_mode"]:
-                            print(f"[디버그] 저장 프로세스 중 오류: {str(e)}")
+                # ask_to_save가 True인 경우에만 저장 여부 확인
+                if ask_to_save:
+                    save_choice = await self.interface.ask_to_save()
+                    
+                    # 사용자가 저장을 원하는 경우에만 저장
+                    if save_choice:
+                        # 평가 정보 없이 저장 (빈 딕셔너리 전달)
+                        await self.save_research_result(question, response, {})
                 
                 return response
                 
@@ -294,8 +284,6 @@ class HealthSupplementChatbot:
             elif cmd == "/debug":
                 # 디버그 모드 토글
                 self.settings["debug_mode"] = not self.settings["debug_mode"]
-                # OllamaClient의 디버그 모드도 함께 업데이트
-                self.client.set_debug_mode(self.settings["debug_mode"])
                 state = "켜짐" if self.settings["debug_mode"] else "꺼짐"
                 self.interface.console.print(f"[green]디버그 모드가 {state}으로 설정되었습니다.[/green]")
             
@@ -306,82 +294,6 @@ class HealthSupplementChatbot:
         except Exception as e:
             self.interface.display_error(f"명령어 처리 중 오류 발생: {str(e)}")
             return True  # 오류가 있어도 계속 실행
-    
-    async def save_research_result(self, question: str, response: str, rating_info: dict = None) -> None:
-        """
-        연구 결과를 파일로 저장
-        
-        Args:
-            question: 사용자 질문
-            response: 생성된 응답
-            rating_info: 사용자 평가 정보 (선택사항)
-        """
-        try:
-            import datetime
-            import json
-            from pathlib import Path
-            from src.utils.config import OUTPUT_DIR
-            
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            
-            # 질문에서 파일명 생성 (간단하게)
-            title_words = question.split()[:5]  # 처음 5개 단어만 사용
-            title = "_".join([w for w in title_words if w]).replace("/", "").replace("\\", "").replace("?", "").replace("!", "")
-            if not title:  # 파일명이 비어있을 경우
-                title = "research_result"
-            
-            # 저장 폴더 생성
-            output_dir = Path(OUTPUT_DIR) / timestamp
-            output_dir.mkdir(parents=True, exist_ok=True)
-            
-            # 결과 파일 경로
-            output_file = output_dir / f"{timestamp}_{title}.md"
-            
-            # 메타데이터 파일 경로
-            meta_file = output_dir / f"{timestamp}_{title}_meta.json"
-            
-            # 마크다운 파일 저장
-            with open(output_file, "w", encoding="utf-8") as f:
-                # 제목 추가
-                f.write(f"# 근육 건강기능식품 연구: {question}\n\n")
-                
-                # 생성된 결과 추가
-                f.write(response)
-            
-            # 메타데이터 저장
-            metadata = {
-                "timestamp": timestamp,
-                "question": question,
-                "settings": self.settings,
-                "model": self.settings["model"],
-                "feedback_loop": {
-                    "depth": self.settings["feedback_depth"],
-                    "width": self.settings["feedback_width"]
-                }
-            }
-            
-            # 평가 정보 추가 (있는 경우)
-            if rating_info:
-                metadata["user_rating"] = rating_info
-            
-            with open(meta_file, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, ensure_ascii=False, indent=2)
-            
-            # 저장 알림 표시
-            if self.interface:
-                self.interface.display_saved_notification(str(output_file))
-                
-            if self.settings["debug_mode"]:
-                print(f"[디버그] 파일 저장 완료: {output_file}")
-                
-        except Exception as e:
-            # 오류 발생 시 디버그 모드일 때만 상세 정보 출력
-            if self.settings["debug_mode"]:
-                import traceback
-                print(f"[디버그] 파일 저장 중 오류 발생: {str(e)}")
-                print(traceback.format_exc())
-            self.interface.display_error(f"결과 저장 중 오류 발생: {str(e)}")
-
 
 async def start(self):
     """
@@ -671,12 +583,9 @@ async def start(self):
 
 
 # 챗봇 런처 구현
-async def main(debug_mode=False):
+async def main():
     """
     메인 함수
-    
-    Args:
-        debug_mode (bool): 디버그 모드 활성화 여부
     """
-    chatbot = HealthSupplementChatbot(debug_mode=debug_mode)
+    chatbot = HealthSupplementChatbot()
     await chatbot.start()

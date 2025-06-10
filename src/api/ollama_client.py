@@ -35,7 +35,8 @@ class OllamaClient:
                  temperature: float = 0.7,
                  max_tokens: int = 4000,
                  min_response_length: int = 500,
-                 ollama_url: Optional[str] = None):
+                 ollama_url: Optional[str] = None,
+                 debug_mode: bool = False):
         """
         Ollama API 클라이언트 초기화
         
@@ -45,6 +46,7 @@ class OllamaClient:
             max_tokens: 최대 토큰 수 (기본값: 4000)
             min_response_length: 최소 응답 길이 (기본값: 500)
             ollama_url: Ollama API 엔드포인트 URL (기본값: 환경 변수에서 로드)
+            debug_mode: 디버그 모드 활성화 여부 (기본값: False)
         """
         # 환경 변수에서 Ollama URL 로드 (지정되지 않은 경우)
         self.ollama_url = ollama_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -68,6 +70,17 @@ class OllamaClient:
         
         # HTTP 클라이언트 세션
         self._http_client = None
+        
+        # 디버그 모드 설정
+        self.debug_mode = debug_mode
+        
+        # 디버그 모드 초기화 상태 정보 출력
+        print(f"[OllamaClient] 초기화 - 디버그 모드: {self.debug_mode}")
+        if self.debug_mode:
+            print(f"[OllamaClient] 사용할 모델: {self.model}")
+            print(f"[OllamaClient] Ollama URL: {self.ollama_url}")
+            print(f"[OllamaClient] GPU 파라미터: {self.gpu_params}")
+    
         
     def _set_adapter(self, model_name: str):
         """
@@ -129,10 +142,11 @@ class OllamaClient:
         # 모델 이름 추가
         payload["model"] = self.model
             
-        # 디버깅 로그 추가
-        print(f"[디버그] OllamaClient.generate 호출: 모델={self.model}, 엔드포인트={endpoint_path}")
-        print(f"[디버그] 프롬프트 길이: {len(prompt)} 자")
-        print(f"[디버그] 페이로드: {str(payload)[:300]}...")
+        # 디버깅 로그 추가 (디버그 모드일 때만)
+        if self.debug_mode:
+            print(f"[디버그] OllamaClient.generate 호출: 모델={self.model}, 엔드포인트={endpoint_path}")
+            print(f"[디버그] 프롬프트 길이: {len(prompt)} 자")
+            print(f"[디버그] 페이로드: {str(payload)[:300]}...")
         
         # 재시도 메커니즘
         last_error = None
@@ -142,7 +156,8 @@ class OllamaClient:
                 client = await self._get_http_client()
                 
                 # API 요청
-                print(f"[디버그] API 요청 시작 (시도 {attempt+1}/{max_retries+1})")
+                if self.debug_mode:
+                    print(f"[디버그] API 요청 시작 (시도 {attempt+1}/{max_retries+1})")
                 response = await client.post(
                     f"{self.ollama_url}{endpoint_path}",  # 어댑터가 제공한 엔드포인트 사용
                     json=payload,
@@ -152,13 +167,16 @@ class OllamaClient:
                 response.raise_for_status()  # HTTP 오류 확인
                 
                 # 응답 파싱
-                print(f"[디버그] API 응답 수신: 상태 코드={response.status_code}")
                 result = response.json()
-                print(f"[디버그] 응답 키: {list(result.keys())}")
                 
-                # raw 응답 로그
-                raw_snippet = str(result.get('response', ''))[:50]
-                print(f"[디버그] 원시 응답 일부: {raw_snippet}...")
+                # 디버그 모드일 때만 로그 출력
+                if self.debug_mode:
+                    print(f"[디버그] API 응답 수신: 상태 코드={response.status_code}")
+                    print(f"[디버그] 응답 키: {list(result.keys())}")
+                    
+                    # raw 응답 로그
+                    raw_snippet = str(result.get('response', ''))[:50]
+                    print(f"[디버그] 원시 응답 일부: {raw_snippet}...")
                 
                 # 어댑터를 사용하여 모델별 응답 파싱
                 generated_text = self.adapter.parse_response(result)
@@ -201,8 +219,8 @@ class OllamaClient:
                     is_invalid_response = True
                     reason = "마크다운 형식이 아님"
                 
-                if is_invalid_response:
-                    print(f"[경고] 유효하지 않은 응답: {reason}")
+                if is_invalid_response and self.debug_mode:
+                    print(f"[디버그] 유효하지 않은 응답: {reason}")
                     # 사용자 친화적인 대체 메시지 반환
                     generated_text = f"""
 # 근육 관련 건강기능식품 정보
@@ -245,8 +263,9 @@ class OllamaClient:
                         generated_text = "[응답이 너무 짧습니다. 다시 질문하거나 `/model Gemma3` 명령어로 모델을 변경해보세요.]"
                 
                 # 응답 내용 미리보기 로그
-                print(f"[디버그] 최종 응답 길이: {len(generated_text)} 자")
-                print(f"[디버그] 응답 미리보기: {generated_text[:200]}...")
+                if self.debug_mode:
+                    print(f"[디버그] 최종 응답 길이: {len(generated_text)} 자")
+                    print(f"[디버그] 응답 미리보기: {generated_text[:200]}...")
                 
                 return generated_text
                     
@@ -327,6 +346,15 @@ class OllamaClient:
         """
         self.model = model_name
         self._set_adapter(model_name)
+        
+    def set_debug_mode(self, debug_mode: bool):
+        """
+        디버그 모드 설정
+        
+        Args:
+            debug_mode: 디버그 모드 활성화 여부
+        """
+        self.debug_mode = debug_mode
         
     async def check_availability(self) -> Dict[str, Any]:
         """
