@@ -1,0 +1,33 @@
+# 대용량 모델 파일
+model/*.gguf
+model/google.txgemma-9b-chat.Q8_0.gguf
+model/google.txgemma-9b-predict.Q8_0.gguf
+
+# 캐시 파일
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 환경 설정 파일
+.env
+.venv/
+env/
+venv/
+
+# 개발 환경 관련 파일
+.idea/
+.vscode/
+
+# 테스트 출력물
+test_outputs/
+
+# 바이너리 파일
+*.so
+*.dylib
+*.dll
+
+# 시스템 파일
+.DS_Store
+Thumbs.db
