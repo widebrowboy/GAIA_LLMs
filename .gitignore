@@ -164,3 +164,4 @@ auth_config.*
 *.tar.gz
 *.zip
 *.7z
+mcp/chembl
