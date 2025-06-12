@@ -41,5 +41,8 @@ h11==0.14.0
 # 비동기 파일 처리 (선택사항)
 aiofiles>=23.1.0
 
-# MCP 지원 (선택사항)
-# mcp>=1.0.0
+# MCP 지원
+mcp>=1.0.0
+
+# FastMCP for advanced MCP server functionality  
+fastmcp>=0.1.0

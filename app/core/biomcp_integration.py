@@ -1,7 +1,7 @@
 """
-BiomCP Integration for GAIA Research System
+BioMCP Integration for GAIA Research System
 
-Integrates BiomCP's biomedical research capabilities with GAIA's research pipeline.
+Integrates BioMCP's biomedical research capabilities with GAIA's research pipeline.
 """
 
 import asyncio
@@ -12,12 +12,12 @@ import json
 logger = logging.getLogger(__name__)
 
 
-class BiomCPIntegration:
-    """Integration layer for BiomCP biomedical research tools"""
+class BioMCPIntegration:
+    """Integration layer for BioMCP biomedical research tools"""
     
     def __init__(self, mcp_manager=None):
         """
-        Initialize BiomCP integration
+        Initialize BioMCP integration
         
         Args:
             mcp_manager: Optional MCP manager instance
@@ -32,7 +32,7 @@ class BiomCPIntegration:
         include_abstracts: bool = True
     ) -> Dict[str, Any]:
         """
-        Search biomedical articles using BiomCP
+        Search biomedical articles using BioMCP
         
         Args:
             query: Search query
@@ -74,7 +74,7 @@ class BiomCPIntegration:
         limit: int = 10
     ) -> Dict[str, Any]:
         """
-        Search clinical trials using BiomCP
+        Search clinical trials using BioMCP
         
         Args:
             condition: Medical condition or disease
@@ -120,7 +120,7 @@ class BiomCPIntegration:
         limit: int = 10
     ) -> Dict[str, Any]:
         """
-        Search genetic variants using BiomCP
+        Search genetic variants using BioMCP
         
         Args:
             gene: Gene name or identifier
@@ -306,11 +306,11 @@ class BiomCPIntegration:
         return results
     
     def _process_biomcp_result(self, result: Dict[str, Any], search_type: str) -> Dict[str, Any]:
-        """Process BiomCP result into standardized format"""
+        """Process BioMCP result into standardized format"""
         if not result or "content" not in result:
             return {
                 "success": False,
-                "error": "No content in BiomCP result",
+                "error": "No content in BioMCP result",
                 "search_type": search_type,
                 "results": []
             }
@@ -319,7 +319,7 @@ class BiomCPIntegration:
         if not content or len(content) == 0:
             return {
                 "success": False,
-                "error": "Empty content in BiomCP result",
+                "error": "Empty content in BioMCP result",
                 "search_type": search_type,
                 "results": []
             }

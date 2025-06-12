@@ -94,6 +94,46 @@
       "env": {
         "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs"
       }
+    },
+    "drugbank-mcp": {
+      "command": "python",
+      "args": [
+        "/home/gaia-bt/workspace/GAIA_LLMs/mcp/drugbank/drugbank_mcp.py"
+      ],
+      "description": "DrugBank MCP Server - Comprehensive drug database access for pharmaceutical research",
+      "capabilities": [
+        "tools"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs",
+        "DRUGBANK_API_KEY": "${DRUGBANK_API_KEY}"
+      }
+    },
+    "opentargets-mcp": {
+      "command": "python",
+      "args": [
+        "/home/gaia-bt/workspace/GAIA_LLMs/mcp/opentargets/opentargets_mcp.py"
+      ],
+      "description": "OpenTargets MCP Server - Target-disease associations and drug discovery platform",
+      "capabilities": [
+        "tools"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs"
+      }
+    },
+    "biorxiv-mcp": {
+      "command": "python",
+      "args": [
+        "/home/gaia-bt/workspace/GAIA_LLMs/mcp/biorxiv/biorxiv_mcp.py"
+      ],
+      "description": "BioRxiv MCP Server - Access to bioRxiv and medRxiv preprint repositories",
+      "capabilities": [
+        "tools"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs"
+      }
     }
   },
   "globalSettings": {
@@ -118,7 +158,10 @@
         "gaia-research",
         "gaia-websocket",
         "biomcp",
-        "chembl"
+        "chembl",
+        "drugbank-mcp",
+        "opentargets-mcp",
+        "biorxiv-mcp"
       ],
       "settings": {
         "logLevel": "info",
@@ -140,7 +183,10 @@
         "sequential-thinking",
         "gaia-research",
         "biomcp",
-        "chembl"
+        "chembl",
+        "drugbank-mcp",
+        "opentargets-mcp",
+        "biorxiv-mcp"
       ],
       "settings": {
         "logLevel": "debug",
@@ -193,6 +239,20 @@
       "settings": {
         "logLevel": "debug",
         "timeout": 60000
+      }
+    },
+    "drug-development": {
+      "servers": [
+        "drugbank-mcp",
+        "opentargets-mcp",
+        "chembl",
+        "biomcp",
+        "biorxiv-mcp",
+        "sequential-thinking"
+      ],
+      "settings": {
+        "logLevel": "info",
+        "timeout": 45000
       }
     }
   },

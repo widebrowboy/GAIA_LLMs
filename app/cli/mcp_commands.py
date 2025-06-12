@@ -16,12 +16,23 @@ class MCPCommands:
     
     async def handle_mcp_command(self, args: str):
         """MCP 명령어 처리"""
+        # 인수 정규화 (공백과 특수문자 처리)
+        args = args.strip() if args else ""
+        
+        # 디버그 정보
+        if self.chatbot.settings.get("debug_mode", False):
+            print(f"🐛 [MCP 디버그] 받은 인수: '{args}' (길이: {len(args)})")
+        
         if not args:
             self.show_mcp_help()
             return
         
         parts = args.split()
         subcommand = parts[0] if parts else ""
+        
+        # 디버그 정보
+        if self.chatbot.settings.get("debug_mode", False):
+            print(f"🐛 [MCP 디버그] 하위명령어: '{subcommand}' (총 {len(parts)}개 부분)")
         
         if subcommand == "start":
             await self.start_mcp()
@@ -102,6 +113,22 @@ class MCPCommands:
                 await self.chembl_smiles_tools(smiles)
             else:
                 self.interface.display_error("사용법: /mcp smiles <SMILES_string>")
+        elif subcommand == "drugbank":
+            if len(parts) >= 3:
+                action = parts[1]
+                query = " ".join(parts[2:])
+                await self.drugbank_search(action, query)
+            else:
+                self.interface.display_error("사용법: /mcp drugbank <action> <query>")
+                self.interface.display_error("Actions: search, details, indication, interaction, target")
+        elif subcommand == "opentargets":
+            if len(parts) >= 3:
+                action = parts[1]
+                query = " ".join(parts[2:])
+                await self.opentargets_search(action, query)
+            else:
+                self.interface.display_error("사용법: /mcp opentargets <action> <query>")
+                self.interface.display_error("Actions: targets, diseases, target_diseases, disease_targets, drugs")
         elif subcommand == "test":
             if len(parts) >= 2:
                 test_type = parts[1]
@@ -137,7 +164,7 @@ class MCPCommands:
 [cyan]/mcp continue <processId> <thought>[/cyan] - 사고 단계 추가
 [cyan]/mcp complete <processId>[/cyan] - 사고 프로세스 완료
 
-[bold cyan]BiomCP (생의학 연구):[/bold cyan]
+[bold cyan]BioMCP (생의학 연구):[/bold cyan]
 [cyan]/mcp bioarticle <query>[/cyan] - 생의학 논문 검색
 [cyan]/mcp biotrial <condition>[/cyan] - 임상시험 검색
 [cyan]/mcp biovariant <gene>[/cyan] - 유전자 변이 정보 검색
@@ -149,9 +176,23 @@ class MCPCommands:
 [cyan]/mcp chembl drug <name>[/cyan] - 약물 정보 검색
 [cyan]/mcp smiles <SMILES>[/cyan] - SMILES 분자 구조 분석
 
+[bold cyan]DrugBank (약물 데이터베이스):[/bold cyan]
+[cyan]/mcp drugbank search <name>[/cyan] - 약물 검색
+[cyan]/mcp drugbank details <drugbank_id>[/cyan] - 약물 상세 정보
+[cyan]/mcp drugbank indication <condition>[/cyan] - 적응증별 약물 검색
+[cyan]/mcp drugbank interaction <drugbank_id>[/cyan] - 약물 상호작용
+[cyan]/mcp drugbank target <target>[/cyan] - 타겟별 약물 검색
+
+[bold cyan]OpenTargets (타겟-질병 연관성):[/bold cyan]
+[cyan]/mcp opentargets targets <gene>[/cyan] - 타겟 유전자 검색
+[cyan]/mcp opentargets diseases <disease>[/cyan] - 질병 검색
+[cyan]/mcp opentargets target_diseases <target_id>[/cyan] - 타겟 연관 질병
+[cyan]/mcp opentargets disease_targets <disease_id>[/cyan] - 질병 연관 타겟
+[cyan]/mcp opentargets drugs <drug>[/cyan] - 약물 검색
+
 [bold cyan]테스트:[/bold cyan]
 [cyan]/mcp test[/cyan] - HNSCC 예제를 활용한 MCP 통합 테스트
-[cyan]/mcp test integrated[/cyan] - ChEMBL + BiomCP + Sequential Thinking 통합 테스트
+[cyan]/mcp test integrated[/cyan] - ChEMBL + BioMCP + Sequential Thinking 통합 테스트
 [cyan]/mcp test deep[/cyan] - Deep Research 기능 테스트 (권장)
 
 MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처리됩니다.
@@ -161,12 +202,11 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
     async def start_mcp(self):
         """MCP 서버 시작"""
         try:
-            self.interface.console.print("[yellow]MCP 서버를 시작하는 중...[/yellow]")
+            self.interface.console.print("[yellow]🔬 통합 Deep Research MCP 시스템 시작 중...[/yellow]")
             
             # 1. GAIA MCP 서버 시작
             success = await self.mcp_manager.start_server()
             if success:
-                self.chatbot.mcp_enabled = True
                 self.interface.console.print("[green]✓ GAIA MCP 서버가 성공적으로 시작되었습니다.[/green]")
                 
                 # 기본 클라이언트 초기화
@@ -176,19 +216,48 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                 except Exception as e:
                     self.interface.console.print(f"[yellow]⚠ 기본 클라이언트 연결 실패: {e}[/yellow]")
                 
-                # 2. 모든 툴이 로컬 서버에 통합됨
-                self.interface.console.print("[green]✓ BiomCP 툴이 통합되었습니다.[/green]")
-                self.interface.console.print("[green]✓ ChEMBL 툴이 통합되었습니다.[/green]")
-                self.interface.console.print("[green]✓ Sequential Thinking 툴이 통합되었습니다.[/green]")
+                # 2. 외부 서버들 시작 (DrugBank, OpenTargets 포함)
+                self.interface.console.print("[blue]외부 MCP 서버들 시작 중...[/blue]")
+                if await self.mcp_manager.start_external_servers():
+                    self.interface.console.print("[green]✓ 외부 MCP 서버들이 시작되었습니다.[/green]")
+                    
+                    # 시작된 서버들 표시
+                    status = self.mcp_manager.get_status()
+                    client_ids = status.get('client_ids', [])
+                    if client_ids:
+                        self.interface.console.print(f"[cyan]활성 클라이언트: {', '.join(client_ids)}[/cyan]")
+                        
+                        # 각 서버별 상태 표시
+                        if 'drugbank-mcp' in client_ids:
+                            self.interface.console.print("[green]💊 DrugBank MCP 서버 연결됨[/green]")
+                        if 'opentargets-mcp' in client_ids:
+                            self.interface.console.print("[green]🎯 OpenTargets MCP 서버 연결됨[/green]")
+                        if 'biomcp' in client_ids:
+                            self.interface.console.print("[green]📄 BioMCP 서버 연결됨[/green]")
+                        if 'chembl' in client_ids:
+                            self.interface.console.print("[green]🧪 ChEMBL 서버 연결됨[/green]")
+                        if 'sequential-thinking' in client_ids:
+                            self.interface.console.print("[green]🧠 Sequential Thinking 서버 연결됨[/green]")
+                else:
+                    self.interface.console.print("[yellow]⚠️ 일부 외부 서버 시작에 실패했습니다.[/yellow]")
                 
-                # 연결 상태 표시
-                await self.show_mcp_status()
+                # 3. 챗봇 MCP 활성화
+                self.chatbot.mcp_enabled = True
+                self.interface.console.print("[green]✓ 챗봇 MCP 기능이 활성화되었습니다.[/green]")
+                
+                self.interface.console.print("\n[bold green]🎉 통합 Deep Research MCP 시스템이 성공적으로 시작되었습니다![/bold green]")
+                self.interface.console.print("[dim]사용 가능한 명령어: /mcp tools, /mcp status[/dim]")
+                self.interface.console.print("[dim]이제 신약개발 질문을 하면 자동으로 모든 MCP 서버를 활용한 Deep Search가 수행됩니다.[/dim]")
+                self.interface.console.print("[dim]디버그 모드: /debug 로 토글 가능[/dim]")
                 
             else:
                 self.interface.console.print("[red]✗ MCP 서버 시작에 실패했습니다.[/red]")
                 
         except Exception as e:
             self.interface.display_error(f"MCP 서버 시작 중 오류: {e}")
+            if self.chatbot.settings.get("debug_mode", False):
+                import traceback
+                self.interface.console.print(f"[dim red]{traceback.format_exc()}[/dim red]")
     
     async def stop_mcp(self):
         """MCP 서버 중지"""
@@ -481,7 +550,7 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             self.interface.display_error(f"Sequential Thinking 완료 중 오류: {e}")
     
     async def search_biomedical_articles(self, query: str):
-        """BiomCP를 통한 생의학 논문 검색"""
+        """BioMCP를 통한 생의학 논문 검색"""
         try:
             if not self.chatbot.mcp_enabled:
                 self.interface.console.print("[yellow]MCP가 활성화되지 않았습니다. '/mcp start'로 시작하세요.[/yellow]")
@@ -507,7 +576,7 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                     # 저장 확인
                     save_choice = input("\n검색 결과를 저장하시겠습니까? (y/N): ").strip().lower()
                     if save_choice == 'y':
-                        await self.chatbot.save_research_result(f"BiomCP Article Search - {query}", response_text)
+                        await self.chatbot.save_research_result(f"BioMCP Article Search - {query}", response_text)
                 else:
                     self.interface.console.print("[yellow]결과가 비어있습니다.[/yellow]")
             else:
@@ -517,7 +586,7 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             self.interface.display_error(f"생의학 논문 검색 중 오류: {e}")
     
     async def search_clinical_trials(self, condition: str):
-        """BiomCP를 통한 임상시험 검색"""
+        """BioMCP를 통한 임상시험 검색"""
         try:
             if not self.chatbot.mcp_enabled:
                 self.interface.console.print("[yellow]MCP가 활성화되지 않았습니다. '/mcp start'로 시작하세요.[/yellow]")
@@ -543,7 +612,7 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                     # 저장 확인
                     save_choice = input("\n검색 결과를 저장하시겠습니까? (y/N): ").strip().lower()
                     if save_choice == 'y':
-                        await self.chatbot.save_research_result(f"BiomCP Clinical Trial Search - {condition}", response_text)
+                        await self.chatbot.save_research_result(f"BioMCP Clinical Trial Search - {condition}", response_text)
                 else:
                     self.interface.console.print("[yellow]결과가 비어있습니다.[/yellow]")
             else:
@@ -553,7 +622,7 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             self.interface.display_error(f"임상시험 검색 중 오류: {e}")
     
     async def search_genetic_variants(self, gene: str):
-        """BiomCP를 통한 유전자 변이 검색"""
+        """BioMCP를 통한 유전자 변이 검색"""
         try:
             if not self.chatbot.mcp_enabled:
                 self.interface.console.print("[yellow]MCP가 활성화되지 않았습니다. '/mcp start'로 시작하세요.[/yellow]")
@@ -579,7 +648,7 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                     # 저장 확인
                     save_choice = input("\n검색 결과를 저장하시겠습니까? (y/N): ").strip().lower()
                     if save_choice == 'y':
-                        await self.chatbot.save_research_result(f"BiomCP Genetic Variant Search - {gene}", response_text)
+                        await self.chatbot.save_research_result(f"BioMCP Genetic Variant Search - {gene}", response_text)
                 else:
                     self.interface.console.print("[yellow]결과가 비어있습니다.[/yellow]")
             else:
@@ -609,6 +678,16 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                     'name': 'chembl',
                     'status': '연결됨 ✓' if self.chatbot.mcp_enabled else '미연결 ✗',
                     'tools': ['search_molecule'] if self.chatbot.mcp_enabled else []
+                },
+                {
+                    'name': 'drugbank-mcp',
+                    'status': '연결됨 ✓' if self.chatbot.mcp_enabled else '미연결 ✗',
+                    'tools': ['search_drugs', 'get_drug_details'] if self.chatbot.mcp_enabled else []
+                },
+                {
+                    'name': 'opentargets-mcp',
+                    'status': '연결됨 ✓' if self.chatbot.mcp_enabled else '미연결 ✗',
+                    'tools': ['search_targets', 'search_diseases'] if self.chatbot.mcp_enabled else []
                 }
             ]
             
@@ -638,8 +717,8 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             
             self.interface.console.print("[cyan]테스트 시나리오:[/cyan]")
             self.interface.console.print("1. Sequential Thinking으로 문제 분석")
-            self.interface.console.print("2. BiomCP로 관련 논문 검색")
-            self.interface.console.print("3. BiomCP로 임상시험 검색")
+            self.interface.console.print("2. BioMCP로 관련 논문 검색")
+            self.interface.console.print("3. BioMCP로 임상시험 검색")
             self.interface.console.print("4. 종합 연구 수행\n")
             
             # 사용자 확인
@@ -654,14 +733,14 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                 "Analyze emerging treatment strategies for HNSCC focusing on immunotherapy"
             )
             
-            # 2. BiomCP 논문 검색
-            self.interface.console.print("\n[bold]2. BiomCP 논문 검색[/bold]")
+            # 2. BioMCP 논문 검색
+            self.interface.console.print("\n[bold]2. BioMCP 논문 검색[/bold]")
             await self.search_biomedical_articles(
                 "HNSCC immunotherapy combination PD-1 PD-L1 clinical trial"
             )
             
-            # 3. BiomCP 임상시험 검색
-            self.interface.console.print("\n[bold]3. BiomCP 임상시험 검색[/bold]")
+            # 3. BioMCP 임상시험 검색
+            self.interface.console.print("\n[bold]3. BioMCP 임상시험 검색[/bold]")
             await self.search_clinical_trials(
                 "head neck squamous cell carcinoma immunotherapy"
             )
@@ -780,10 +859,10 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             self.interface.display_error(f"SMILES 분석 중 오류: {e}")
     
     async def run_integrated_mcp_test(self):
-        """ChEMBL + BiomCP + Sequential Thinking 통합 테스트"""
+        """ChEMBL + BioMCP + Sequential Thinking 통합 테스트"""
         try:
             self.interface.console.print("[bold blue]=== 통합 MCP 테스트 ===\n[/bold blue]")
-            self.interface.console.print("[cyan]ChEMBL + BiomCP + Sequential Thinking 통합 연구[/cyan]\n")
+            self.interface.console.print("[cyan]ChEMBL + BioMCP + Sequential Thinking 통합 연구[/cyan]\n")
             
             # MCP가 활성화되어 있는지 확인
             if not self.chatbot.mcp_enabled:
@@ -798,7 +877,7 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             self.interface.console.print("[cyan]연구 시나리오:[/cyan]")
             self.interface.console.print("1. Sequential Thinking으로 연구 계획 수립")
             self.interface.console.print("2. ChEMBL로 크레아틴 분자 구조 분석")
-            self.interface.console.print("3. BiomCP로 관련 논문 및 임상시험 검색")
+            self.interface.console.print("3. BioMCP로 관련 논문 및 임상시험 검색")
             self.interface.console.print("4. GAIA로 종합 연구 분석")
             self.interface.console.print(f"\n[yellow]연구 대상:[/yellow] 크레아틴 (SMILES: {creatine_smiles})")
             
@@ -821,8 +900,8 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             self.interface.console.print("\n[bold]2-1. SMILES 구조 분석[/bold]")
             await self.chembl_smiles_tools(creatine_smiles)
             
-            # 3. BiomCP로 생의학 연구
-            self.interface.console.print("\n[bold]3. BiomCP - 크레아틴 연구 데이터[/bold]")
+            # 3. BioMCP로 생의학 연구
+            self.interface.console.print("\n[bold]3. BioMCP - 크레아틴 연구 데이터[/bold]")
             await self.search_biomedical_articles("creatine supplementation muscle growth performance")
             
             await self.search_clinical_trials("creatine supplementation athletic performance")
@@ -840,7 +919,7 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             self.interface.console.print("\n[green]✓ 통합 MCP 테스트가 완료되었습니다![/green]")
             self.interface.console.print("\n[cyan]통합 시스템 검증 완료:[/cyan]")
             self.interface.console.print("- ✓ 화학 구조 분석 (ChEMBL)")
-            self.interface.console.print("- ✓ 생의학 연구 데이터 (BiomCP)")
+            self.interface.console.print("- ✓ 생의학 연구 데이터 (BioMCP)")
             self.interface.console.print("- ✓ 단계별 추론 (Sequential Thinking)")
             self.interface.console.print("- ✓ 종합 연구 분석 (GAIA + Ollama Gemma3)")
             self.interface.console.print("\n[yellow]모든 결과가 research_outputs 폴더에 저장되었습니다.[/yellow]")
@@ -904,7 +983,7 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                 self.interface.console.print(f"[cyan]질문:[/cyan] {test_case['question']}\n")
                 
                 # Deep Research 실행 (실제 챗봇의 generate_response 사용)
-                self.interface.console.print("[yellow]Deep Research 수행 중... (Sequential Thinking → ChEMBL → BiomCP → Ollama)[/yellow]")
+                self.interface.console.print("[yellow]Deep Research 수행 중... (Sequential Thinking → ChEMBL → BioMCP → Ollama)[/yellow]")
                 
                 try:
                     # 챗봇의 Deep Research 기능 활용
@@ -940,7 +1019,7 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             self.interface.console.print("\n[cyan]검증된 기능:[/cyan]")
             self.interface.console.print("- ✓ Sequential Thinking 기반 연구 계획")
             self.interface.console.print("- ✓ ChEMBL 화학 데이터 통합")
-            self.interface.console.print("- ✓ BiomCP 생의학 연구 데이터")
+            self.interface.console.print("- ✓ BioMCP 생의학 연구 데이터")
             self.interface.console.print("- ✓ Ollama Gemma3 종합 분석")
             self.interface.console.print("- ✓ 구조화된 연구 보고서 생성")
             
@@ -952,3 +1031,117 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             self.interface.display_error(f"Deep Research 테스트 중 오류: {e}")
             import traceback
             traceback.print_exc()
+    
+    async def drugbank_search(self, action: str, query: str):
+        """DrugBank 데이터베이스 검색"""
+        try:
+            if not self.chatbot.mcp_enabled:
+                self.interface.console.print("[yellow]MCP가 활성화되지 않았습니다. '/mcp start'로 시작하세요.[/yellow]")
+                return
+            
+            self.interface.console.print(f"[yellow]DrugBank {action} 검색 중: '{query}'[/yellow]")
+            
+            # DrugBank 툴 이름 매핑
+            tool_mapping = {
+                "search": "search_drugs",
+                "details": "get_drug_details", 
+                "indication": "find_drugs_by_indication",
+                "interaction": "get_drug_interactions",
+                "target": "find_drugs_by_target"
+            }
+            
+            tool_name = tool_mapping.get(action)
+            if not tool_name:
+                self.interface.display_error(f"지원하지 않는 action: {action}")
+                return
+            
+            # 인자 구성
+            if action == "search":
+                arguments = {"query": query, "limit": 10}
+            elif action == "details":
+                arguments = {"drugbank_id": query}
+            elif action == "indication":
+                arguments = {"indication": query, "limit": 10}
+            elif action == "interaction":
+                arguments = {"drugbank_id": query, "limit": 20}
+            elif action == "target":
+                arguments = {"target": query, "limit": 10}
+            
+            result = await self.mcp_manager.call_tool(
+                client_id="drugbank-mcp",
+                tool_name=tool_name,
+                arguments=arguments
+            )
+            
+            if result and "content" in result:
+                content = result["content"]
+                if content and len(content) > 0:
+                    response_text = content[0].get("text", "결과 없음")
+                    self.interface.display_response(response_text)
+                    
+                    # 저장 확인
+                    save_choice = input("\n검색 결과를 저장하시겠습니까? (y/N): ").strip().lower()
+                    if save_choice == 'y':
+                        await self.chatbot.save_research_result(f"DrugBank {action} Search - {query}", response_text)
+                else:
+                    self.interface.console.print("[yellow]결과가 비어있습니다.[/yellow]")
+            else:
+                self.interface.console.print(f"[yellow]원본 결과: {result}[/yellow]")
+            
+        except Exception as e:
+            self.interface.display_error(f"DrugBank 검색 중 오류: {e}")
+    
+    async def opentargets_search(self, action: str, query: str):
+        """OpenTargets 플랫폼 검색"""
+        try:
+            if not self.chatbot.mcp_enabled:
+                self.interface.console.print("[yellow]MCP가 활성화되지 않았습니다. '/mcp start'로 시작하세요.[/yellow]")
+                return
+            
+            self.interface.console.print(f"[yellow]OpenTargets {action} 검색 중: '{query}'[/yellow]")
+            
+            # OpenTargets 툴 이름 매핑
+            tool_mapping = {
+                "targets": "search_targets",
+                "diseases": "search_diseases", 
+                "target_diseases": "get_target_associated_diseases",
+                "disease_targets": "get_disease_associated_targets",
+                "drugs": "search_drugs"
+            }
+            
+            tool_name = tool_mapping.get(action)
+            if not tool_name:
+                self.interface.display_error(f"지원하지 않는 action: {action}")
+                return
+            
+            # 인자 구성
+            if action in ["targets", "diseases", "drugs"]:
+                arguments = {"query": query, "limit": 10}
+            elif action == "target_diseases":
+                arguments = {"target_id": query, "limit": 10}
+            elif action == "disease_targets":
+                arguments = {"disease_id": query, "limit": 10}
+            
+            result = await self.mcp_manager.call_tool(
+                client_id="opentargets-mcp",
+                tool_name=tool_name,
+                arguments=arguments
+            )
+            
+            if result and "content" in result:
+                content = result["content"]
+                if content and len(content) > 0:
+                    response_text = content[0].get("text", "결과 없음")
+                    self.interface.display_response(response_text)
+                    
+                    # 저장 확인
+                    save_choice = input("\n검색 결과를 저장하시겠습니까? (y/N): ").strip().lower()
+                    if save_choice == 'y':
+                        await self.chatbot.save_research_result(f"OpenTargets {action} Search - {query}", response_text)
+                else:
+                    self.interface.console.print("[yellow]결과가 비어있습니다.[/yellow]")
+            else:
+                self.interface.console.print(f"[yellow]원본 결과: {result}[/yellow]")
+            
+        except Exception as e:
+            self.interface.display_error(f"OpenTargets 검색 중 오류: {e}")

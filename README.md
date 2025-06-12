@@ -17,9 +17,10 @@ Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 연구 및 �
 - **약물 상호작용**: 분자 수준 약물-타겟 상호작용 연구
 
 ### 고성능 연구 플랫폼
-- **MCP 통합**: ChEMBL, Biomedical 데이터베이스, Sequential Thinking 데이터 접근
-- **Deep Search**: 통합 연구 수행으로 포괄적 분석 제공
-- **실시간 분석**: 최신 논문 및 임상시험 데이터 실시간 조회
+- **통합 MCP 서버**: DrugBank, OpenTargets, ChEMBL, BioRxiv/medRxiv, PubMed/PubTator3, ClinicalTrials.gov, Sequential Thinking
+- **스마트 Deep Search**: 질문 키워드 분석 기반 적응형 다중 데이터베이스 검색
+- **실시간 분석**: 최신 논문, 임상시험, 약물-타겟 상호작용 데이터 실시간 조회
+- **AI 통합 분석**: Sequential Thinking + 다중 데이터소스 조합으로 포괄적 연구 수행
 - **과학적 근거**: 모든 답변에 참고문헌 및 데이터 소스 포함
 
 ## 📋 목차
@@ -123,11 +124,38 @@ python main.py -i
 
 #### MCP 연구 명령어
 ```bash
-/mcp bioarticle <검색어>     # 논문 검색
-/mcp biotrial <조건>        # 임상시험 검색
-/mcp chembl molecule <분자> # 화학 분자 분석
-/mcp think <문제>          # 단계별 추론
-/mcp test deep            # Deep Search 테스트
+# 기본 MCP 관리
+/mcp start                 # MCP 서버 시작
+/mcp status               # MCP 상태 확인
+
+# DrugBank 약물 데이터베이스
+/mcp drugbank search <약물명>          # 약물 검색
+/mcp drugbank indication <적응증>      # 적응증별 약물 검색
+/mcp drugbank interaction <drugbank_id> # 약물 상호작용
+
+# OpenTargets 타겟-질병 연관성
+/mcp opentargets targets <유전자>      # 타겟 검색
+/mcp opentargets diseases <질병>       # 질병 검색
+/mcp opentargets target_diseases <타겟ID> # 타겟-질병 연관성
+
+# ChEMBL 화학 데이터베이스
+/mcp chembl molecule <분자명>         # 분자 정보 검색
+/mcp smiles <SMILES>                 # SMILES 구조 분석
+
+# BioMCP 생의학 데이터베이스
+/mcp bioarticle <검색어>              # 논문 검색
+/mcp biotrial <조건>                 # 임상시험 검색
+
+# BioRxiv 프리프린트 저장소
+/mcp biorxiv recent <interval>       # 최근 프리프린트 검색
+/mcp biorxiv search <날짜범위>        # 기간별 프리프린트 검색
+/mcp biorxiv doi <DOI>               # DOI로 프리프린트 상세 정보
+
+# Sequential Thinking AI 추론
+/mcp think <문제>                    # 단계별 추론 분석
+
+# 통합 테스트
+/mcp test deep                       # Deep Search 통합 테스트
 ```
 
 ### 배치 처리
@@ -144,23 +172,95 @@ python main.py -f questions.json -d 3 -w 2
 
 ## 🔬 MCP 통합 기능
 
-### 1. ChEMBL 화학 데이터베이스
+GAIA-BT는 7개의 전문 MCP 서버를 통합하여 포괄적인 신약개발 연구를 지원합니다.
+
+### 1. 💊 DrugBank - 약물 데이터베이스
+- **약물 검색 및 정보**: 15,000+ 승인된 약물 및 실험적 화합물
+- **약물 상호작용**: 약물-약물, 약물-음식 상호작용 분석
+- **적응증 매핑**: 질병별 치료제 검색 및 분석
+- **타겟 정보**: 약물-타겟 관계 및 작용 메커니즘
+- **ADMET 데이터**: 흡수, 분포, 대사, 배설, 독성 정보
+
+```bash
+# DrugBank 명령어 예제
+/mcp drugbank search "aspirin"          # 아스피린 검색
+/mcp drugbank indication "cancer"       # 암 치료제 검색
+/mcp drugbank interaction "DB00945"     # 약물 상호작용 조회
+```
+
+### 2. 🎯 OpenTargets - 타겟-질병 연관성
+- **타겟 발굴**: 60,000+ 유전자 타겟 정보
+- **질병 연관성**: 27,000+ 질병과 타겟 간 연관성 분석
+- **증거 기반 분석**: 유전학적, 약물학적, 병리학적 증거 통합
+- **약물 재창출**: 기존 약물의 새로운 적응증 발굴
+- **유전체 분석**: GWAS, 체세포 변이, 발현 데이터
+
+```bash
+# OpenTargets 명령어 예제
+/mcp opentargets targets "BRCA1"        # BRCA1 타겟 정보
+/mcp opentargets diseases "cancer"      # 암 관련 타겟 검색
+/mcp opentargets target_diseases "ENSG00000012048"  # 타겟-질병 연관성
+```
+
+### 3. 🧪 ChEMBL - 화학 데이터베이스
 - **분자 구조 분석**: SMILES, InChI 등 화학 구조 정보
 - **물리화학적 특성**: 분자량, logP, 용해도 등
 - **약물-타겟 상호작용**: 결합 친화도, IC50 값
 - **개발 단계 정보**: 임상 단계 및 승인 상태
+- **SAR 분석**: 구조-활성 관계 연구
 
-### 2. Biomedical 데이터베이스 통합
+```bash
+# ChEMBL 명령어 예제
+/mcp chembl molecule "aspirin"          # 분자 정보 검색
+/mcp smiles "CC(=O)OC1=CC=CC=C1C(=O)O"  # SMILES 구조 분석
+```
+
+### 4. 📄 BioMCP - 생의학 데이터베이스 통합
 - **PubMed & PubTator3**: 최신 연구 논문 및 생의학 문헌 검색
 - **ClinicalTrials.gov**: 임상시험 데이터 및 치료법 정보
 - **유전체 변이 분석**: CIViC, ClinVar, COSMIC, dbSNP 등
 - **바이오마커**: 진단, 예후, 치료 반응 바이오마커
 
-### 3. Sequential Thinking
+```bash
+# BioMCP 명령어 예제
+/mcp bioarticle "immunotherapy cancer"  # 논문 검색
+/mcp biotrial "breast cancer"           # 임상시험 검색
+```
+
+### 5. 📑 BioRxiv - 프리프린트 논문 저장소
+- **bioRxiv & medRxiv**: 최신 프리프린트 논문 및 연구 동향
+- **출판 전 연구**: 출판 전 최신 연구 결과 접근
+- **신속한 정보**: 빠른 과학적 정보 획득 및 동향 파악
+- **연구 추적**: DOI 기반 프리프린트 상세 정보 조회
+
+```bash
+# BioRxiv 명령어 예제
+/mcp biorxiv recent 7                    # 최근 7일 프리프린트
+/mcp biorxiv search "2024-12-01" "2024-12-12"  # 기간별 검색
+/mcp biorxiv doi "10.1101/2024.12.01.123456"   # DOI 상세 정보
+```
+
+### 6. 🧠 Sequential Thinking - AI 추론
 - **문제 분해**: 복잡한 연구 질문을 단계별로 분석
 - **논리적 추론**: 체계적 사고 과정 추적
 - **대안 탐색**: 다양한 접근법 검토
 - **결론 도출**: 종합적 분석 결과
+
+```bash
+# Sequential Thinking 명령어 예제
+/mcp think "새로운 항암제 개발 전략"   # 단계별 사고 분석
+```
+
+### 7. 📊 통합 Deep Search
+질문 키워드를 자동 분석하여 관련 MCP 서버들을 지능적으로 선택하고 통합 검색을 수행합니다.
+
+**키워드 기반 자동 매핑:**
+- **약물 관련** → DrugBank + ChEMBL
+- **타겟 관련** → OpenTargets + ChEMBL  
+- **질병 관련** → OpenTargets + BioMCP + BioRxiv
+- **화학 관련** → ChEMBL + DrugBank
+- **최신 연구** → BioRxiv + BioMCP
+- **모든 경우** → Sequential Thinking + BioMCP + BioRxiv
 
 ## 🤖 LLM 모델 선택 가이드
 
@@ -281,48 +381,91 @@ ollama serve --models-path /fast-ssd/models
 
 ## 💊 신약개발 활용 사례
 
-### 1. 타겟 발굴 및 검증
+### 1. 통합 타겟-질병 연구
 ```bash
 # 질문 예시
-> 알츠하이머병 치료를 위한 새로운 분자 타겟은 무엇이 있나요?
+> BRCA1 타겟을 이용한 유방암 치료제 개발 전략을 분석해주세요
 
-# MCP 활용
-/mcp bioarticle "Alzheimer drug targets 2024"
-/mcp biotrial "Alzheimer disease"
+# 자동 Deep Search 수행 (질문만 입력하면 아래가 자동 실행됨)
+🧠 Sequential Thinking: 연구 계획 수립
+🎯 OpenTargets: BRCA1 타겟-질병 연관성 분석  
+💊 DrugBank: BRCA1 관련 기존 치료제 검색
+🧪 ChEMBL: BRCA1 화합물 상호작용 데이터
+📄 BioMCP: 최신 BRCA1 유방암 연구 논문
+
+# 개별 명령어로도 실행 가능
+/mcp opentargets targets "BRCA1"
+/mcp drugbank search "breast cancer"
+/mcp bioarticle "BRCA1 breast cancer therapy"
+```
+
+### 2. 약물 재창출 연구
+```bash
+# 질문 예시  
+> 아스피린의 새로운 적응증 가능성과 분자 메커니즘을 분석해주세요
+
+# 자동 Deep Search 수행
+🧠 Sequential Thinking: 약물 재창출 전략 분석
+💊 DrugBank: 아스피린 약물 정보 및 상호작용  
+🧪 ChEMBL: 아스피린 분자 구조 및 타겟 분석
+📄 BioMCP: 아스피린 새로운 적응증 연구
+
+# 개별 명령어 예제
+/mcp drugbank search "aspirin"
+/mcp drugbank interaction "DB00945"
+/mcp chembl molecule "aspirin"
+/mcp smiles "CC(=O)OC1=CC=CC=C1C(=O)O"
+```
+
+### 3. 신규 타겟 발굴
+```bash
+# 질문 예시
+> 알츠하이머병 치료를 위한 새로운 타겟 발굴 전략을 제시해주세요
+
+# 자동 Deep Search 수행
+🧠 Sequential Thinking: 타겟 발굴 체계적 접근
+🎯 OpenTargets: 알츠하이머 관련 타겟 및 질병 연관성
+💊 DrugBank: 기존 알츠하이머 치료제 분석
+📄 BioMCP: 최신 알츠하이머 타겟 연구
+
+# 개별 명령어 예제
+/mcp opentargets diseases "Alzheimer"
+/mcp drugbank indication "Alzheimer"
 /mcp think "Novel Alzheimer therapeutic targets"
 ```
 
-### 2. 화합물 분석 및 최적화
-```bash
-# 질문 예시  
-> 이 화합물의 구조-활성 관계를 분석해주세요: CC(C)CC(C(=O)O)N
-
-# MCP 활용
-/mcp chembl molecule "leucine"
-/mcp smiles "CC(C)CC(C(=O)O)N"
-/mcp bioarticle "structure activity relationship"
-```
-
-### 3. 임상시험 설계
+### 4. 화합물 최적화 연구
 ```bash
 # 질문 예시
-> PD-1 억제제의 임상시험 설계 시 고려사항은 무엇인가요?
+> 새로운 키나제 억제제의 구조 최적화와 독성 평가 전략을 분석해주세요
 
-# MCP 활용
-/mcp biotrial "PD-1 inhibitor"
-/mcp bioarticle "PD-1 clinical trial design"
-/mcp think "Clinical trial design considerations"
-```
+# 자동 Deep Search 수행
+🧠 Sequential Thinking: 구조 최적화 전략 수립
+🧪 ChEMBL: 키나제 억제제 구조-활성 관계
+💊 DrugBank: 키나제 억제제 안전성 프로파일
+📄 BioMCP: 키나제 억제제 독성 평가 연구
 
-### 4. 약물 안전성 평가
-```bash
-# 질문 예시
-> 새로운 키나제 억제제의 독성 프로파일을 어떻게 평가해야 하나요?
-
-# MCP 활용
-/mcp bioarticle "kinase inhibitor toxicity"
+# 개별 명령어 예제  
 /mcp chembl molecule "kinase inhibitor"
-/mcp think "Drug safety evaluation strategy"
+/mcp drugbank indication "kinase"
+/mcp bioarticle "kinase inhibitor toxicity SAR"
+```
+
+### 5. 임상시험 설계 지원
+```bash
+# 질문 예시
+> 면역항암제 병용요법의 임상시험 설계 가이드라인을 제시해주세요
+
+# 자동 Deep Search 수행
+🧠 Sequential Thinking: 임상시험 설계 체계적 접근
+📄 BioMCP: 면역항암제 임상시험 데이터 검색
+🎯 OpenTargets: 면역치료 타겟 정보
+💊 DrugBank: 면역항암제 약물 상호작용
+
+# 개별 명령어 예제
+/mcp biotrial "immunotherapy combination"
+/mcp bioarticle "immunotherapy clinical trial design"
+/mcp drugbank interaction "pembrolizumab"
 ```
 
 ## 📄 출력 형식

@@ -1,6 +1,6 @@
-# GAIA-BT 신약개발 Deep Research 사용자 매뉴얼
+# GAIA-BT v2.0 신약개발 Deep Research 사용자 매뉴얼
 
-**신약개발 전문 AI 연구 어시스턴트 상세 가이드** 🧬
+**통합 Deep Research MCP 시스템 - 신약개발 전문 AI 연구 어시스턴트 상세 가이드** 🧬
 
 ## 📋 목차
 
@@ -25,27 +25,36 @@ GAIA-BT(GAIA-BioTech)는 신약개발 전 과정을 지원하는 AI 연구 어�
 - **임상시험 설계**: 프로토콜 및 바이오마커 선정
 - **규제 전략**: FDA/EMA 승인 경로 분석
 
-### 시스템 아키텍처
+### 통합 Deep Research MCP 시스템 아키텍처
 
 ```
-사용자 질문
-    ↓
-Sequential Thinking (연구 계획 수립)
-    ↓
-ChEMBL (화학 구조 및 분자 데이터)
-    ↓
-PubMed/PubTator3 (논문 및 생의학 문헌)
-    ↓
-ClinicalTrials.gov (임상시험 데이터)
-    ↓
-유전체 변이 DB (CIViC, ClinVar, COSMIC, dbSNP)
-    ↓
-통합 컨텍스트 생성
-    ↓
-Ollama Gemma3 (최종 AI 분석)
-    ↓
-구조화된 신약개발 연구 보고서
+사용자 질문 → 스마트 키워드 분석
+                    ↓
+        Sequential Thinking (AI 연구 계획 수립)
+                    ↓
+┌─────────────────────┬─────────────────────┬─────────────────────┐
+│   💊 DrugBank       │   🎯 OpenTargets    │   🧪 ChEMBL         │
+│   15,000+ 약물      │   60,000+ 타겟      │   분자 구조 & 물성   │
+│   상호작용, ADMET   │   타겟-질병 연관성   │   SAR 분석          │
+└─────────────────────┼─────────────────────┼─────────────────────┘
+                    ↓
+        📄 BioMCP (생의학 데이터베이스)
+    PubMed/PubTator3 + ClinicalTrials.gov + 유전체 변이 DB
+                    ↓
+            통합 컨텍스트 생성
+                    ↓
+          Ollama Gemma3 (최종 AI 분석)
+                    ↓
+        구조화된 신약개발 연구 보고서
 ```
+
+### 🆕 v2.0 신기능
+
+- **💊 DrugBank MCP**: 15,000+ 약물 데이터베이스, 약물상호작용, ADMET 데이터
+- **🎯 OpenTargets MCP**: 60,000+ 타겟-질병 연관성, 유전체 분석
+- **📑 BioRxiv MCP**: bioRxiv/medRxiv 프리프린트 논문 저장소 접근
+- **🔍 스마트 키워드 분석**: 질문에 맞는 데이터베이스 자동 선택
+- **🧠 향상된 AI 추론**: 모든 데이터소스를 통합한 Deep Search
 
 ## 🚀 시작하기
 
@@ -61,15 +70,21 @@ python run_chatbot.py
 /mcp start
 ```
 
-**출력 예시:**
+**v2.0 출력 예시:**
 ```
-MCP 서버를 시작하는 중...
+🔬 통합 Deep Research MCP 시스템 시작 중...
 ✓ GAIA MCP 서버가 성공적으로 시작되었습니다.
-✓ PubMed/PubTator3 서버가 연결되었습니다.
-✓ ClinicalTrials.gov 서버가 연결되었습니다.
-✓ 유전체 변이 DB 서버가 연결되었습니다.
-✓ ChEMBL 서버가 연결되었습니다.
-✓ Sequential Thinking 서버가 연결되었습니다.
+✓ 기본 MCP 클라이언트가 연결되었습니다.
+✓ 외부 MCP 서버들이 시작되었습니다.
+💊 DrugBank MCP 서버 연결됨
+🎯 OpenTargets MCP 서버 연결됨
+📄 BioMCP 서버 연결됨
+📑 BioRxiv MCP 서버 연결됨
+🧪 ChEMBL 서버 연결됨
+🧠 Sequential Thinking 서버 연결됨
+✓ 챗봇 MCP 기능이 활성화되었습니다.
+
+🎉 통합 Deep Research MCP 시스템이 성공적으로 시작되었습니다!
 ```
 
 ### 3. 연결 상태 확인
@@ -86,27 +101,42 @@ MCP 서버를 시작하는 중...
 EGFR 억제제의 내성 메커니즘과 차세대 치료 전략을 분석해주세요.
 ```
 
-#### 시스템 처리 과정:
+#### v2.0 시스템 처리 과정:
 
-1. **Sequential Thinking 단계**
+1. **스마트 키워드 분석 & AI 연구 계획**
    ```
-   🔍 MCP Deep Search 수행 중...
-   🔍 ✓ AI 분석 완료
-   ```
-
-2. **ChEMBL 화학 분석**
-   ```
-   🔍 ✓ 약물 분자 정보 검색 완료
+   🔬 통합 MCP Deep Search 수행 중...
+   🧠 AI 분석 및 연구 계획 수립...
+   ✓ AI 분석 완료
    ```
 
-3. **Biomedical 데이터베이스 통합**
+2. **DrugBank 약물 데이터 검색**
    ```
-   🔍 ✓ 논문 검색 완료
+   💊 DrugBank 약물 데이터 검색...
+   ✓ DrugBank 검색 완료
    ```
 
-4. **Deep Search 완료**
+3. **OpenTargets 타겟-질병 연관성**
    ```
-   🔍 ✓ Deep Search 완료 - 데이터 통합 중...
+   🎯 OpenTargets 타겟-질병 연관성 검색...
+   ✓ OpenTargets 검색 완료
+   ```
+
+4. **ChEMBL 화학 구조 분석**
+   ```
+   🧪 ChEMBL 화학 데이터 검색...
+   ✓ ChEMBL 검색 완료
+   ```
+
+5. **BioMCP 생의학 연구 데이터**
+   ```
+   📄 BioMCP 생의학 논문 검색...
+   ✓ BioMCP 검색 완료
+   ```
+
+6. **통합 Deep Search 완료**
+   ```
+   📊 통합 Deep Search 완료 - 데이터 분석 중...
    ```
 
 #### 예상 출력 (구조화된 보고서):
@@ -181,31 +211,105 @@ HER2 양성 유방암을 위한 ADC 개발에서 고려해야 할 핵심 요소�
 면역항암제 치료 반응 예측을 위한 바이오마커 개발 전략을 수립해주세요.
 ```
 
-## 🔬 MCP 개별 명령어 테스트
+## 🔬 v2.0 통합 MCP 명령어 테스트
 
-### Sequential Thinking 테스트
+### 💊 DrugBank 약물 데이터베이스
 ```bash
-/mcp think "신약개발에서 분자 타겟 검증 과정"
-/mcp think "임상시험 실패 원인 분석"
+# 약물 검색
+/mcp drugbank search "imatinib"
+/mcp drugbank search "pembrolizumab"
+
+# 적응증별 약물 검색
+/mcp drugbank indication "cancer"
+/mcp drugbank indication "diabetes"
+
+# 약물 상호작용 분석
+/mcp drugbank interaction "DB00619"  # Imatinib ID
+/mcp drugbank details "DB00619"     # 상세 정보
+
+# 타겟별 약물 검색
+/mcp drugbank target "BCR-ABL"
 ```
 
-### ChEMBL 화학 데이터 테스트
+### 🎯 OpenTargets 타겟-질병 연관성
 ```bash
+# 타겟/유전자 검색
+/mcp opentargets targets "BRCA1"
+/mcp opentargets targets "EGFR"
+
+# 질병 검색
+/mcp opentargets diseases "breast cancer"
+/mcp opentargets diseases "alzheimer"
+
+# 약물 검색
+/mcp opentargets drugs "pembrolizumab"
+
+# 연관성 분석
+/mcp opentargets target_diseases "ENSG00000012048"  # BRCA1
+/mcp opentargets disease_targets "EFO_0000305"     # Breast cancer
+```
+
+### 🧪 ChEMBL 화학 데이터베이스
+```bash
+# 분자 정보 검색
 /mcp chembl molecule "imatinib"
 /mcp chembl molecule "pembrolizumab"
+
+# SMILES 구조 분석
+/mcp smiles "CCO"                    # 에탄올
+/mcp smiles "CC(=O)OC1=CC=CC=C1C(=O)O" # 아스피린
+
+# 화학 분석 툴
 /mcp chembl target "PD-1"
+/mcp chembl activity "kinase inhibitor"
 ```
 
-### 생의학 데이터베이스 테스트
+### 📄 BioMCP 생의학 연구 데이터
 ```bash
+# 논문 검색
 /mcp bioarticle "CAR-T cell therapy development"
+/mcp bioarticle "CRISPR drug discovery"
+
+# 임상시험 검색
 /mcp biotrial "pembrolizumab combination therapy"
+/mcp biotrial "immunotherapy cancer"
+
+# 유전자 변이 검색
 /mcp biovariant "BRCA1"
+/mcp biovariant "TP53"
 ```
 
-### 통합 테스트
+### 📑 BioRxiv 프리프린트 저장소
 ```bash
-/mcp test deep
+# 최근 프리프린트 검색
+/mcp biorxiv recent 7                    # 최근 7일간 프리프린트
+/mcp biorxiv recent 14                   # 최근 14일간 프리프린트
+
+# 기간별 프리프린트 검색
+/mcp biorxiv search "2024-12-01" "2024-12-12" # 기간별 검색
+/mcp biorxiv search "2024-11-01" "2024-11-30" # 11월 전체
+
+# DOI 기반 상세 정보
+/mcp biorxiv doi "10.1101/2024.12.01.123456"  # 특정 프리프린트 정보
+/mcp biorxiv published "10.1101/2024.12.01.123456"  # 출판 버전 확인
+```
+
+### 🧠 Sequential Thinking AI 분석
+```bash
+# 복잡한 신약개발 문제 분석
+/mcp think "신약개발에서 분자 타겟 검증 과정"
+/mcp think "임상시험 실패 원인 분석"
+/mcp think "항체-약물 접합체 개발 전략"
+```
+
+### 🔍 통합 Deep Research 테스트
+```bash
+# 통합 Deep Search 테스트
+/mcp test deep                    # 권장: 모든 MCP 서버 통합 테스트
+
+# 개별 통합 테스트
+/mcp test integrated             # ChEMBL + BioMCP + Sequential
+/mcp test                        # HNSCC 예제 기본 테스트
 ```
 
 ## 🤖 LLM 모델 선택 가이드
