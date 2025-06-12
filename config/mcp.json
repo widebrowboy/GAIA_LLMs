@@ -1,0 +1,205 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "mcp/sequentialthinking"
+      ],
+      "description": "GAIA Sequential Thinking MCP Server - Dynamic and reflective problem-solving through thought sequences",
+      "capabilities": [
+        "tools"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    "gaia-sequential-thinking-npm": {
+      "command": "npx",
+      "args": [
+        "@gaia/mcp-server-sequential-thinking"
+      ],
+      "description": "GAIA Sequential Thinking MCP Server (NPM) - Dynamic and reflective problem-solving through thought sequences",
+      "capabilities": [
+        "tools"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    "biomcp": {
+      "command": "biomcp",
+      "args": [
+        "run",
+        "--mode",
+        "stdio"
+      ],
+      "description": "BiomCP - Biomedical Model Context Protocol Server for research and clinical data",
+      "capabilities": [
+        "tools"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs/mcp/biomcp/src"
+      }
+    },
+    "chembl": {
+      "command": "python",
+      "args": [
+        "/home/gaia-bt/workspace/GAIA_LLMs/mcp/chembl/simple_chembl_server.py"
+      ],
+      "description": "ChEMBL MCP Server - Chemical database access for drug discovery and molecular analysis",
+      "capabilities": [
+        "tools"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs"
+      }
+    },
+    "gaia-research": {
+      "command": "python",
+      "args": [
+        "-m", 
+        "mcp.run_server",
+        "--transport", 
+        "stdio"
+      ],
+      "description": "GAIA Research MCP Server - Comprehensive research and analysis tools",
+      "capabilities": [
+        "tools"
+      ],
+      "cwd": "/home/gaia-bt/workspace/GAIA_LLMs",
+      "env": {
+        "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs"
+      }
+    },
+    "gaia-websocket": {
+      "command": "python",
+      "args": [
+        "-m", 
+        "mcp.run_server",
+        "--transport", 
+        "websocket",
+        "--host",
+        "localhost",
+        "--port",
+        "8765"
+      ],
+      "description": "GAIA WebSocket MCP Server - WebSocket-based MCP server for web integration",
+      "capabilities": [
+        "tools"
+      ],
+      "cwd": "/home/gaia-bt/workspace/GAIA_LLMs",
+      "env": {
+        "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs"
+      }
+    }
+  },
+  "globalSettings": {
+    "timeout": 30000,
+    "retries": 3,
+    "logLevel": "info"
+  },
+  "profiles": {
+    "development": {
+      "servers": [
+        "sequential-thinking",
+        "gaia-research"
+      ],
+      "settings": {
+        "logLevel": "debug",
+        "timeout": 60000
+      }
+    },
+    "production": {
+      "servers": [
+        "sequential-thinking",
+        "gaia-research",
+        "gaia-websocket",
+        "biomcp",
+        "chembl"
+      ],
+      "settings": {
+        "logLevel": "info",
+        "timeout": 30000
+      }
+    },
+    "npm-development": {
+      "servers": [
+        "gaia-sequential-thinking-npm",
+        "gaia-research"
+      ],
+      "settings": {
+        "logLevel": "debug",
+        "timeout": 60000
+      }
+    },
+    "python-development": {
+      "servers": [
+        "sequential-thinking",
+        "gaia-research",
+        "biomcp",
+        "chembl"
+      ],
+      "settings": {
+        "logLevel": "debug",
+        "timeout": 60000
+      }
+    },
+    "chemical-research": {
+      "servers": [
+        "chembl",
+        "biomcp",
+        "sequential-thinking"
+      ],
+      "settings": {
+        "logLevel": "info",
+        "timeout": 45000
+      }
+    },
+    "biomedical-research": {
+      "servers": [
+        "biomcp",
+        "gaia-research"
+      ],
+      "settings": {
+        "logLevel": "info",
+        "timeout": 45000
+      }
+    },
+    "research-only": {
+      "servers": [
+        "gaia-research"
+      ],
+      "settings": {
+        "logLevel": "info",
+        "timeout": 45000
+      }
+    },
+    "thinking-only": {
+      "servers": [
+        "sequential-thinking"
+      ],
+      "settings": {
+        "logLevel": "debug",
+        "timeout": 60000
+      }
+    },
+    "thinking-npm": {
+      "servers": [
+        "gaia-sequential-thinking-npm"
+      ],
+      "settings": {
+        "logLevel": "debug",
+        "timeout": 60000
+      }
+    }
+  },
+  "schema": {
+    "version": "1.0.0",
+    "description": "GAIA LLMs MCP Configuration",
+    "author": "GAIA Team",
+    "repository": "https://github.com/your-org/GAIA_LLMs"
+  }
+}

@@ -1,0 +1,48 @@
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt websockets
+
+# Copy application code
+COPY src/ ./src/
+COPY mcp/ ./mcp/
+COPY *.py ./
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash mcp
+RUN chown -R mcp:mcp /app
+USER mcp
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV MCP_HOST=0.0.0.0
+ENV MCP_PORT=8765
+
+# Expose port
+EXPOSE 8765
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD python -c "import socket; s=socket.socket(); s.connect(('localhost', 8765)); s.close()" || exit 1
+
+# Default command
+CMD ["python", "-m", "mcp.run_server", "--transport", "websocket", "--host", "0.0.0.0", "--port", "8765"]
+
+# Metadata
+LABEL org.opencontainers.image.title="GAIA WebSocket MCP Server"
+LABEL org.opencontainers.image.description="WebSocket gateway for GAIA MCP servers"
+LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.authors="GAIA Team"
+LABEL org.opencontainers.image.source="https://github.com/your-org/GAIA_LLMs"
+LABEL org.opencontainers.image.licenses="MIT"

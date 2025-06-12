@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # GAIA Sequential Thinking MCP Server
+  sequential-thinking:
+    build:
+      context: ./mcp/sequential-thinking
+      dockerfile: Dockerfile
+    image: mcp/sequentialthinking:latest
+    container_name: gaia-sequential-thinking
+    stdin_open: true
+    tty: true
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    labels:
+      - "mcp.server=sequential-thinking"
+      - "mcp.version=0.1.0"
+      - "mcp.capabilities=tools"
+
+  # GAIA Research MCP Server (Python)
+  research-server:
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile.research
+    image: mcp/gaia-research:latest
+    container_name: gaia-research
+    stdin_open: true
+    tty: true
+    environment:
+      - PYTHONPATH=/app
+      - LOG_LEVEL=info
+    volumes:
+      - ./research_outputs:/app/research_outputs
+      - ./src:/app/src:ro
+      - ./mcp:/app/mcp:ro
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    labels:
+      - "mcp.server=research"
+      - "mcp.version=0.1.0"
+      - "mcp.capabilities=tools"
+
+  # WebSocket MCP Gateway (Optional)
+  websocket-gateway:
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile.websocket
+    image: mcp/gaia-websocket:latest
+    container_name: gaia-websocket
+    ports:
+      - "8765:8765"
+    environment:
+      - PYTHONPATH=/app
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8765
+      - LOG_LEVEL=info
+    volumes:
+      - ./src:/app/src:ro
+      - ./mcp:/app/mcp:ro
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    labels:
+      - "mcp.server=websocket-gateway"
+      - "mcp.version=0.1.0"
+      - "mcp.capabilities=tools"
+    depends_on:
+      - sequential-thinking
+      - research-server
+
+networks:
+  mcp-network:
+    driver: bridge
+    name: gaia-mcp-network
+
+volumes:
+  research-data:
+    name: gaia-research-data

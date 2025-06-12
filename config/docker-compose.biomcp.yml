@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # BiomCP MCP Server
+  biomcp-server:
+    build:
+      context: ./mcp/biomcp
+      dockerfile: Dockerfile
+    image: biomcp/server:latest
+    container_name: gaia-biomcp
+    stdin_open: true
+    tty: true
+    environment:
+      - PYTHONPATH=/app/src
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    labels:
+      - "mcp.server=biomcp"
+      - "mcp.version=0.1.9"
+      - "mcp.capabilities=tools"
+      - "mcp.type=biomedical"
+
+  # BiomCP Worker Mode (Optional HTTP API)
+  biomcp-worker:
+    build:
+      context: ./mcp/biomcp
+      dockerfile: Dockerfile
+    image: biomcp/server:latest
+    container_name: gaia-biomcp-worker
+    ports:
+      - "8001:8000"
+    environment:
+      - PYTHONPATH=/app/src
+      - LOG_LEVEL=info
+    command: ["biomcp", "run", "--mode", "worker"]
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    labels:
+      - "mcp.server=biomcp-worker"
+      - "mcp.version=0.1.9"
+      - "mcp.capabilities=tools,http"
+      - "mcp.type=biomedical"
+    depends_on:
+      - biomcp-server
+
+  # GAIA Research + BiomCP Integration
+  gaia-research-biomcp:
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile.research
+    image: mcp/gaia-research-biomcp:latest
+    container_name: gaia-research-biomcp
+    stdin_open: true
+    tty: true
+    environment:
+      - PYTHONPATH=/app
+      - LOG_LEVEL=info
+      - BIOMCP_ENABLED=true
+    volumes:
+      - ./research_outputs:/app/research_outputs
+      - ./src:/app/src:ro
+      - ./mcp:/app/mcp:ro
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    labels:
+      - "mcp.server=gaia-research-biomcp"
+      - "mcp.version=0.1.0"
+      - "mcp.capabilities=tools,research,biomedical"
+    depends_on:
+      - biomcp-server
+
+networks:
+  mcp-network:
+    driver: bridge
+    name: gaia-biomcp-network
+
+volumes:
+  biomcp-cache:
+    name: gaia-biomcp-cache
+  research-data:
+    name: gaia-research-biomcp-data
