@@ -134,6 +134,32 @@
       "env": {
         "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs"
       }
+    },
+    "pubmed-mcp": {
+      "command": "python",
+      "args": [
+        "/home/gaia-bt/workspace/GAIA_LLMs/mcp/pubmed/pubmed_mcp.py"
+      ],
+      "description": "PubMed MCP Server - Access to PubMed research database for scientific literature search",
+      "capabilities": [
+        "tools"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs"
+      }
+    },
+    "clinicaltrials-mcp": {
+      "command": "python",
+      "args": [
+        "/home/gaia-bt/workspace/GAIA_LLMs/mcp/clinicaltrials/clinicaltrials_mcp.py"
+      ],
+      "description": "ClinicalTrials.gov MCP Server - Access to clinical trials database for research and trial information",
+      "capabilities": [
+        "tools"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs"
+      }
     }
   },
   "globalSettings": {
@@ -161,7 +187,9 @@
         "chembl",
         "drugbank-mcp",
         "opentargets-mcp",
-        "biorxiv-mcp"
+        "biorxiv-mcp",
+        "pubmed-mcp",
+        "clinicaltrials-mcp"
       ],
       "settings": {
         "logLevel": "info",
@@ -186,7 +214,9 @@
         "chembl",
         "drugbank-mcp",
         "opentargets-mcp",
-        "biorxiv-mcp"
+        "biorxiv-mcp",
+        "pubmed-mcp",
+        "clinicaltrials-mcp"
       ],
       "settings": {
         "logLevel": "debug",
@@ -207,7 +237,9 @@
     "biomedical-research": {
       "servers": [
         "biomcp",
-        "gaia-research"
+        "gaia-research",
+        "pubmed-mcp",
+        "clinicaltrials-mcp"
       ],
       "settings": {
         "logLevel": "info",
@@ -248,6 +280,8 @@
         "chembl",
         "biomcp",
         "biorxiv-mcp",
+        "pubmed-mcp",
+        "clinicaltrials-mcp",
         "sequential-thinking"
       ],
       "settings": {

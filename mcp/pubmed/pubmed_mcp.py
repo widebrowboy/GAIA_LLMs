@@ -7,379 +7,359 @@ Provides access to PubMed research database for scientific literature search.
 Supports paper search, abstract retrieval, author searches, and related articles.
 """
 
-import asyncio
-import json
 import os
-import logging
-import argparse
-from datetime import datetime
-from typing import Optional, Dict, Any, List, Union
+import sys
+from typing import Any, List, Optional
 import httpx
+from pathlib import Path
 
-# FastMCP imports
+# Add the parent directory to sys.path to import from mcp package
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 try:
     from mcp.server.fastmcp import FastMCP
-    from mcp.server.stdio import stdio_server
 except ImportError:
-    # Fallback if FastMCP is not available
-    print("Warning: FastMCP not available. Using basic MCP implementation.")
-    FastMCP = None
-    stdio_server = None
+    # Try alternative import path
+    try:
+        from mcp.server.models import Tool, ToolResult
+        from mcp.server import Server
+        from mcp.server.stdio import stdio_server
+        
+        # Create a simple FastMCP wrapper
+        class FastMCP:
+            def __init__(self, name: str, working_dir: str = None):
+                self.name = name
+                self.working_dir = working_dir
+                self.server = Server(name)
+                self.tools = []
+                
+            def tool(self):
+                def decorator(func):
+                    # Register the tool with the server
+                    tool = Tool(
+                        name=func.__name__,
+                        description=func.__doc__ or "",
+                        input_schema={
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    )
+                    self.tools.append((tool, func))
+                    return func
+                return decorator
+                
+            async def run(self):
+                # Run the server
+                from mcp.server.stdio import stdio_server
+                async with stdio_server() as (read_stream, write_stream):
+                    await self.server.run(read_stream, write_stream)
+    except ImportError:
+        print("Error: Could not import MCP server components")
+        sys.exit(1)
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Initialize FastMCP server
+mcp = FastMCP("pubmed-mcp", working_dir=str(Path(__file__).parent))
 
+# Constants
+ENTREZ_BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+DATABASE = "pubmed"
+TOOL_NAME = "GAIA-MCP-PubMed"
+EMAIL = "research@gaia-bt.com"  # Required by NCBI
 
-class PubMedMCPServer:
-    """PubMed MCP Server implementation for accessing scientific literature"""
+async def make_entrez_request(endpoint: str, params: dict, is_json: bool = True) -> Any:
+    """Make a request to the Entrez API with proper error handling."""
+    url = f"{ENTREZ_BASE_URL}/{endpoint}.fcgi"
     
-    def __init__(self, server_name: str = "pubmed-mcp"):
-        self.server_name = server_name
-        self.base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
-        self.client = None
-        self.tool_name = "GAIA-MCP-PubMed"
-        self.email = "research@gaia-bt.com"  # Required by NCBI
-        
-        # Initialize FastMCP if available
-        if FastMCP:
-            self.app = FastMCP(server_name)
-            self._register_tools()
-        else:
-            self.app = None
-            logger.warning("FastMCP not available. Server may not function properly.")
+    # Add required parameters
+    params.update({
+        "db": DATABASE,
+        "tool": TOOL_NAME,
+        "email": EMAIL,
+    })
     
-    async def __aenter__(self):
-        """Async context manager entry"""
-        self.client = httpx.AsyncClient(timeout=30.0)
-        return self
+    if is_json:
+        params["retmode"] = "json"
     
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit"""
-        if self.client:
-            await self.client.aclose()
-    
-    def _register_tools(self):
-        """Register tools with FastMCP if available"""
-        if not self.app:
-            return
-        
-        @self.app.tool()
-        async def search_pubmed(query: str, max_results: int = 20) -> str:
-            """
-            Search PubMed articles by query.
-            
-            Args:
-                query: Search query for PubMed articles
-                max_results: Maximum number of results to return (default: 20)
-                
-            Returns:
-                JSON string with search results
-            """
-            return await self.search_pubmed(query, max_results)
-        
-        @self.app.tool()
-        async def get_pubmed_abstract(pmid: str) -> str:
-            """
-            Get abstract for a specific PubMed article.
-            
-            Args:
-                pmid: PubMed ID of the article
-                
-            Returns:
-                JSON string with article abstract and details
-            """
-            return await self.get_pubmed_abstract(pmid)
-        
-        @self.app.tool()
-        async def find_by_author(author: str, max_results: int = 15) -> str:
-            """
-            Find articles by specific author.
-            
-            Args:
-                author: Author name to search for
-                max_results: Maximum number of results to return (default: 15)
-                
-            Returns:
-                JSON string with author's publications
-            """
-            return await self.find_by_author(author, max_results)
-        
-        @self.app.tool()
-        async def get_related_articles(pmid: str, max_results: int = 10) -> str:
-            """
-            Get articles related to a specific publication.
-            
-            Args:
-                pmid: PubMed ID of the reference article
-                max_results: Maximum number of related articles (default: 10)
-                
-            Returns:
-                JSON string with related articles
-            """
-            return await self.get_related_articles(pmid, max_results)
-    
-    async def _make_request(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Make HTTP request to NCBI Entrez API"""
-        if not self.client:
-            raise RuntimeError("HTTP client not initialized. Use async context manager.")
-        
-        url = f"{self.base_url}/{endpoint}"
-        
-        # Add required parameters
-        params.update({
-            'tool': self.tool_name,
-            'email': self.email,
-            'retmode': 'json'
-        })
-        
+    async with httpx.AsyncClient() as client:
         try:
-            response = await self.client.get(url, params=params)
+            response = await client.get(url, params=params, timeout=30.0)
             response.raise_for_status()
-            return response.json()
-        
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error {e.response.status_code}: {e.response.text}")
-            raise
-        except httpx.RequestError as e:
-            logger.error(f"Request error: {e}")
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {e}")
-            raise
-    
-    async def search_pubmed(self, query: str, max_results: int = 20) -> str:
-        """Search PubMed articles by query"""
-        try:
-            # Step 1: Search for article IDs
-            search_params = {
-                'db': 'pubmed',
-                'term': query,
-                'retmax': max_results,
-                'sort': 'relevance'
-            }
             
-            search_result = await self._make_request('esearch.fcgi', search_params)
-            
-            if not search_result.get('esearchresult', {}).get('idlist'):
-                return json.dumps({"error": "No articles found for query", "query": query})
-            
-            pmids = search_result['esearchresult']['idlist']
-            
-            # Step 2: Get article summaries
-            summary_params = {
-                'db': 'pubmed',
-                'id': ','.join(pmids)
-            }
-            
-            summary_result = await self._make_request('esummary.fcgi', summary_params)
-            
-            # Format results
-            articles = []
-            for pmid in pmids:
-                if pmid in summary_result.get('result', {}):
-                    article_data = summary_result['result'][pmid]
-                    
-                    # Extract authors
-                    authors = []
-                    if 'authors' in article_data:
-                        authors = [author['name'] for author in article_data['authors'][:3]]  # First 3 authors
-                        if len(article_data['authors']) > 3:
-                            authors.append('et al.')
-                    
-                    article = {
-                        'pmid': pmid,
-                        'title': article_data.get('title', 'No title'),
-                        'authors': authors,
-                        'journal': article_data.get('source', 'Unknown journal'),
-                        'pub_date': article_data.get('pubdate', 'Unknown date'),
-                        'doi': article_data.get('elocationid', '').replace('doi: ', '') if 'doi:' in article_data.get('elocationid', '') else None,
-                        'pubmed_url': f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-                        'abstract_available': 'hasabstract' in article_data and article_data['hasabstract'] == 1
-                    }
-                    articles.append(article)
-            
-            return json.dumps({
-                'query': query,
-                'total_found': len(articles),
-                'articles': articles
-            }, indent=2)
-        
+            if is_json:
+                return response.json()
+            return response.text
         except Exception as e:
-            logger.error(f"Error searching PubMed: {e}")
-            return json.dumps({"error": f"Failed to search PubMed: {str(e)}"})
-    
-    async def get_pubmed_abstract(self, pmid: str) -> str:
-        """Get abstract for a specific PubMed article"""
-        try:
-            # Get article details including abstract
-            fetch_params = {
-                'db': 'pubmed',
-                'id': pmid,
-                'rettype': 'abstract',
-                'retmode': 'text'
-            }
-            
-            # Get abstract in text format
-            url = f"{self.base_url}/efetch.fcgi"
-            params = {
-                'tool': self.tool_name,
-                'email': self.email,
-                'db': 'pubmed',
-                'id': pmid,
-                'rettype': 'abstract',
-                'retmode': 'text'
-            }
-            
-            response = await self.client.get(url, params=params)
-            response.raise_for_status()
-            abstract_text = response.text
-            
-            # Also get summary for metadata
-            summary_params = {
-                'db': 'pubmed',
-                'id': pmid
-            }
-            
-            summary_result = await self._make_request('esummary.fcgi', summary_params)
-            
-            if pmid in summary_result.get('result', {}):
-                article_data = summary_result['result'][pmid]
-                
-                # Extract authors
-                authors = []
-                if 'authors' in article_data:
-                    authors = [author['name'] for author in article_data['authors']]
-                
-                result = {
-                    'pmid': pmid,
-                    'title': article_data.get('title', 'No title'),
-                    'authors': authors,
-                    'journal': article_data.get('source', 'Unknown journal'),
-                    'pub_date': article_data.get('pubdate', 'Unknown date'),
-                    'doi': article_data.get('elocationid', '').replace('doi: ', '') if 'doi:' in article_data.get('elocationid', '') else None,
-                    'abstract': abstract_text.strip() if abstract_text.strip() else 'Abstract not available',
-                    'pubmed_url': f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
-                }
-                
-                return json.dumps(result, indent=2)
-            else:
-                return json.dumps({"error": f"Article with PMID {pmid} not found"})
-        
-        except Exception as e:
-            logger.error(f"Error getting abstract: {e}")
-            return json.dumps({"error": f"Failed to get abstract: {str(e)}"})
-    
-    async def find_by_author(self, author: str, max_results: int = 15) -> str:
-        """Find articles by specific author"""
-        try:
-            # Format author query
-            author_query = f"{author}[Author]"
-            
-            return await self.search_pubmed(author_query, max_results)
-        
-        except Exception as e:
-            logger.error(f"Error finding articles by author: {e}")
-            return json.dumps({"error": f"Failed to find articles by author: {str(e)}"})
-    
-    async def get_related_articles(self, pmid: str, max_results: int = 10) -> str:
-        """Get articles related to a specific publication"""
-        try:
-            # Use ELink to find related articles
-            link_params = {
-                'dbfrom': 'pubmed',
-                'db': 'pubmed',
-                'id': pmid,
-                'cmd': 'neighbor',
-                'linkname': 'pubmed_pubmed'
-            }
-            
-            link_result = await self._make_request('elink.fcgi', link_params)
-            
-            if not link_result.get('linksets'):
-                return json.dumps({"error": f"No related articles found for PMID {pmid}"})
-            
-            # Extract related PMIDs
-            related_pmids = []
-            for linkset in link_result['linksets']:
-                if 'linksetdbs' in linkset:
-                    for linksetdb in linkset['linksetdbs']:
-                        if 'links' in linksetdb:
-                            related_pmids.extend(linksetdb['links'][:max_results])
-            
-            if not related_pmids:
-                return json.dumps({"error": f"No related articles found for PMID {pmid}"})
-            
-            # Get summaries for related articles
-            summary_params = {
-                'db': 'pubmed',
-                'id': ','.join(map(str, related_pmids[:max_results]))
-            }
-            
-            summary_result = await self._make_request('esummary.fcgi', summary_params)
-            
-            # Format results
-            related_articles = []
-            for related_pmid in map(str, related_pmids[:max_results]):
-                if related_pmid in summary_result.get('result', {}):
-                    article_data = summary_result['result'][related_pmid]
-                    
-                    authors = []
-                    if 'authors' in article_data:
-                        authors = [author['name'] for author in article_data['authors'][:3]]
-                        if len(article_data['authors']) > 3:
-                            authors.append('et al.')
-                    
-                    article = {
-                        'pmid': related_pmid,
-                        'title': article_data.get('title', 'No title'),
-                        'authors': authors,
-                        'journal': article_data.get('source', 'Unknown journal'),
-                        'pub_date': article_data.get('pubdate', 'Unknown date'),
-                        'pubmed_url': f"https://pubmed.ncbi.nlm.nih.gov/{related_pmid}/"
-                    }
-                    related_articles.append(article)
-            
-            return json.dumps({
-                'reference_pmid': pmid,
-                'total_related': len(related_articles),
-                'related_articles': related_articles
-            }, indent=2)
-        
-        except Exception as e:
-            logger.error(f"Error getting related articles: {e}")
-            return json.dumps({"error": f"Failed to get related articles: {str(e)}"})
+            return {"error": str(e)} if is_json else f"Error: {str(e)}"
 
+@mcp.tool()
+async def search_pubmed(query: str, max_results: int = 10) -> str:
+    """Search PubMed for articles matching the query.
+    
+    Args:
+        query: Search query in PubMed syntax
+        max_results: Maximum number of results to return (default: 10)
+    """
+    # First use ESearch to get IDs
+    search_params = {
+        "term": query,
+        "retmax": max_results,
+        "sort": "relevance",
+        "usehistory": "y"
+    }
+    
+    search_result = await make_entrez_request("esearch", search_params)
+    
+    if isinstance(search_result, dict) and "error" in search_result:
+        return f"Error searching PubMed: {search_result['error']}"
+    
+    if "esearchresult" not in search_result:
+        return "No search results found"
+    
+    result = search_result["esearchresult"]
+    id_list = result.get("idlist", [])
+    
+    if not id_list:
+        return f"No articles found for query: {query}"
+    
+    # Now fetch summaries for these IDs
+    summary_params = {
+        "id": ",".join(id_list),
+        "retmax": max_results
+    }
+    
+    summary_result = await make_entrez_request("esummary", summary_params)
+    
+    if isinstance(summary_result, dict) and "error" in summary_result:
+        return f"Error fetching summaries: {summary_result['error']}"
+    
+    # Format the results
+    output = [f"Found {result.get('count', 0)} articles (showing top {len(id_list)}):"]
+    
+    if "result" in summary_result:
+        for pmid in id_list:
+            if pmid in summary_result["result"]:
+                article = summary_result["result"][pmid]
+                output.append(f"\n{'-'*60}")
+                output.append(f"PMID: {pmid}")
+                output.append(f"Title: {article.get('title', 'N/A')}")
+                
+                # Get authors
+                authors = article.get("authors", [])
+                if authors:
+                    author_names = [f"{a.get('name', '')}" for a in authors[:3]]
+                    if len(authors) > 3:
+                        author_names.append("et al.")
+                    output.append(f"Authors: {', '.join(author_names)}")
+                
+                output.append(f"Journal: {article.get('source', 'N/A')}")
+                output.append(f"Date: {article.get('pubdate', 'N/A')}")
+                
+                # Add DOI if available
+                doi = article.get("elocationid", "")
+                if doi and "doi" in doi:
+                    output.append(f"DOI: {doi}")
+    
+    return "\n".join(output)
 
-async def main():
-    """Main function to run the PubMed MCP server"""
-    parser = argparse.ArgumentParser(description="PubMed MCP Server")
-    parser.add_argument("--name", default="pubmed-mcp", help="Server name")
-    parser.add_argument("--working-directory", help="Working directory")
+@mcp.tool()
+async def get_article_details(pmid: str) -> str:
+    """Get detailed information about a specific PubMed article.
     
-    args = parser.parse_args()
+    Args:
+        pmid: PubMed ID of the article
+    """
+    # Fetch article details
+    params = {
+        "id": pmid,
+        "rettype": "abstract",
+        "retmode": "text"
+    }
     
-    if args.working_directory:
-        os.chdir(args.working_directory)
+    abstract_text = await make_entrez_request("efetch", params, is_json=False)
     
-    if not FastMCP or not stdio_server:
-        logger.error("FastMCP or stdio_server not available. Cannot start server.")
-        return
+    if "Error:" in abstract_text:
+        return abstract_text
     
-    # Create and start the server
-    async with PubMedMCPServer(args.name) as server:
-        logger.info(f"Starting PubMed MCP Server: {args.name}")
+    # Also get structured data
+    summary_params = {"id": pmid}
+    summary_result = await make_entrez_request("esummary", summary_params)
+    
+    output = [f"Article Details for PMID: {pmid}", "="*60]
+    
+    # Add structured data if available
+    if isinstance(summary_result, dict) and "result" in summary_result and pmid in summary_result["result"]:
+        article = summary_result["result"][pmid]
+        output.append(f"\nTitle: {article.get('title', 'N/A')}")
         
-        # Run the server
-        async with stdio_server() as (read_stream, write_stream):
-            await server.app.run(read_stream, write_stream)
+        # Full author list
+        authors = article.get("authors", [])
+        if authors:
+            author_names = [f"{a.get('name', '')}" for a in authors]
+            output.append(f"\nAuthors: {', '.join(author_names)}")
+        
+        output.append(f"\nJournal: {article.get('source', 'N/A')}")
+        output.append(f"Publication Date: {article.get('pubdate', 'N/A')}")
+        output.append(f"Volume: {article.get('volume', 'N/A')}, Issue: {article.get('issue', 'N/A')}, Pages: {article.get('pages', 'N/A')}")
+        
+        # Add identifiers
+        output.append(f"\nPMID: {pmid}")
+        doi = article.get("elocationid", "")
+        if doi:
+            output.append(f"DOI: {doi}")
+        
+        # Add PubMed Central ID if available
+        pmc = article.get("pmcid", "")
+        if pmc:
+            output.append(f"PMC: {pmc}")
+    
+    # Add abstract
+    output.append(f"\n{'='*60}\nAbstract and Full Text:\n{'='*60}\n")
+    output.append(abstract_text)
+    
+    return "\n".join(output)
 
+@mcp.tool()
+async def find_related_articles(pmid: str, max_results: int = 10) -> str:
+    """Find articles related to a specific PubMed article.
+    
+    Args:
+        pmid: PubMed ID of the reference article
+        max_results: Maximum number of related articles to return
+    """
+    # Use ELink to find related articles
+    params = {
+        "dbfrom": DATABASE,
+        "id": pmid,
+        "cmd": "neighbor_score"
+    }
+    
+    link_result = await make_entrez_request("elink", params)
+    
+    if isinstance(link_result, dict) and "error" in link_result:
+        return f"Error finding related articles: {link_result['error']}"
+    
+    # Extract related PMIDs
+    related_ids = []
+    if "linksets" in link_result:
+        for linkset in link_result["linksets"]:
+            if "linksetdbs" in linkset:
+                for db in linkset["linksetdbs"]:
+                    if db.get("dbto") == DATABASE and "links" in db:
+                        related_ids.extend(db["links"][:max_results])
+                        break
+    
+    if not related_ids:
+        return f"No related articles found for PMID: {pmid}"
+    
+    # Fetch summaries for related articles
+    summary_params = {
+        "id": ",".join(related_ids[:max_results])
+    }
+    
+    summary_result = await make_entrez_request("esummary", summary_params)
+    
+    output = [f"Related articles for PMID {pmid} (top {len(related_ids)}):"]
+    
+    if "result" in summary_result:
+        for rid in related_ids:
+            if rid in summary_result["result"]:
+                article = summary_result["result"][rid]
+                output.append(f"\n{'-'*40}")
+                output.append(f"PMID: {rid}")
+                output.append(f"Title: {article.get('title', 'N/A')}")
+                
+                # Short author list
+                authors = article.get("authors", [])
+                if authors:
+                    first_author = authors[0].get("name", "")
+                    if len(authors) > 1:
+                        output.append(f"Authors: {first_author} et al.")
+                    else:
+                        output.append(f"Author: {first_author}")
+                
+                output.append(f"Journal: {article.get('source', 'N/A')} ({article.get('pubdate', 'N/A')})")
+    
+    return "\n".join(output)
+
+@mcp.tool()
+async def search_by_author(author_name: str, max_results: int = 10) -> str:
+    """Search PubMed for articles by a specific author.
+    
+    Args:
+        author_name: Name of the author to search for
+        max_results: Maximum number of results to return
+    """
+    # Format author name for PubMed search
+    query = f"{author_name}[Author]"
+    return await search_pubmed(query, max_results)
+
+@mcp.tool()
+async def get_citations(pmid: str) -> str:
+    """Get articles that cite a specific PubMed article.
+    
+    Args:
+        pmid: PubMed ID of the article
+    """
+    # Use ELink to find citing articles
+    params = {
+        "dbfrom": DATABASE,
+        "linkname": "pubmed_pubmed_citedin",
+        "id": pmid
+    }
+    
+    link_result = await make_entrez_request("elink", params)
+    
+    if isinstance(link_result, dict) and "error" in link_result:
+        return f"Error finding citations: {link_result['error']}"
+    
+    # Extract citing PMIDs
+    citing_ids = []
+    if "linksets" in link_result:
+        for linkset in link_result["linksets"]:
+            if "linksetdbs" in linkset:
+                for db in linkset["linksetdbs"]:
+                    if "links" in db:
+                        citing_ids.extend(db["links"])
+                        break
+    
+    if not citing_ids:
+        return f"No citations found for PMID: {pmid} (or citation data not available)"
+    
+    # Limit results
+    citing_ids = citing_ids[:20]  # Top 20 citations
+    
+    # Fetch summaries
+    summary_params = {
+        "id": ",".join(citing_ids)
+    }
+    
+    summary_result = await make_entrez_request("esummary", summary_params)
+    
+    output = [f"Articles citing PMID {pmid} (found {len(citing_ids)} citations):"]
+    
+    if "result" in summary_result:
+        for cid in citing_ids:
+            if cid in summary_result["result"]:
+                article = summary_result["result"][cid]
+                output.append(f"\n{'-'*40}")
+                output.append(f"PMID: {cid}")
+                output.append(f"Title: {article.get('title', 'N/A')}")
+                output.append(f"Journal: {article.get('source', 'N/A')} ({article.get('pubdate', 'N/A')})")
+    
+    return "\n".join(output)
 
 if __name__ == "__main__":
+    import asyncio
+    
+    print(f"Starting PubMed MCP Server...")
+    print(f"Server name: {mcp.name}")
+    print(f"Working directory: {mcp.working_dir}")
+    
     try:
-        asyncio.run(main())
+        asyncio.run(mcp.run())
     except KeyboardInterrupt:
-        logger.info("Server stopped by user")
+        print("\nServer stopped.")
     except Exception as e:
-        logger.error(f"Server error: {e}")
-        raise
+        print(f"Error running server: {e}")
+        sys.exit(1)

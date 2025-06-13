@@ -1,6 +1,6 @@
 # GAIA-BT 신약개발 연구 시스템
 
-Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 연구 및 분석 시스템입니다. GPU 가속, 병렬 처리, 피드백 루프, 그리고 ChEMBL/PubMed/PubTator3/ClinicalTrials.gov/Sequential Thinking 통합을 통해 높은 품질의 과학적 근거 기반 신약개발 분석을 제공합니다.
+Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 연구 및 분석 시스템입니다. GPU 가속, 병렬 처리, 피드백 루프, 그리고 DrugBank/OpenTargets/ChEMBL/PubMed/ClinicalTrials.gov/BioRxiv/Sequential Thinking 통합을 통해 높은 품질의 과학적 근거 기반 신약개발 분석을 제공합니다.
 
 <div align="center">
 
@@ -17,7 +17,7 @@ Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 연구 및 �
 - **약물 상호작용**: 분자 수준 약물-타겟 상호작용 연구
 
 ### 고성능 연구 플랫폼
-- **통합 MCP 서버**: DrugBank, OpenTargets, ChEMBL, BioRxiv/medRxiv, PubMed/PubTator3, ClinicalTrials.gov, Sequential Thinking
+- **통합 MCP 서버**: DrugBank, OpenTargets, ChEMBL, PubMed, ClinicalTrials.gov, BioMCP, BioRxiv/medRxiv, Sequential Thinking
 - **스마트 Deep Search**: 질문 키워드 분석 기반 적응형 다중 데이터베이스 검색
 - **실시간 분석**: 최신 논문, 임상시험, 약물-타겟 상호작용 데이터 실시간 조회
 - **AI 통합 분석**: Sequential Thinking + 다중 데이터소스 조합으로 포괄적 연구 수행
@@ -142,6 +142,20 @@ python main.py -i
 /mcp chembl molecule <분자명>         # 분자 정보 검색
 /mcp smiles <SMILES>                 # SMILES 구조 분석
 
+# PubMed 과학 문헌 데이터베이스
+/mcp pubmed search <검색어> <개수>     # 논문 검색
+/mcp pubmed author <저자명> <개수>     # 저자별 논문 검색
+/mcp pubmed details <PMID>           # 논문 상세 정보
+/mcp pubmed related <PMID> <개수>     # 관련 논문 검색
+/mcp pubmed citations <PMID>         # 인용 논문 검색
+
+# ClinicalTrials.gov 임상시험 데이터베이스
+/mcp clinical search <질병> <상태> <개수>  # 임상시험 검색
+/mcp clinical details <NCT_ID>            # 시험 상세 정보
+/mcp clinical sponsor <스폰서명> <개수>     # 스폰서별 시험 검색
+/mcp clinical condition <조건> <개수>      # 조건별 시험 검색
+/mcp clinical results <NCT_ID>            # 시험 결과 조회
+
 # BioMCP 생의학 데이터베이스
 /mcp bioarticle <검색어>              # 논문 검색
 /mcp biotrial <조건>                 # 임상시험 검색
@@ -153,6 +167,9 @@ python main.py -i
 
 # Sequential Thinking AI 추론
 /mcp think <문제>                    # 단계별 추론 분석
+
+# Deep Research (새로운 기능)
+/mcp deep_research <주제>            # 통합 심층 연구 (중복 제거 포함)
 
 # 통합 테스트
 /mcp test deep                       # Deep Search 통합 테스트
@@ -172,7 +189,7 @@ python main.py -f questions.json -d 3 -w 2
 
 ## 🔬 MCP 통합 기능
 
-GAIA-BT는 7개의 전문 MCP 서버를 통합하여 포괄적인 신약개발 연구를 지원합니다.
+GAIA-BT는 9개의 전문 MCP 서버를 통합하여 포괄적인 신약개발 연구를 지원합니다.
 
 ### 1. 💊 DrugBank - 약물 데이터베이스
 - **약물 검색 및 정보**: 15,000+ 승인된 약물 및 실험적 화합물
@@ -215,11 +232,42 @@ GAIA-BT는 7개의 전문 MCP 서버를 통합하여 포괄적인 신약개발 �
 /mcp smiles "CC(=O)OC1=CC=CC=C1C(=O)O"  # SMILES 구조 분석
 ```
 
-### 4. 📄 BioMCP - 생의학 데이터베이스 통합
-- **PubMed & PubTator3**: 최신 연구 논문 및 생의학 문헌 검색
-- **ClinicalTrials.gov**: 임상시험 데이터 및 치료법 정보
+### 4. 📄 PubMed - 과학 문헌 데이터베이스
+- **논문 검색**: 35M+ 의학 및 생명과학 논문 검색
+- **저자 기반 검색**: 특정 연구자의 논문 검색
+- **관련 논문 추천**: 논문 간 연관성 분석
+- **인용 분석**: 논문 인용 관계 추적
+- **상세 정보**: 초록, 저자, 저널, DOI 등 완전한 메타데이터
+
+```bash
+# PubMed 명령어 예제
+/mcp pubmed search "immunotherapy cancer" 10    # 면역치료 암 논문 검색
+/mcp pubmed author "John Smith" 5               # 저자별 논문 검색
+/mcp pubmed details "PMID:12345678"             # 논문 상세 정보
+/mcp pubmed related "PMID:12345678" 5           # 관련 논문 검색
+/mcp pubmed citations "PMID:12345678"           # 인용 논문 검색
+```
+
+### 5. 🏥 ClinicalTrials.gov - 임상시험 데이터베이스
+- **임상시험 검색**: 450,000+ 전 세계 임상시험 정보
+- **조건별 검색**: 질병/조건별 임상시험 현황
+- **스폰서별 검색**: 제약회사별 임상시험 추적
+- **시험 단계 분석**: Phase I/II/III/IV 단계별 분석
+- **결과 데이터**: 완료된 임상시험의 결과 및 부작용 정보
+
+```bash
+# ClinicalTrials 명령어 예제
+/mcp clinical search "breast cancer" "RECRUITING" 10  # 모집 중인 유방암 시험
+/mcp clinical details "NCT12345678"                   # 시험 상세 정보
+/mcp clinical sponsor "Pfizer" 5                      # 스폰서별 시험 검색
+/mcp clinical condition "Alzheimer" 10                # 조건별 시험 검색
+/mcp clinical results "NCT12345678"                   # 시험 결과 조회
+```
+
+### 6. 📄 BioMCP - 생의학 데이터베이스 통합
 - **유전체 변이 분석**: CIViC, ClinVar, COSMIC, dbSNP 등
 - **바이오마커**: 진단, 예후, 치료 반응 바이오마커
+- **통합 검색**: 다중 데이터베이스 통합 검색
 
 ```bash
 # BioMCP 명령어 예제
@@ -227,7 +275,7 @@ GAIA-BT는 7개의 전문 MCP 서버를 통합하여 포괄적인 신약개발 �
 /mcp biotrial "breast cancer"           # 임상시험 검색
 ```
 
-### 5. 📑 BioRxiv - 프리프린트 논문 저장소
+### 7. 📑 BioRxiv - 프리프린트 논문 저장소
 - **bioRxiv & medRxiv**: 최신 프리프린트 논문 및 연구 동향
 - **출판 전 연구**: 출판 전 최신 연구 결과 접근
 - **신속한 정보**: 빠른 과학적 정보 획득 및 동향 파악
@@ -240,7 +288,7 @@ GAIA-BT는 7개의 전문 MCP 서버를 통합하여 포괄적인 신약개발 �
 /mcp biorxiv doi "10.1101/2024.12.01.123456"   # DOI 상세 정보
 ```
 
-### 6. 🧠 Sequential Thinking - AI 추론
+### 8. 🧠 Sequential Thinking - AI 추론
 - **문제 분해**: 복잡한 연구 질문을 단계별로 분석
 - **논리적 추론**: 체계적 사고 과정 추적
 - **대안 탐색**: 다양한 접근법 검토
@@ -251,16 +299,28 @@ GAIA-BT는 7개의 전문 MCP 서버를 통합하여 포괄적인 신약개발 �
 /mcp think "새로운 항암제 개발 전략"   # 단계별 사고 분석
 ```
 
-### 7. 📊 통합 Deep Search
+### 9. 📊 통합 Deep Search
 질문 키워드를 자동 분석하여 관련 MCP 서버들을 지능적으로 선택하고 통합 검색을 수행합니다.
 
 **키워드 기반 자동 매핑:**
-- **약물 관련** → DrugBank + ChEMBL
-- **타겟 관련** → OpenTargets + ChEMBL  
-- **질병 관련** → OpenTargets + BioMCP + BioRxiv
-- **화학 관련** → ChEMBL + DrugBank
-- **최신 연구** → BioRxiv + BioMCP
-- **모든 경우** → Sequential Thinking + BioMCP + BioRxiv
+- **약물 관련** → DrugBank + ChEMBL + PubMed
+- **타겟 관련** → OpenTargets + ChEMBL + PubMed
+- **질병 관련** → OpenTargets + PubMed + ClinicalTrials + BioRxiv
+- **화학 관련** → ChEMBL + DrugBank + PubMed
+- **임상 관련** → ClinicalTrials + PubMed + BioMCP
+- **최신 연구** → PubMed + BioRxiv + BioMCP
+- **모든 경우** → Sequential Thinking + PubMed + ClinicalTrials
+
+**🔄 중복 제거 기능:**
+- **지능형 중복 탐지**: 제목, PMID, NCT ID 기반 중복 식별
+- **품질 기반 필터링**: 완성도 높은 결과만 유지
+- **통합 결과 제공**: 최고 품질의 중복 제거된 통합 결과
+
+**🤖 AI 통합 요약:**
+- **종합 분석**: 모든 데이터 소스의 정보를 AI가 종합 분석
+- **핵심 발견사항**: 주요 연구 결과 요약
+- **임상적 의의**: 실용적 적용 가능성 분석
+- **향후 연구 방향**: 추가 연구 제안
 
 ## 🤖 LLM 모델 선택 가이드
 

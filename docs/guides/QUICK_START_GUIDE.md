@@ -4,9 +4,9 @@
 
 <div align="center">
 
-**NEW! 6개 전문 데이터베이스 통합**  
-💊 DrugBank | 🎯 OpenTargets | 🧪 ChEMBL | 📄 BioMCP | 🧠 Sequential Thinking  
-**스마트 키워드 분석으로 자동 선택!**
+**NEW! 9개 전문 데이터베이스 통합**  
+💊 DrugBank | 🎯 OpenTargets | 🧪 ChEMBL | 📄 PubMed | 🏥 ClinicalTrials | 📄 BioMCP | 📑 BioRxiv | 🧠 Sequential Thinking  
+**스마트 키워드 분석 + 중복 제거로 최고 품질 결과!**
 
 </div>
 

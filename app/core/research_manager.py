@@ -16,6 +16,7 @@ from app.core.file_storage import FileStorage
 from app.core.answer_generator import AnswerGenerator
 from app.core.question_handler import QuestionHandler
 from app.core.research_parallel import ResearchParallel
+from app.core.biomcp_integration import BioMCPIntegration
 
 
 class ResearchManager:
@@ -29,7 +30,8 @@ class ResearchManager:
                 feedback_depth: int = 2,
                 feedback_width: int = 2,
                 concurrent_research: int = 2,
-                output_dir: Optional[str] = None):
+                output_dir: Optional[str] = None,
+                mcp_manager=None):
         """
         연구 관리자 초기화
 
@@ -39,6 +41,7 @@ class ResearchManager:
             feedback_width: 피드백 루프 너비 (기본값: 2)
             concurrent_research: 동시 연구 프로세스 수 (기본값: 2)
             output_dir: 결과 저장 디렉토리 (기본값: environment OUTPUT_DIR)
+            mcp_manager: MCP Manager 인스턴스 (옵션)
         """
         # 컴포넌트 초기화
         self.client = ollama_client or OllamaClient()
@@ -46,6 +49,10 @@ class ResearchManager:
         self.answer_generator = AnswerGenerator(self.client)
         self.evaluator = AnswerEvaluator(self.client)
         self.parallel_executor = ResearchParallel(self.client, concurrent_research)
+        
+        # MCP 통합 초기화
+        self.mcp_manager = mcp_manager
+        self.biomcp = BioMCPIntegration(mcp_manager) if mcp_manager else None
 
         # 환경 설정
         self.output_dir = output_dir or os.getenv('OUTPUT_DIR', './research_outputs')
@@ -415,6 +422,177 @@ class ResearchManager:
         print(f"- 결과 저장 위치: {research_dir}")
 
         return summary
+    
+    async def deep_research(
+        self,
+        topic: str,
+        include_articles: bool = True,
+        include_trials: bool = True,
+        include_variants: bool = False,
+        max_results_per_type: int = 10,
+        deduplicate: bool = True
+    ) -> Dict[str, Any]:
+        """
+        특정 주제에 대한 심층 연구 수행 (MCP 서버 활용)
+        
+        Args:
+            topic: 연구 주제
+            include_articles: 논문 검색 포함 여부
+            include_trials: 임상시험 검색 포함 여부
+            include_variants: 유전자 변이 검색 포함 여부
+            max_results_per_type: 각 유형별 최대 결과 수
+            deduplicate: 중복 제거 여부
+            
+        Returns:
+            Dict[str, Any]: 심층 연구 결과
+        """
+        if not self.biomcp:
+            return {
+                "success": False,
+                "error": "MCP 통합이 초기화되지 않았습니다. MCP Manager가 필요합니다.",
+                "topic": topic
+            }
+        
+        print(f"\n🔬 심층 연구 시작: {topic}")
+        start_time = time.time()
+        
+        # BiomCP를 통한 종합 연구
+        research_results = await self.biomcp.comprehensive_biomedical_research(
+            topic=topic,
+            include_articles=include_articles,
+            include_trials=include_trials,
+            include_variants=include_variants,
+            max_results_per_type=max_results_per_type
+        )
+        
+        # 중복 제거 처리
+        if deduplicate and research_results.get("success"):
+            print("🔄 중복 제거 처리 중...")
+            
+            # 각 카테고리별 중복 제거
+            data = research_results.get("data", {})
+            
+            # 논문 중복 제거
+            if "articles" in data and data["articles"].get("results"):
+                original_count = len(data["articles"]["results"])
+                data["articles"]["results"] = await self.biomcp.deduplicate_research_results(
+                    data["articles"]["results"]
+                )
+                dedup_count = len(data["articles"]["results"])
+                if original_count > dedup_count:
+                    print(f"  📄 논문: {original_count} → {dedup_count} (중복 {original_count - dedup_count}개 제거)")
+            
+            # 임상시험 중복 제거
+            if "trials" in data and data["trials"].get("results"):
+                original_count = len(data["trials"]["results"])
+                data["trials"]["results"] = await self.biomcp.deduplicate_research_results(
+                    data["trials"]["results"]
+                )
+                dedup_count = len(data["trials"]["results"])
+                if original_count > dedup_count:
+                    print(f"  🏥 임상시험: {original_count} → {dedup_count} (중복 {original_count - dedup_count}개 제거)")
+            
+            # 유전자 변이 중복 제거
+            if "variants" in data and data["variants"].get("results"):
+                original_count = len(data["variants"]["results"])
+                data["variants"]["results"] = await self.biomcp.deduplicate_research_results(
+                    data["variants"]["results"]
+                )
+                dedup_count = len(data["variants"]["results"])
+                if original_count > dedup_count:
+                    print(f"  🧬 유전자 변이: {original_count} → {dedup_count} (중복 {original_count - dedup_count}개 제거)")
+            
+            research_results["data"] = data
+        
+        # AI 기반 요약 생성
+        if research_results.get("success") and research_results.get("data"):
+            print("\n📝 AI 기반 종합 요약 생성 중...")
+            
+            # 연구 결과를 텍스트로 변환
+            research_text = self._format_research_results(research_results["data"])
+            
+            # AI에게 요약 요청
+            summary_prompt = f"""다음은 '{topic}'에 대한 심층 연구 결과입니다:
+
+{research_text}
+
+위 연구 결과를 바탕으로 다음 형식으로 종합 요약을 작성해주세요:
+
+1. 핵심 발견사항 (3-5개)
+2. 주요 연구 동향
+3. 임상적 의의
+4. 향후 연구 방향
+5. 결론
+
+각 섹션은 구체적이고 과학적인 근거를 포함해야 합니다."""
+
+            summary_response = await self.client.generate(
+                prompt=summary_prompt,
+                system="당신은 신약개발 연구 전문가입니다. 과학적 정확성을 유지하면서 핵심 내용을 명확하게 요약해주세요.",
+                model=self.client.model
+            )
+            
+            research_results["ai_summary"] = summary_response.get("response", "요약 생성 실패")
+        
+        # 실행 시간 기록
+        elapsed_time = time.time() - start_time
+        research_results["elapsed_seconds"] = elapsed_time
+        
+        # 결과 저장
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"deep_research_{topic.replace(' ', '_')}_{timestamp}"
+        
+        # 세션 디렉토리에 저장
+        session_dir = os.path.join(self.output_dir, self.session_id)
+        os.makedirs(session_dir, exist_ok=True)
+        
+        filepath = os.path.join(session_dir, f"{filename}.json")
+        await self.file_storage._save_json(research_results, filepath)
+        
+        print(f"\n✅ 심층 연구 완료 (소요시간: {elapsed_time:.1f}초)")
+        print(f"📁 결과 저장: {filepath}")
+        
+        return research_results
+    
+    def _format_research_results(self, data: Dict[str, Any]) -> str:
+        """연구 결과를 텍스트 형식으로 변환"""
+        formatted_text = []
+        
+        # 논문 결과
+        if "articles" in data and data["articles"].get("results"):
+            formatted_text.append("=== 연구 논문 ===")
+            for i, article in enumerate(data["articles"]["results"][:5], 1):
+                if isinstance(article, dict):
+                    title = article.get("title", "제목 없음")
+                    formatted_text.append(f"{i}. {title}")
+                elif isinstance(article, str):
+                    formatted_text.append(f"{i}. {article[:200]}...")
+            formatted_text.append("")
+        
+        # 임상시험 결과
+        if "trials" in data and data["trials"].get("results"):
+            formatted_text.append("=== 임상시험 ===")
+            for i, trial in enumerate(data["trials"]["results"][:5], 1):
+                if isinstance(trial, dict):
+                    title = trial.get("title", trial.get("brief_title", "제목 없음"))
+                    status = trial.get("status", "상태 불명")
+                    formatted_text.append(f"{i}. {title} (상태: {status})")
+                elif isinstance(trial, str):
+                    formatted_text.append(f"{i}. {trial[:200]}...")
+            formatted_text.append("")
+        
+        # 유전자 변이 결과
+        if "variants" in data and data["variants"].get("results"):
+            formatted_text.append("=== 유전자 변이 ===")
+            for i, variant in enumerate(data["variants"]["results"][:5], 1):
+                if isinstance(variant, dict):
+                    gene = variant.get("gene", "유전자 불명")
+                    variant_type = variant.get("type", "타입 불명")
+                    formatted_text.append(f"{i}. {gene} - {variant_type}")
+                elif isinstance(variant, str):
+                    formatted_text.append(f"{i}. {variant[:200]}...")
+        
+        return "\n".join(formatted_text)
 
 
 # 모듈 직접 실행 시 테스트

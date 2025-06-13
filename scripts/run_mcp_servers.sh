@@ -68,6 +68,14 @@ start_server "chembl" "python $PROJECT_ROOT/mcp/chembl/chembl_server.py --transp
 export PYTHONPATH="$PROJECT_ROOT/mcp/python-sequential-thinking/src:$PYTHONPATH"
 start_server "sequential-thinking" "sequential-thinking run > $PID_DIR/sequential-thinking.log 2>&1"
 
+# 5. PubMed MCP 서버 시작
+export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
+start_server "pubmed-mcp" "python $PROJECT_ROOT/mcp/pubmed/pubmed_mcp.py > $PID_DIR/pubmed-mcp.log 2>&1"
+
+# 6. ClinicalTrials MCP 서버 시작
+export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
+start_server "clinicaltrials-mcp" "python $PROJECT_ROOT/mcp/clinicaltrials/clinicaltrials_mcp.py > $PID_DIR/clinicaltrials-mcp.log 2>&1"
+
 echo ""
 echo "모든 MCP 서버가 시작되었습니다."
 echo "서버 중지: $SCRIPT_DIR/stop_mcp_servers.sh"

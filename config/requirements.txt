@@ -21,6 +21,7 @@ markdown>=3.5.0
 rich>=13.3.0
 colorama==0.4.6
 tqdm==4.67.1
+prompt_toolkit>=3.0.0
 
 # 설정 관리
 python-dotenv==1.0.1
