@@ -166,7 +166,7 @@ async def run_chatbot_interactive():
                         print(f"🐛 디버그 모드가 {state}으로 설정되었습니다.")
                     elif normalized_input == "/normal":
                         # 일반 모드로 전환
-                        chatbot.switch_to_normal_mode()
+                        await chatbot.switch_to_normal_mode()
                         print("🔄 일반 모드로 전환되었습니다.")
                     elif normalized_input == "/mcpshow":
                         # MCP 출력 표시 토글

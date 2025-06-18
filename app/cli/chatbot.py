@@ -1256,16 +1256,33 @@ class DrugDevelopmentChatbot:
             # 평가 정보 없이 저장 (빈 딕셔너리 전달)
             await self.save_research_result(question, best_response, {})
 
-    def switch_to_deep_research_mode(self):
-        """Deep Research 모드로 전환"""
+    async def switch_to_deep_research_mode(self):
+        """Deep Research 모드로 전환 (MCP 서버 자동 시작)"""
         if self.current_mode != "deep_research":
             self.current_mode = "deep_research"
             self.mode_banner_shown = False  # 배너 다시 표시하도록
             self._show_mode_banner()
+            
+            # MCP 서버 자동 시작
+            if hasattr(self, 'mcp_commands') and self.mcp_commands:
+                try:
+                    print("🔄 MCP 서버를 자동으로 시작하는 중...")
+                    await self.mcp_commands.start_mcp()
+                except Exception as e:
+                    print(f"⚠️ MCP 서버 자동 시작 실패: {e}")
+                    print("💡 수동으로 '/mcp start' 명령어를 사용해보세요.")
 
-    def switch_to_normal_mode(self):
-        """일반 모드로 전환"""
+    async def switch_to_normal_mode(self):
+        """일반 모드로 전환 (MCP 서버 자동 중지)"""
         if self.current_mode != "normal":
+            # MCP 서버 자동 중지 (모드 변경 전에 수행)
+            if hasattr(self, 'mcp_commands') and self.mcp_commands and self.mcp_enabled:
+                try:
+                    print("🔄 MCP 서버를 자동으로 중지하는 중...")
+                    await self.mcp_commands.stop_mcp()
+                except Exception as e:
+                    print(f"⚠️ MCP 서버 자동 중지 실패: {e}")
+            
             self.current_mode = "normal"
             self.mode_banner_shown = False  # 배너 다시 표시하도록
             self._show_mode_banner()

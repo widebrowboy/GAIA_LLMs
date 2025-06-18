@@ -61,7 +61,7 @@ async def demo_dual_mode_system():
     print("=" * 60)
     
     print("\n🔄 모드 전환 중...")
-    chatbot.switch_to_deep_research_mode()
+    await chatbot.switch_to_deep_research_mode()
     
     print(f"\n📋 변경된 설정:")
     print(f"  • 현재 모드: {chatbot.current_mode}")
@@ -114,7 +114,7 @@ async def demo_dual_mode_system():
     print("=" * 60)
     
     print("\n🔄 일반 모드로 전환 중...")
-    chatbot.switch_to_normal_mode()
+    await chatbot.switch_to_normal_mode()
     
     print(f"\n📋 최종 설정:")
     print(f"  • 현재 모드: {chatbot.current_mode}")

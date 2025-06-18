@@ -21,7 +21,7 @@ class MCPCommands:
         
         # Deep Research 모드로 전환
         if not hasattr(self.chatbot, 'current_mode') or self.chatbot.current_mode != "deep_research":
-            self.chatbot.switch_to_deep_research_mode()
+            await self.chatbot.switch_to_deep_research_mode()
         
         # 디버그 정보
         if self.chatbot.settings.get("debug_mode", False):
