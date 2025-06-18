@@ -15,10 +15,21 @@ sys.path.insert(0, str(project_root))
 
 def display_startup_banner():
     """시작 배너 표시"""
-    banner = """
+    from app.utils.config import OLLAMA_MODEL
+    from app.utils.prompt_manager import get_prompt_manager
+    
+    # 현재 프롬프트 정보 가져오기
+    prompt_manager = get_prompt_manager()
+    default_prompt = prompt_manager.get_prompt_template("default")
+    prompt_desc = default_prompt.description if default_prompt else "신약개발 전문 AI"
+    
+    # 프롬프트 설명 포맷팅
+    prompt_text = f"default ({prompt_desc[:35]}{'...' if len(prompt_desc) > 35 else ''})"
+    
+    banner = f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                          🧬 GAIA-BT v2.0 🧬                                 ║
-║                     신약개발 연구 AI 어시스턴트                              ║
+║                          🧬 GAIA-BT v2.0 🧬                                  ║
+║                     신약개발 연구 AI 어시스턴트                                  ║
 ║                                                                              ║
 ║  🎯 NEW! 통합 Deep Research MCP 시스템                                      ║
 ║  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ║
@@ -30,6 +41,11 @@ def display_startup_banner():
 ║                                                                              ║
 ║  🚀 스마트 키워드 분석으로 질문에 맞는 데이터베이스를 자동 선택!            ║
 ║  🔍 단일 질문으로 모든 관련 데이터소스를 통합 검색!                        ║
+║  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ║
+║  🤖 현재 AI 모델: {OLLAMA_MODEL:<55} ║
+║  💡 모델 변경: /model <모델명> (예: /model gemma3:latest)                    ║
+║  🎯 현재 프롬프트: {prompt_text:<52} ║
+║  🔧 프롬프트 변경: /prompt <모드> (clinical/research/chemistry/regulatory)    ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
     """
     print(banner)
@@ -37,13 +53,14 @@ def display_startup_banner():
 async def run_chatbot_interactive():
     """대화형 챗봇 실행"""
     try:
-        from app.cli.chatbot import DrugDevelopmentChatbot
+        from app.cli.chatbot import DrugDevelopmentChatbot, Config
         
         # 시작 배너 표시
         display_startup_banner()
         
         # 챗봇 초기화
-        chatbot = DrugDevelopmentChatbot(debug_mode=False)
+        config = Config(debug_mode=False)
+        chatbot = DrugDevelopmentChatbot(config)
         
         # GAIA-BT 환영 메시지
         chatbot.interface.display_welcome()
@@ -51,9 +68,8 @@ async def run_chatbot_interactive():
         # API 연결 확인
         print("🔗 시스템 초기화 중...")
         status = await chatbot.client.check_availability()
-        if not status["available"]:
-            print(f"❌ Ollama API 연결 실패: {status.get('error', '알 수 없는 오류')}")
-            print("🔧 해결방법: Ollama를 시작하세요 → ollama serve")
+        if not status:
+            print("❌ Ollama API를 사용할 수 없습니다.")
             return
         
         print("✅ Ollama API 연결 성공")
@@ -93,7 +109,7 @@ async def run_chatbot_interactive():
                 user_input = user_input.strip().replace('\u200b', '').replace('\ufeff', '')  # 제로폭 공백 제거
                 
                 # 디버그: 입력 문자열 분석
-                if chatbot.settings.get("debug_mode", False):
+                if chatbot.config.debug_mode:
                     print(f"🐛 [디버그] 입력 원본: repr='{repr(user_input)}', 길이={len(user_input)}")
                     print(f"🐛 [디버그] 첫 글자: '{user_input[0] if user_input else 'None'}' (ASCII: {ord(user_input[0]) if user_input else 'None'})")
                     print(f"🐛 [디버그] startswith('/'): {user_input.startswith('/')}")
@@ -105,15 +121,15 @@ async def run_chatbot_interactive():
                 
                 # 명령어 정규화 - '/' 없이 입력된 명령어도 처리
                 normalized_input = user_input
-                if not user_input.startswith("/") and user_input.split()[0] in ['help', 'mcp', 'model', 'debug', 'exit']:
+                if not user_input.startswith("/") and user_input.split()[0] in ['help', 'mcp', 'model', 'prompt', 'debug', 'exit']:
                     normalized_input = "/" + user_input
-                    if chatbot.settings.get("debug_mode", False):
+                    if chatbot.config.debug_mode:
                         print(f"🐛 [디버그] 명령어 정규화: '{user_input}' → '{normalized_input}'")
                 
                 # 명령어 처리
                 if normalized_input.startswith("/"):
                     # 디버그: 명령어 감지 확인
-                    if chatbot.settings.get("debug_mode", False):
+                    if chatbot.config.debug_mode:
                         print(f"🐛 [디버그] 명령어 감지: '{normalized_input}'")
                     
                     if normalized_input == "/help":
@@ -122,7 +138,7 @@ async def run_chatbot_interactive():
                         # MCP 명령어 부분 추출 (공백 문제 해결)
                         mcp_args = normalized_input[4:].strip()  # "/mcp" 제거하고 공백 정리
                         
-                        if chatbot.settings.get("debug_mode", False):
+                        if chatbot.config.debug_mode:
                             print(f"🐛 [디버그] MCP 명령어 처리: '{mcp_args}'")
                         
                         # MCP 사용 가능성 확인
@@ -133,7 +149,7 @@ async def run_chatbot_interactive():
                                 await chatbot.mcp_commands.handle_mcp_command(mcp_args)
                             except Exception as e:
                                 print(f"❌ MCP 명령어 처리 중 오류: {e}")
-                                if chatbot.settings.get("debug_mode", False):
+                                if chatbot.config.debug_mode:
                                     import traceback
                                     print(f"🐛 [디버그] MCP 오류 상세: {traceback.format_exc()}")
                     elif normalized_input.startswith("/model"):
@@ -142,15 +158,19 @@ async def run_chatbot_interactive():
                             await chatbot.change_model(parts[1])
                         else:
                             print("사용법: /model <모델명>")
+                    elif normalized_input.startswith("/prompt"):
+                        parts = normalized_input.split(maxsplit=1)
+                        prompt_type = parts[1] if len(parts) > 1 else None
+                        await chatbot.change_prompt(prompt_type)
                     elif normalized_input == "/debug":
                         # 디버그 모드 토글
-                        chatbot.settings["debug_mode"] = not chatbot.settings["debug_mode"]
-                        chatbot.client.set_debug_mode(chatbot.settings["debug_mode"])
-                        state = "켜짐" if chatbot.settings["debug_mode"] else "꺼짐"
+                        chatbot.config.debug_mode = not chatbot.config.debug_mode
+                        chatbot.client.set_debug_mode(chatbot.config.debug_mode)
+                        state = "켜짐" if chatbot.config.debug_mode else "꺼짐"
                         print(f"🐛 디버그 모드가 {state}으로 설정되었습니다.")
                     else:
                         print(f"❌ 알 수 없는 명령어: {normalized_input}")
-                        print("사용 가능한 명령어: /help, /mcp, /model, /debug, /exit")
+                        print("사용 가능한 명령어: /help, /mcp, /model, /prompt, /debug, /exit")
                         print("💡 팁: '/' 없이도 명령어를 사용할 수 있습니다 (예: mcp start)")
                 else:
                     # 특별 MCP 명령어 패턴 확인 (추가 안전장치)
@@ -164,7 +184,7 @@ async def run_chatbot_interactive():
                     user_lower = user_input.lower().strip()
                     if any(user_lower.startswith(pattern) for pattern in mcp_patterns):
                         command_part = user_lower.replace('/', '').strip()
-                        if chatbot.settings.get("debug_mode", False):
+                        if chatbot.config.debug_mode:
                             print(f"🐛 [디버그] 특별 MCP 명령어 감지: '{command_part}'")
                         
                         if chatbot.mcp_commands is None:
@@ -175,7 +195,7 @@ async def run_chatbot_interactive():
                                 await chatbot.mcp_commands.handle_mcp_command(mcp_args)
                             except Exception as e:
                                 print(f"❌ MCP 명령어 처리 중 오류: {e}")
-                                if chatbot.settings.get("debug_mode", False):
+                                if chatbot.config.debug_mode:
                                     import traceback
                                     print(f"🐛 [디버그] MCP 오류 상세: {traceback.format_exc()}")
                         continue

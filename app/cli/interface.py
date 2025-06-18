@@ -52,6 +52,7 @@ class CliInterface:
 
     def display_welcome(self):
         """시작 메시지와 사용 지침을 표시합니다."""
+        from app.utils.config import OLLAMA_MODEL
         # GAIA-BT GPT 배너
         banner = """
 [bold bright_blue]
@@ -65,8 +66,14 @@ class CliInterface:
 [bold bright_cyan]                     G P T[/bold bright_cyan]
 """
         
+        # 현재 프롬프트 정보 가져오기
+        from app.utils.prompt_manager import get_prompt_manager
+        prompt_manager = get_prompt_manager()
+        default_prompt = prompt_manager.get_prompt_template("default")
+        prompt_desc = default_prompt.description if default_prompt else "신약개발 전문 AI"
+        
         # 소개글 - GAIA-BT vs 일반 GPT 차이점 강조
-        intro_text = """[bold bright_green]🧪 GAIA-BT: 신약개발 전문 AI 연구 어시스턴트[/bold bright_green]
+        intro_text = f"""[bold bright_green]🧪 GAIA-BT: 신약개발 전문 AI 연구 어시스턴트[/bold bright_green]
 
 [bold yellow]💡 일반 GPT와의 차이점:[/bold yellow]
 [green]✓[/green] [cyan]9개 전문 데이터베이스 실시간 연동[/cyan] (DrugBank, ChEMBL, PubMed, ClinicalTrials 등)
@@ -74,6 +81,12 @@ class CliInterface:
 [green]✓[/green] [cyan]신약개발 전 과정 전문화[/cyan] (타겟 발굴 → 임상시험 → 규제 승인)
 [green]✓[/green] [cyan]최신 연구 데이터 반영[/cyan] (프리프린트, 임상시험 결과 실시간 업데이트)
 [green]✓[/green] [cyan]AI 추론 + 데이터 검증[/cyan] (Sequential Thinking + 중복 제거)
+
+[bold magenta]🤖 현재 AI 모델: {OLLAMA_MODEL}[/bold magenta]
+[dim bright_yellow]💡 모델 변경: /model <모델명> (예: /model gemma3:latest)[/dim bright_yellow]
+
+[bold cyan]🎯 현재 프롬프트: default ({prompt_desc})[/bold cyan]
+[dim bright_yellow]🔧 프롬프트 변경: /prompt <모드> (clinical/research/chemistry/regulatory)[/dim bright_yellow]
 
 [dim bright_cyan]분자 구조 분석부터 임상 연구 데이터까지, 신뢰할 수 있는 신약개발 정보를 제공합니다.[/dim bright_cyan]
 """
