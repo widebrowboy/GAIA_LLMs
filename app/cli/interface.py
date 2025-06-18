@@ -72,44 +72,39 @@ class CliInterface:
         default_prompt = prompt_manager.get_prompt_template("default")
         prompt_desc = default_prompt.description if default_prompt else "신약개발 전문 AI"
         
-        # 소개글 - GAIA-BT vs 일반 GPT 차이점 강조
+        # 소개글 - 간결한 설명
         intro_text = f"""[bold bright_green]🧪 GAIA-BT: 신약개발 전문 AI 연구 어시스턴트[/bold bright_green]
 
-[bold yellow]💡 일반 GPT와의 차이점:[/bold yellow]
-[green]✓[/green] [cyan]9개 전문 데이터베이스 실시간 연동[/cyan] (DrugBank, ChEMBL, PubMed, ClinicalTrials 등)
-[green]✓[/green] [cyan]과학적 근거 기반 답변[/cyan] (모든 응답에 참고문헌 포함)
-[green]✓[/green] [cyan]신약개발 전 과정 전문화[/cyan] (타겟 발굴 → 임상시험 → 규제 승인)
-[green]✓[/green] [cyan]최신 연구 데이터 반영[/cyan] (프리프린트, 임상시험 결과 실시간 업데이트)
-[green]✓[/green] [cyan]AI 추론 + 데이터 검증[/cyan] (Sequential Thinking + 중복 제거)
+[bold yellow]💡 핵심 특징:[/bold yellow]
+[green]✓[/green] [cyan]신약개발 전 과정 전문화[/cyan] - 타겟 발굴부터 임상시험까지
+[green]✓[/green] [cyan]과학적 근거 기반 답변[/cyan] - 모든 응답에 참고문헌 포함
+[green]✓[/green] [cyan]전문 프롬프트 시스템[/cyan] - 목적에 맞는 맞춤형 응답
 
 [bold magenta]🤖 현재 AI 모델: {OLLAMA_MODEL}[/bold magenta]
-[dim bright_yellow]💡 모델 변경: /model <모델명> (예: /model gemma3:latest)[/dim bright_yellow]
+[dim bright_yellow]💡 모델 변경: /model <모델명> | 프롬프트 변경: /prompt <모드>[/dim bright_yellow]
 
 [bold cyan]🎯 현재 프롬프트: default ({prompt_desc})[/bold cyan]
-[dim bright_yellow]🔧 프롬프트 변경: /prompt <모드> (clinical/research/chemistry/regulatory)[/dim bright_yellow]
 
 [dim bright_cyan]분자 구조 분석부터 임상 연구 데이터까지, 신뢰할 수 있는 신약개발 정보를 제공합니다.[/dim bright_cyan]
 """
 
         welcome_text = """
-[bold bright_blue]🚀 신약개발 전문 기능[/bold bright_blue]
-💊 [bold cyan]DrugBank[/bold cyan] - 15,000+ 약물 데이터, 상호작용 분석
-🎯 [bold cyan]OpenTargets[/bold cyan] - 60,000+ 타겟-질병 연관성
-🧪 [bold cyan]ChEMBL[/bold cyan] - 분자 구조 및 SAR 분석
-📄 [bold cyan]PubMed[/bold cyan] - 35M+ 과학 논문, 저자 분석
-🏥 [bold cyan]ClinicalTrials[/bold cyan] - 450K+ 임상시험 정보
-📑 [bold cyan]BioRxiv[/bold cyan] - 최신 프리프린트 논문
-🧬 [bold cyan]유전체 변이[/bold cyan] - CIViC, ClinVar, COSMIC, dbSNP
-🧠 [bold cyan]Sequential Thinking[/bold cyan] - AI 단계별 추론
-🔄 [bold cyan]중복 제거[/bold cyan] - 품질 기반 결과 필터링
+[bold bright_blue]💬 기본 사용법[/bold bright_blue]
+📝 [cyan]신약개발 질문[/cyan] - 일반적인 질문을 자연어로 입력하세요
+🎯 [cyan]전문 프롬프트[/cyan] - 임상/연구/화학/규제 전문 모드 활용
+📚 [cyan]과학적 근거[/cyan] - 모든 답변에 참고문헌 및 근거 포함
 
-[bold yellow]⚡ 빠른 시작:[/bold yellow]
-[bright_green]/mcp start[/bright_green] - 9개 전문 데이터베이스 시스템 시작
-[bright_green]/mcp deep_research <주제>[/bright_green] - 통합 심층 연구 자동화
-[bright_green]/feedback <질문>[/bright_green] - 다중 피드백 루프 심화 연구
-[bright_green]/help[/bright_green] - 전체 명령어 가이드
+[bold yellow]⚡ 사용 예시:[/bold yellow]
+[bright_green]"아스피린의 작용 메커니즘을 설명해주세요"[/bright_green]
+[bright_green]"EGFR 억제제의 부작용은 무엇인가요?"[/bright_green]
+[bright_green]"임상시험 1상과 2상의 차이점은?"[/bright_green]
 
-[dim bright_yellow]💡 예시: "EGFR 억제제의 내성 메커니즘을 분석해주세요" → 자동 Deep Search![/dim bright_yellow]
+[bold cyan]🔧 고급 기능:[/bold cyan]
+[bright_green]/help[/bright_green] - 모든 명령어 및 고급 기능 확인
+[bright_green]/mcp[/bright_green] - Deep Research 시스템 (전문 데이터베이스 연동)
+[bright_green]/prompt[/bright_green] - 전문 프롬프트 모드 변경
+
+[dim bright_yellow]💡 궁금한 신약개발 관련 질문을 자유롭게 입력해보세요![/dim bright_yellow]
         """
 
         # 배너 출력 (왼쪽 정렬)

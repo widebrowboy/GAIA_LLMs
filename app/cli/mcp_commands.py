@@ -19,6 +19,10 @@ class MCPCommands:
         # 인수 정규화 (공백과 특수문자 처리)
         args = args.strip() if args else ""
         
+        # MCP 시스템 소개 (첫 사용 시 또는 도움말 요청 시)
+        if not args or args in ["help", "start"]:
+            self._show_deep_research_intro()
+        
         # 디버그 정보
         if self.chatbot.settings.get("debug_mode", False):
             print(f"🐛 [MCP 디버그] 받은 인수: '{args}' (길이: {len(args)})")
@@ -1277,3 +1281,31 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
     async def playwright_navigate(self, url: str):
         """간편한 웹 페이지 네비게이션"""
         await self.playwright_action("navigate", url)
+
+    def _show_deep_research_intro(self):
+        """Deep Research 시스템 소개 표시"""
+        intro_text = """
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    🔬 Deep Research MCP 시스템 활성화                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+🎯 전문 데이터베이스 통합 연구 시스템:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💊 DrugBank     - 15,000+ 약물 데이터베이스 (약물상호작용, ADMET)
+🎯 OpenTargets  - 60,000+ 타겟-질병 연관성 (유전체 분석)
+🧪 ChEMBL       - 분자 구조 & 물리화학적 특성 (SAR 분석)
+📄 BioMCP       - 최신 논문 & 임상시험 (PubMed, ClinicalTrials.gov)
+🧠 Sequential   - AI 기반 체계적 사고 & 추론
+🌐 Playwright   - 웹 자동화 & 데이터 수집
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 스마트 키워드 분석으로 질문에 맞는 데이터베이스를 자동 선택!
+🔍 단일 질문으로 모든 관련 데이터소스를 통합 검색!
+
+💡 Deep Research 사용법:
+1. '/mcp start' 명령어로 통합 MCP 시스템을 시작하세요
+2. 신약개발 질문을 입력하면 자동으로 관련 데이터베이스들을 검색합니다
+3. '/debug' 명령어로 상세한 검색 과정을 확인할 수 있습니다
+
+        """
+        print(intro_text)
