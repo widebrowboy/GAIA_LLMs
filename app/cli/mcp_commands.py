@@ -163,6 +163,23 @@ class MCPCommands:
     
     def show_mcp_help(self):
         """MCP 도움말 표시"""
+        # MCP 출력이 숨겨진 상태라면 간단한 메시지만 표시
+        if not self.chatbot.config.show_mcp_output:
+            simple_help = """
+[bold green]🔬 Deep Research MCP 시스템[/bold green]
+
+[cyan]주요 명령어:[/cyan]
+• [cyan]/mcp start[/cyan] - MCP 서버 시작 및 Deep Research 모드 활성화
+• [cyan]/mcp status[/cyan] - MCP 상태 확인  
+• [cyan]/mcp stop[/cyan] - MCP 서버 중지
+• [cyan]/mcpshow[/cyan] - MCP 명령어 전체 목록 표시/숨김 토글
+
+[yellow]💡 '/mcpshow' 명령어로 전체 MCP 명령어 목록을 확인할 수 있습니다.[/yellow]
+            """
+            self.interface.console.print(simple_help)
+            return
+            
+        # 전체 도움말 표시
         help_text = """
 [bold green]MCP (Model Context Protocol) 명령어:[/bold green]
 
