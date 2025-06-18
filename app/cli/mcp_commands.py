@@ -252,7 +252,8 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             else:
                 print_fn = print
                 
-            print_fn("[yellow]🔬 통합 Deep Research MCP 시스템 시작 중...[/yellow]")
+            if self.chatbot.config.show_mcp_output:
+                print_fn("[yellow]🔬 통합 Deep Research MCP 시스템 시작 중...[/yellow]")
             
             # MCP 관리자 초기화
             if not self.mcp_manager:
@@ -263,48 +264,57 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             # 1. GAIA MCP 서버 시작
             success = await self.mcp_manager.start_server()
             if success:
-                print_fn("[green]✓ GAIA MCP 서버가 성공적으로 시작되었습니다.[/green]")
+                if self.chatbot.config.show_mcp_output:
+                    print_fn("[green]✓ GAIA MCP 서버가 성공적으로 시작되었습니다.[/green]")
                 
                 # 기본 클라이언트 초기화
                 try:
                     await self.mcp_manager.create_client("default")
-                    print_fn("[green]✓ 기본 MCP 클라이언트가 연결되었습니다.[/green]")
+                    if self.chatbot.config.show_mcp_output:
+                        print_fn("[green]✓ 기본 MCP 클라이언트가 연결되었습니다.[/green]")
                 except Exception as e:
                     print_fn(f"[yellow]⚠ 기본 클라이언트 연결 실패: {e}[/yellow]")
                 
                 # 2. 외부 서버들 시작 (DrugBank, OpenTargets 포함)
-                print_fn("[blue]외부 MCP 서버들 시작 중...[/blue]")
+                if self.chatbot.config.show_mcp_output:
+                    print_fn("[blue]외부 MCP 서버들 시작 중...[/blue]")
                 if await self.mcp_manager.start_external_servers():
-                    print_fn("[green]✓ 외부 MCP 서버들이 시작되었습니다.[/green]")
+                    if self.chatbot.config.show_mcp_output:
+                        print_fn("[green]✓ 외부 MCP 서버들이 시작되었습니다.[/green]")
                     
                     # 시작된 서버들 표시
-                    status = self.mcp_manager.get_status()
-                    client_ids = status.get('client_ids', [])
-                    if client_ids:
-                        print_fn(f"[cyan]활성 클라이언트: {', '.join(client_ids)}[/cyan]")
-                        
-                        # 각 서버별 상태 표시
-                        if 'drugbank-mcp' in client_ids:
-                            print_fn("[green]💊 DrugBank MCP 서버 연결됨[/green]")
-                        if 'opentargets-mcp' in client_ids:
-                            print_fn("[green]🎯 OpenTargets MCP 서버 연결됨[/green]")
-                        if 'biomcp' in client_ids:
-                            print_fn("[green]📄 BioMCP 서버 연결됨[/green]")
-                        if 'chembl' in client_ids:
-                            print_fn("[green]🧪 ChEMBL 서버 연결됨[/green]")
-                        if 'sequential-thinking' in client_ids:
-                            print_fn("[green]🧠 Sequential Thinking 서버 연결됨[/green]")
+                    if self.chatbot.config.show_mcp_output:
+                        status = self.mcp_manager.get_status()
+                        client_ids = status.get('client_ids', [])
+                        if client_ids:
+                            print_fn(f"[cyan]활성 클라이언트: {', '.join(client_ids)}[/cyan]")
+                            
+                            # 각 서버별 상태 표시
+                            if 'drugbank-mcp' in client_ids:
+                                print_fn("[green]💊 DrugBank MCP 서버 연결됨[/green]")
+                            if 'opentargets-mcp' in client_ids:
+                                print_fn("[green]🎯 OpenTargets MCP 서버 연결됨[/green]")
+                            if 'biomcp' in client_ids:
+                                print_fn("[green]📄 BioMCP 서버 연결됨[/green]")
+                            if 'chembl' in client_ids:
+                                print_fn("[green]🧪 ChEMBL 서버 연결됨[/green]")
+                            if 'sequential-thinking' in client_ids:
+                                print_fn("[green]🧠 Sequential Thinking 서버 연결됨[/green]")
                 else:
                     print_fn("[yellow]⚠️ 일부 외부 서버 시작에 실패했습니다.[/yellow]")
                 
                 # 3. 챗봇 MCP 활성화
                 self.chatbot.mcp_enabled = True
-                print_fn("[green]✓ 챗봇 MCP 기능이 활성화되었습니다.[/green]")
-                
-                print_fn("\n[bold green]🎉 통합 Deep Research MCP 시스템이 성공적으로 시작되었습니다![/bold green]")
-                print_fn("[dim]사용 가능한 명령어: /mcp tools, /mcp status[/dim]")
-                self.interface.console.print("[dim]이제 신약개발 질문을 하면 자동으로 모든 MCP 서버를 활용한 Deep Search가 수행됩니다.[/dim]")
-                self.interface.console.print("[dim]디버그 모드: /debug 로 토글 가능[/dim]")
+                if self.chatbot.config.show_mcp_output:
+                    print_fn("[green]✓ 챗봇 MCP 기능이 활성화되었습니다.[/green]")
+                    
+                    print_fn("\n[bold green]🎉 통합 Deep Research MCP 시스템이 성공적으로 시작되었습니다![/bold green]")
+                    print_fn("[dim]사용 가능한 명령어: /mcp tools, /mcp status[/dim]")
+                    self.interface.console.print("[dim]이제 신약개발 질문을 하면 자동으로 모든 MCP 서버를 활용한 Deep Search가 수행됩니다.[/dim]")
+                    self.interface.console.print("[dim]디버그 모드: /debug 로 토글 가능[/dim]")
+                else:
+                    # 간단한 성공 메시지만 표시
+                    print_fn("[green]✓ Deep Research 모드가 활성화되었습니다.[/green]")
                 
             else:
                 print_fn("[red]✗ MCP 서버 시작에 실패했습니다.[/red]")
@@ -321,17 +331,22 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
     async def stop_mcp(self):
         """MCP 서버 중지"""
         try:
-            self.interface.console.print("[yellow]MCP 서버를 중지하는 중...[/yellow]")
+            if self.chatbot.config.show_mcp_output:
+                self.interface.console.print("[yellow]MCP 서버를 중지하는 중...[/yellow]")
             
             # 외부 서버들 먼저 중지
             await self.mcp_manager.stop_external_servers()
-            self.interface.console.print("[green]✓ 외부 MCP 서버들이 중지되었습니다.[/green]")
+            if self.chatbot.config.show_mcp_output:
+                self.interface.console.print("[green]✓ 외부 MCP 서버들이 중지되었습니다.[/green]")
+            else:
+                self.interface.console.print("[green]✓ Deep Research 모드가 비활성화되었습니다.[/green]")
             
             # 전체 cleanup
             await self.mcp_manager.cleanup()
             self.chatbot.mcp_enabled = False
             
-            self.interface.console.print("[green]✓ 모든 MCP 서버가 중지되었습니다.[/green]")
+            if self.chatbot.config.show_mcp_output:
+                self.interface.console.print("[green]✓ 모든 MCP 서버가 중지되었습니다.[/green]")
             
         except Exception as e:
             self.interface.display_error(f"MCP 서버 중지 중 오류: {e}")
@@ -421,7 +436,8 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                         else:
                             args_dict["text"] = args_str  # 기본값
             
-            self.interface.console.print(f"[yellow]MCP 툴 '{tool_name}' 호출 중...[/yellow]")
+            if self.chatbot.config.show_mcp_output:
+                self.interface.console.print(f"[yellow]MCP 툴 '{tool_name}' 호출 중...[/yellow]")
             
             result = await self.mcp_manager.call_tool("default", tool_name, args_dict)
             
@@ -627,7 +643,8 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                 self.interface.console.print("[yellow]MCP가 활성화되지 않았습니다. '/mcp start'로 시작하세요.[/yellow]")
                 return
             
-            self.interface.console.print(f"[yellow]생의학 논문 검색 중: '{query}'[/yellow]")
+            if self.chatbot.config.show_mcp_output:
+                self.interface.console.print(f"[yellow]생의학 논문 검색 중: '{query}'[/yellow]")
             
             result = await self.mcp_manager.call_tool(
                 client_id="default",
@@ -663,7 +680,8 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                 self.interface.console.print("[yellow]MCP가 활성화되지 않았습니다. '/mcp start'로 시작하세요.[/yellow]")
                 return
             
-            self.interface.console.print(f"[yellow]임상시험 검색 중: '{condition}'[/yellow]")
+            if self.chatbot.config.show_mcp_output:
+                self.interface.console.print(f"[yellow]임상시험 검색 중: '{condition}'[/yellow]")
             
             result = await self.mcp_manager.call_tool(
                 client_id="default",
@@ -699,7 +717,8 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                 self.interface.console.print("[yellow]MCP가 활성화되지 않았습니다. '/mcp start'로 시작하세요.[/yellow]")
                 return
             
-            self.interface.console.print(f"[yellow]유전자 변이 검색 중: '{gene}'[/yellow]")
+            if self.chatbot.config.show_mcp_output:
+                self.interface.console.print(f"[yellow]유전자 변이 검색 중: '{gene}'[/yellow]")
             
             result = await self.mcp_manager.call_tool(
                 client_id="default",
@@ -836,7 +855,8 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                 self.interface.console.print("[yellow]MCP가 활성화되지 않았습니다. '/mcp start'로 시작하세요.[/yellow]")
                 return
             
-            self.interface.console.print(f"[yellow]ChEMBL {action} 검색 중: '{query}'[/yellow]")
+            if self.chatbot.config.show_mcp_output:
+                self.interface.console.print(f"[yellow]ChEMBL {action} 검색 중: '{query}'[/yellow]")
             
             # ChEMBL 툴 이름 매핑
             tool_mapping = {
@@ -1110,7 +1130,8 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                 self.interface.console.print("[yellow]MCP가 활성화되지 않았습니다. '/mcp start'로 시작하세요.[/yellow]")
                 return
             
-            self.interface.console.print(f"[yellow]DrugBank {action} 검색 중: '{query}'[/yellow]")
+            if self.chatbot.config.show_mcp_output:
+                self.interface.console.print(f"[yellow]DrugBank {action} 검색 중: '{query}'[/yellow]")
             
             # DrugBank 툴 이름 매핑
             tool_mapping = {
@@ -1169,7 +1190,8 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
                 self.interface.console.print("[yellow]MCP가 활성화되지 않았습니다. '/mcp start'로 시작하세요.[/yellow]")
                 return
             
-            self.interface.console.print(f"[yellow]OpenTargets {action} 검색 중: '{query}'[/yellow]")
+            if self.chatbot.config.show_mcp_output:
+                self.interface.console.print(f"[yellow]OpenTargets {action} 검색 중: '{query}'[/yellow]")
             
             # OpenTargets 툴 이름 매핑
             tool_mapping = {
@@ -1220,7 +1242,8 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
     async def playwright_action(self, action: str, url_or_query: str):
         """Playwright 액션 실행"""
         try:
-            self.interface.print_thinking(f"Playwright {action} 실행 중...")
+            if self.chatbot.config.show_mcp_output:
+                self.interface.print_thinking(f"Playwright {action} 실행 중...")
             
             # 액션에 따른 도구 이름 매핑
             tool_mapping = {
