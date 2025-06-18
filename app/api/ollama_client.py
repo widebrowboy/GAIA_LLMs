@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 from dotenv import load_dotenv
+import aiohttp
 
 # 어댑터 클래스 임포트
 from app.api.model_adapters import get_adapter_for_model
@@ -354,41 +355,31 @@ class OllamaClient:
         """
         self.debug_mode = debug_mode
 
-    async def check_availability(self) -> Dict[str, Any]:
-        """
-        Ollama API 가용성 확인
-
-        Returns:
-            Dict[str, Any]: API 가용성 정보
-        """
+    async def check_availability(self) -> dict:
+        """Ollama API 연결 및 모델 가용성 확인"""
         try:
-            client = await self._get_http_client()
-            response = await client.get(f"{self.ollama_url}/api/tags")
-            response.raise_for_status()
-
-            # 모델 정보 파싱
-            api_response = response.json()
-            models = api_response.get("models", [])
-
-            return {
-                "available": True,
-                "message": "Ollama API가 사용 가능합니다.",
-                "models": models,
-                "models_count": len(models)
-            }
-
-        except (httpx.RequestError, httpx.HTTPStatusError) as e:
-            return {
-                "available": False,
-                "message": f"Ollama API 연결 오류: {e!s}",
-                "error": str(e)
-            }
+            # API 연결 확인
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.ollama_url}/api/tags") as response:
+                    if response.status == 200:
+                        print("✅ Ollama API 연결 성공")
+                        
+                        # 모델 확인
+                        data = await response.json()
+                        models = [model["name"] for model in data.get("models", [])]
+                        if self.model in models:
+                            print(f"✅ 모델 '{self.model}' 확인됨")
+                            return {"available": True, "models": models}
+                        else:
+                            print(f"❌ 모델 '{self.model}'을 찾을 수 없습니다.")
+                            print(f"🔧 해결방법: ollama pull {self.model}")
+                            return {"available": False, "error": f"모델 '{self.model}'을 찾을 수 없습니다.", "models": models}
+                    else:
+                        print("❌ Ollama API 연결 실패")
+                        return {"available": False, "error": "Ollama API 연결 실패"}
         except Exception as e:
-            return {
-                "available": False,
-                "message": f"Ollama API 확인 오류: {e!s}",
-                "error": str(e)
-            }
+            print(f"❌ 모델 확인 중 오류 발생: {str(e)}")
+            return {"available": False, "error": str(e)}
 
     async def list_models(self) -> List[Dict[str, Any]]:
         """
@@ -480,9 +471,9 @@ if __name__ == "__main__":
 
         # API 가용성 확인
         status = await client.check_availability()
-        print(f"Ollama API 상태: {status['status']}")
+        print(f"Ollama API 상태: {status}")
 
-        if status['status'] == 'available':
+        if status:
             # 단일 생성 테스트
             response = await client.generate(
                 prompt="근육 발달에 가장 중요한 영양소 3가지를 간단히 설명해주세요.",

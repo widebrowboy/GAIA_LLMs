@@ -199,62 +199,94 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
         """
         self.interface.console.print(help_text)
     
+    async def call_tool(self, client_id: str, tool_name: str, arguments: dict = None):
+        """
+        MCP 툴 호출 메서드
+        
+        Args:
+            client_id: 클라이언트 ID
+            tool_name: 툴 이름
+            arguments: 툴 인자
+        
+        Returns:
+            dict: 툴 실행 결과
+        """
+        if not self.mcp_manager:
+            raise RuntimeError("MCP 관리자가 초기화되지 않았습니다")
+        
+        return await self.mcp_manager.call_tool(client_id, tool_name, arguments)
+    
     async def start_mcp(self):
         """MCP 서버 시작"""
         try:
-            self.interface.console.print("[yellow]🔬 통합 Deep Research MCP 시스템 시작 중...[/yellow]")
+            # console 속성 확인
+            if hasattr(self.interface, 'console'):
+                print_fn = lambda msg: self.interface.console.print(msg)
+            else:
+                print_fn = print
+                
+            print_fn("[yellow]🔬 통합 Deep Research MCP 시스템 시작 중...[/yellow]")
+            
+            # MCP 관리자 초기화
+            if not self.mcp_manager:
+                from mcp.integration.mcp_manager import MCPManager
+                self.mcp_manager = MCPManager()
+                self.chatbot.mcp_manager = self.mcp_manager
             
             # 1. GAIA MCP 서버 시작
             success = await self.mcp_manager.start_server()
             if success:
-                self.interface.console.print("[green]✓ GAIA MCP 서버가 성공적으로 시작되었습니다.[/green]")
+                print_fn("[green]✓ GAIA MCP 서버가 성공적으로 시작되었습니다.[/green]")
                 
                 # 기본 클라이언트 초기화
                 try:
                     await self.mcp_manager.create_client("default")
-                    self.interface.console.print("[green]✓ 기본 MCP 클라이언트가 연결되었습니다.[/green]")
+                    print_fn("[green]✓ 기본 MCP 클라이언트가 연결되었습니다.[/green]")
                 except Exception as e:
-                    self.interface.console.print(f"[yellow]⚠ 기본 클라이언트 연결 실패: {e}[/yellow]")
+                    print_fn(f"[yellow]⚠ 기본 클라이언트 연결 실패: {e}[/yellow]")
                 
                 # 2. 외부 서버들 시작 (DrugBank, OpenTargets 포함)
-                self.interface.console.print("[blue]외부 MCP 서버들 시작 중...[/blue]")
+                print_fn("[blue]외부 MCP 서버들 시작 중...[/blue]")
                 if await self.mcp_manager.start_external_servers():
-                    self.interface.console.print("[green]✓ 외부 MCP 서버들이 시작되었습니다.[/green]")
+                    print_fn("[green]✓ 외부 MCP 서버들이 시작되었습니다.[/green]")
                     
                     # 시작된 서버들 표시
                     status = self.mcp_manager.get_status()
                     client_ids = status.get('client_ids', [])
                     if client_ids:
-                        self.interface.console.print(f"[cyan]활성 클라이언트: {', '.join(client_ids)}[/cyan]")
+                        print_fn(f"[cyan]활성 클라이언트: {', '.join(client_ids)}[/cyan]")
                         
                         # 각 서버별 상태 표시
                         if 'drugbank-mcp' in client_ids:
-                            self.interface.console.print("[green]💊 DrugBank MCP 서버 연결됨[/green]")
+                            print_fn("[green]💊 DrugBank MCP 서버 연결됨[/green]")
                         if 'opentargets-mcp' in client_ids:
-                            self.interface.console.print("[green]🎯 OpenTargets MCP 서버 연결됨[/green]")
+                            print_fn("[green]🎯 OpenTargets MCP 서버 연결됨[/green]")
                         if 'biomcp' in client_ids:
-                            self.interface.console.print("[green]📄 BioMCP 서버 연결됨[/green]")
+                            print_fn("[green]📄 BioMCP 서버 연결됨[/green]")
                         if 'chembl' in client_ids:
-                            self.interface.console.print("[green]🧪 ChEMBL 서버 연결됨[/green]")
+                            print_fn("[green]🧪 ChEMBL 서버 연결됨[/green]")
                         if 'sequential-thinking' in client_ids:
-                            self.interface.console.print("[green]🧠 Sequential Thinking 서버 연결됨[/green]")
+                            print_fn("[green]🧠 Sequential Thinking 서버 연결됨[/green]")
                 else:
-                    self.interface.console.print("[yellow]⚠️ 일부 외부 서버 시작에 실패했습니다.[/yellow]")
+                    print_fn("[yellow]⚠️ 일부 외부 서버 시작에 실패했습니다.[/yellow]")
                 
                 # 3. 챗봇 MCP 활성화
                 self.chatbot.mcp_enabled = True
-                self.interface.console.print("[green]✓ 챗봇 MCP 기능이 활성화되었습니다.[/green]")
+                print_fn("[green]✓ 챗봇 MCP 기능이 활성화되었습니다.[/green]")
                 
-                self.interface.console.print("\n[bold green]🎉 통합 Deep Research MCP 시스템이 성공적으로 시작되었습니다![/bold green]")
-                self.interface.console.print("[dim]사용 가능한 명령어: /mcp tools, /mcp status[/dim]")
+                print_fn("\n[bold green]🎉 통합 Deep Research MCP 시스템이 성공적으로 시작되었습니다![/bold green]")
+                print_fn("[dim]사용 가능한 명령어: /mcp tools, /mcp status[/dim]")
                 self.interface.console.print("[dim]이제 신약개발 질문을 하면 자동으로 모든 MCP 서버를 활용한 Deep Search가 수행됩니다.[/dim]")
                 self.interface.console.print("[dim]디버그 모드: /debug 로 토글 가능[/dim]")
                 
             else:
-                self.interface.console.print("[red]✗ MCP 서버 시작에 실패했습니다.[/red]")
+                print_fn("[red]✗ MCP 서버 시작에 실패했습니다.[/red]")
                 
         except Exception as e:
-            self.interface.display_error(f"MCP 서버 시작 중 오류: {e}")
+            if hasattr(self.interface, 'display_error'):
+                self.interface.display_error(f"MCP 서버 시작 중 오류: {e}")
+            else:
+                print(f"❌ MCP 서버 시작 중 오류: {e}")
             if self.chatbot.settings.get("debug_mode", False):
                 import traceback
                 self.interface.console.print(f"[dim red]{traceback.format_exc()}[/dim red]")
@@ -280,33 +312,45 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
     async def show_mcp_status(self):
         """MCP 상태 표시"""
         try:
+            if not self.mcp_manager:
+                print("❌ MCP 관리자가 초기화되지 않았습니다")
+                return
+                
+            if hasattr(self.interface, 'console'):
+                print_fn = lambda msg: self.interface.console.print(msg)
+            else:
+                print_fn = print
+            
             status = self.mcp_manager.get_status()
             
-            self.interface.console.print("[bold]MCP 상태:[/bold]")
-            self.interface.console.print(f"• 실행 중: {'✓' if status['running'] else '✗'}")
-            self.interface.console.print(f"• 서버 활성: {'✓' if status['server_active'] else '✗'}")
-            self.interface.console.print(f"• 클라이언트 수: {status['clients_count']}")
-            self.interface.console.print(f"• 챗봇 MCP 활성화: {'✓' if self.chatbot.mcp_enabled else '✗'}")
+            print_fn("[bold]MCP 상태:[/bold]")
+            print_fn(f"• 실행 중: {'✓' if status['running'] else '✗'}")
+            print_fn(f"• 서버 활성: {'✓' if status['server_active'] else '✗'}")
+            print_fn(f"• 클라이언트 수: {status['clients_count']}")
+            print_fn(f"• 챗봇 MCP 활성화: {'✓' if self.chatbot.mcp_enabled else '✗'}")
             
             if status['server_info']:
                 server_info = status['server_info']
-                self.interface.console.print(f"• 서버 이름: {server_info.get('name', 'N/A')}")
-                self.interface.console.print(f"• 서버 버전: {server_info.get('version', 'N/A')}")
-                self.interface.console.print(f"• 등록된 툴 수: {server_info.get('tools_count', 0)}")
+                print_fn(f"• 서버 이름: {server_info.get('name', 'N/A')}")
+                print_fn(f"• 서버 버전: {server_info.get('version', 'N/A')}")
+                print_fn(f"• 등록된 툴 수: {server_info.get('tools_count', 0)}")
             
             # 연결된 MCP 서버 목록 표시
-            self.interface.console.print("\n[bold]연결된 MCP 서버:[/bold]")
+            print_fn("\n[bold]연결된 MCP 서버:[/bold]")
             connected_servers = await self.get_connected_mcp_servers()
             if connected_servers:
                 for server in connected_servers:
-                    self.interface.console.print(f"• [cyan]{server['name']}[/cyan]: {server['status']}")
+                    print_fn(f"• [cyan]{server['name']}[/cyan]: {server['status']}")
                     if server.get('tools'):
-                        self.interface.console.print(f"  └─ 툴: {', '.join(server['tools'][:3])}{'...' if len(server['tools']) > 3 else ''}")
+                        print_fn(f"  └─ 툴: {', '.join(server['tools'][:3])}{'...' if len(server['tools']) > 3 else ''}")
             else:
-                self.interface.console.print("[yellow]연결된 MCP 서버가 없습니다.[/yellow]")
+                print_fn("[yellow]연결된 MCP 서버가 없습니다.[/yellow]")
             
         except Exception as e:
-            self.interface.display_error(f"MCP 상태 확인 중 오류: {e}")
+            if hasattr(self.interface, 'display_error'):
+                self.interface.display_error(f"MCP 상태 확인 중 오류: {e}")
+            else:
+                print(f"❌ MCP 상태 확인 중 오류: {e}")
     
     async def list_mcp_tools(self):
         """MCP 툴 목록 표시"""
