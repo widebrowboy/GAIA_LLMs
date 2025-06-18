@@ -1,4 +1,4 @@
-# GAIA-BT v2.0 신약개발 연구 시스템 - 빠른 시작 가이드
+# GAIA-BT v2.0 Alpha 신약개발 연구 시스템 - 빠른 시작 가이드
 
 **🧬 5분 만에 통합 Deep Research MCP 시스템 시작하기** 🚀
 

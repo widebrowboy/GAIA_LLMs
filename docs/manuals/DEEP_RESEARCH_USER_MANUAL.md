@@ -1,4 +1,4 @@
-# GAIA-BT v2.0 신약개발 Deep Research 사용자 매뉴얼
+# GAIA-BT v2.0 Alpha 신약개발 Deep Research 사용자 매뉴얼
 
 **통합 Deep Research MCP 시스템 - 신약개발 전문 AI 연구 어시스턴트 상세 가이드** 🧬
 

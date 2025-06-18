@@ -129,6 +129,20 @@ class MCPCommands:
             else:
                 self.interface.display_error("사용법: /mcp opentargets <action> <query>")
                 self.interface.display_error("Actions: targets, diseases, target_diseases, disease_targets, drugs")
+        elif subcommand == "playwright":
+            if len(parts) >= 3:
+                action = parts[1]
+                url_or_query = " ".join(parts[2:])
+                await self.playwright_action(action, url_or_query)
+            else:
+                self.interface.display_error("사용법: /mcp playwright <action> <url_or_query>")
+                self.interface.display_error("Actions: navigate, screenshot, extract, click, type, wait")
+        elif subcommand == "web":
+            if len(parts) >= 2:
+                url = " ".join(parts[1:])
+                await self.playwright_navigate(url)
+            else:
+                self.interface.display_error("사용법: /mcp web <url>")
         elif subcommand == "test":
             if len(parts) >= 2:
                 test_type = parts[1]
@@ -189,6 +203,15 @@ class MCPCommands:
 [cyan]/mcp opentargets target_diseases <target_id>[/cyan] - 타겟 연관 질병
 [cyan]/mcp opentargets disease_targets <disease_id>[/cyan] - 질병 연관 타겟
 [cyan]/mcp opentargets drugs <drug>[/cyan] - 약물 검색
+
+[bold cyan]Playwright (웹 자동화):[/bold cyan]
+[cyan]/mcp playwright navigate <url>[/cyan] - 웹 페이지 이동
+[cyan]/mcp playwright screenshot <url>[/cyan] - 웹 페이지 스크린샷
+[cyan]/mcp playwright extract <url>[/cyan] - 웹 페이지 텍스트 추출
+[cyan]/mcp playwright click <url> <selector>[/cyan] - 요소 클릭
+[cyan]/mcp playwright type <url> <text>[/cyan] - 텍스트 입력
+[cyan]/mcp playwright wait <url> <selector>[/cyan] - 요소 대기
+[cyan]/mcp web <url>[/cyan] - 웹 페이지 빠른 이동
 
 [bold cyan]테스트:[/bold cyan]
 [cyan]/mcp test[/cyan] - HNSCC 예제를 활용한 MCP 통합 테스트
@@ -1189,3 +1212,68 @@ MCP가 활성화되면 일반 질문도 자동으로 MCP 툴을 사용하여 처
             
         except Exception as e:
             self.interface.display_error(f"OpenTargets 검색 중 오류: {e}")
+
+    async def playwright_action(self, action: str, url_or_query: str):
+        """Playwright 액션 실행"""
+        try:
+            self.interface.print_thinking(f"Playwright {action} 실행 중...")
+            
+            # 액션에 따른 도구 이름 매핑
+            tool_mapping = {
+                "navigate": "navigate",
+                "screenshot": "screenshot",
+                "extract": "extract_text", 
+                "click": "click",
+                "type": "type_text",
+                "wait": "wait_for_element"
+            }
+            
+            tool_name = tool_mapping.get(action)
+            if not tool_name:
+                self.interface.display_error(f"지원하지 않는 액션: {action}")
+                return
+            
+            # 액션별 인자 구성
+            if action == "navigate":
+                arguments = {"url": url_or_query}
+            elif action == "screenshot":
+                arguments = {"url": url_or_query, "fullPage": True}
+            elif action == "extract":
+                arguments = {"url": url_or_query}
+            elif action in ["click", "type", "wait"]:
+                parts = url_or_query.split(maxsplit=1)
+                if len(parts) < 2:
+                    self.interface.display_error(f"사용법: /mcp playwright {action} <url> <selector_or_text>")
+                    return
+                url, selector_or_text = parts
+                arguments = {"url": url, "selector": selector_or_text} if action != "type" else {"url": url, "text": selector_or_text}
+            else:
+                arguments = {"url": url_or_query}
+            
+            result = await self.mcp_manager.call_tool(
+                client_id="playwright-mcp",
+                tool_name=tool_name,
+                arguments=arguments
+            )
+            
+            if result and "content" in result:
+                content = result["content"]
+                if content and len(content) > 0:
+                    response_text = content[0].get("text", "결과 없음")
+                    self.interface.display_response(f"🌐 Playwright {action.title()} 결과:\n{response_text}")
+                    
+                    # 저장 확인
+                    save_choice = input(f"\nPlaywright {action} 결과를 저장하시겠습니까? (y/N): ").strip().lower()
+                    if save_choice == 'y':
+                        await self.chatbot.save_research_result(f"Playwright {action.title()} - {url_or_query}", response_text)
+                else:
+                    self.interface.console.print("[yellow]결과가 비어있습니다.[/yellow]")
+            else:
+                self.interface.console.print(f"[yellow]원본 결과: {result}[/yellow]")
+                
+        except Exception as e:
+            self.interface.display_error(f"Playwright 액션 실행 중 오류: {e}")
+
+    async def playwright_navigate(self, url: str):
+        """간편한 웹 페이지 네비게이션"""
+        await self.playwright_action("navigate", url)

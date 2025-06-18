@@ -148,6 +148,20 @@
         "PYTHONPATH": "/home/gaia-bt/workspace/GAIA_LLMs"
       }
     },
+    "playwright-mcp": {
+      "command": "node",
+      "args": [
+        "/home/gaia-bt/workspace/GAIA_LLMs/mcp/playwright-mcp/cli.js",
+        "--headless"
+      ],
+      "description": "Playwright MCP Server - Web automation and browser interaction capabilities for automated testing and data extraction",
+      "capabilities": [
+        "tools"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
     "clinicaltrials-mcp": {
       "command": "python",
       "args": [
@@ -189,7 +203,8 @@
         "opentargets-mcp",
         "biorxiv-mcp",
         "pubmed-mcp",
-        "clinicaltrials-mcp"
+        "clinicaltrials-mcp",
+        "playwright-mcp"
       ],
       "settings": {
         "logLevel": "info",
@@ -282,7 +297,8 @@
         "biorxiv-mcp",
         "pubmed-mcp",
         "clinicaltrials-mcp",
-        "sequential-thinking"
+        "sequential-thinking",
+        "playwright-mcp"
       ],
       "settings": {
         "logLevel": "info",

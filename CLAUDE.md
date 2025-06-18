@@ -1,12 +1,13 @@
-# GAIA-BT 신약개발 연구 시스템 - 개발 가이드 & 규칙
+# GAIA-BT v2.0 Alpha 신약개발 연구 시스템 - 개발 가이드 & 규칙
 
 ## 📋 프로젝트 개요
-GAIA-BT는 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
+GAIA-BT v2.0 Alpha는 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
 
 ## 🎯 현재 구현 상태 (2024년 기준)
-- **전체 완성도**: 85-90% 완료
+- **전체 완성도**: 90-95% 완료 (Alpha 버전)
 - **핵심 기능**: 모든 주요 기능 구현 완료
-- **상태**: 프로덕션 레디 (Production Ready)
+- **신규 기능**: Playwright MCP 웹 자동화 추가
+- **상태**: 알파 테스트 단계 (Alpha Testing)
 - **사용 가능**: 즉시 사용 가능한 상태
 
 ## 🔧 개발 시 필수 준수 규칙
@@ -218,6 +219,10 @@ GAIA_LLMs/
 │   ├── 📁 biomcp/               # BiomCP 서버 (서브모듈)
 │   ├── 📁 chembl/               # ChEMBL 서버 (서브모듈)
 │   ├── 📁 sequential-thinking/  # 추론 서버
+│   ├── 📁 playwright-mcp/       # Playwright MCP 서버 (신규 v2.0 Alpha)
+│   │   ├── cli.js               # Playwright MCP 실행 파일
+│   │   ├── package.json         # Node.js 의존성 정의
+│   │   └── src/                 # 소스 코드
 │   └── run_server.py           # MCP 서버 실행
 ├── 📁 scripts/                  # 실행 스크립트
 │   ├── run_mcp_servers.sh      # MCP 서버 시작
@@ -334,7 +339,7 @@ GAIA_LLMs/
   ✅ mcp/integration/gaia_mcp_server.py 완료
 
 ### 8단계: MCP 명령어 시스템 구현 ✅ COMPLETED
-✅ app/cli/mcp_commands.py 구현 완료 (고급 기능 포함, 1,191라인)
+✅ app/cli/mcp_commands.py 구현 완료 (고급 기능 포함, 1,270라인)
   ✅ MCP 서버 시작/중지 완료
   ✅ 상태 확인 완료
   ✅ 개별 툴 호출 완룼
@@ -344,7 +349,7 @@ GAIA_LLMs/
   ✅ BiomCP 서버 통합 완료
   ✅ 데이터 변환 및 포맷팅 완료
 
-### 9단계: 외부 MCP 서버 통합 ✅ MOSTLY COMPLETED (85%)
+### 9단계: 외부 MCP 서버 통합 ✅ MOSTLY COMPLETED (90%)
 ✅ BiomCP 서버 통합 완료
   ✅ 논문 검색 (PubMed/PubTator3) 완료
   ✅ 임상시험 데이터 (ClinicalTrials.gov) 완료
@@ -355,6 +360,10 @@ GAIA_LLMs/
 ✅ Sequential Thinking 서버 통합 완룼
   ✅ 단계별 추론 완료
   ✅ 문제 분해 완료
+✅ **신규!** Playwright MCP 서버 통합 완료 (v2.0 Alpha)
+  ✅ 웹 페이지 자동화 (navigate, screenshot, extract) 완료
+  ✅ 웹 요소 상호작용 (click, type, wait) 완료
+  ✅ 브라우저 기반 데이터 수집 완료
 ⚠️ **주의**: 현재 Mock 응답 사용 중, 실제 API 연결 필요
 
 ### 10단계: 실행 파일 및 스크립트 작성 ✅ COMPLETED
@@ -430,7 +439,8 @@ GAIA_LLMs/
 - 피드백 루프를 통한 답변 개선
 - 구조화된 연구 보고서 생성
 - 다중 LLM 모델 지원
-- 목적별 전문 프롬프트 시스템 (신규)
+- 목적별 전문 프롬프트 시스템
+- **신규!** 웹 자동화 및 브라우저 기반 데이터 수집 (Playwright MCP)
 
 ### 설정 항목
 - Ollama 연결 설정

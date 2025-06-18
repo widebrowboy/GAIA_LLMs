@@ -1,4 +1,4 @@
-# GAIA-BT v2.0 신약개발 연구 챗봇 실행 가이드
+# GAIA-BT v2.0 Alpha 신약개발 연구 챗봇 실행 가이드
 
 **통합 Deep Research MCP 시스템 - 신약개발 전문 AI 연구 어시스턴트 실행 매뉴얼** 🧬💊
 

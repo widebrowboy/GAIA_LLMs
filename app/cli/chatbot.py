@@ -688,7 +688,7 @@ class DrugDevelopmentChatbot:
                         successful_dbs.append("🧠 Sequential Thinking")
                 
                 result_stats = f"""
-🔬 **GAIA-BT v2.0 통합 Deep Search 수행 완루**
+🔬 **GAIA-BT v2.0 Alpha 통합 Deep Search 수행 완루**
 
 📊 **성공적으로 검색된 MCP 데이터베이스:**
 {' + '.join(set(successful_dbs)) if successful_dbs else '검색 결과 없음'}
