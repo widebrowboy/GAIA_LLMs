@@ -78,6 +78,9 @@ async def run_chatbot_interactive():
         
         print("✅ AI 모델 준비 완료")
         
+        # 일반 모드 배너 표시
+        chatbot._show_mode_banner()
+        
         # 기본 사용법 안내
         print("\n" + "="*80)
         print("💬 신약개발 질문을 입력하거나 명령어를 사용하세요:")
@@ -114,7 +117,7 @@ async def run_chatbot_interactive():
                 
                 # 명령어 정규화 - '/' 없이 입력된 명령어도 처리
                 normalized_input = user_input
-                if not user_input.startswith("/") and user_input.split()[0] in ['help', 'mcp', 'model', 'prompt', 'debug', 'exit']:
+                if not user_input.startswith("/") and user_input.split()[0] in ['help', 'mcp', 'model', 'prompt', 'debug', 'exit', 'normal']:
                     normalized_input = "/" + user_input
                     if chatbot.config.debug_mode:
                         print(f"🐛 [디버그] 명령어 정규화: '{user_input}' → '{normalized_input}'")
@@ -161,9 +164,13 @@ async def run_chatbot_interactive():
                         chatbot.client.set_debug_mode(chatbot.config.debug_mode)
                         state = "켜짐" if chatbot.config.debug_mode else "꺼짐"
                         print(f"🐛 디버그 모드가 {state}으로 설정되었습니다.")
+                    elif normalized_input == "/normal":
+                        # 일반 모드로 전환
+                        chatbot.switch_to_normal_mode()
+                        print("🔄 일반 모드로 전환되었습니다.")
                     else:
                         print(f"❌ 알 수 없는 명령어: {normalized_input}")
-                        print("사용 가능한 명령어: /help, /mcp, /model, /prompt, /debug, /exit")
+                        print("사용 가능한 명령어: /help, /mcp, /model, /prompt, /debug, /normal, /exit")
                         print("💡 팁: '/' 없이도 명령어를 사용할 수 있습니다 (예: mcp start)")
                 else:
                     # 특별 MCP 명령어 패턴 확인 (추가 안전장치)
@@ -227,8 +234,10 @@ def print_help():
 📋 기본 명령어 (유연한 입력 지원):
   /help 또는 help           - 이 도움말 표시
   /debug 또는 debug         - 디버그 모드 토글 (Deep Search 과정 표시)
+  /normal 또는 normal       - 일반 모드로 전환
   /exit 또는 exit           - 챗봇 종료
   /model <이름>             - AI 모델 변경 (gemma3:latest 권장)
+  /prompt <모드>            - 전문 프롬프트 변경 (clinical/research/chemistry)
 
 🔬 통합 Deep Research MCP 명령어 (유연한 입력 지원):
   ┌─ 기본 제어 ─────────────────────────────────────────────────────┐
