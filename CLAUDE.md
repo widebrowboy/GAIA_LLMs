@@ -4,9 +4,13 @@
 GAIA-BT v2.0 Alpha는 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
 
 ## 🎯 현재 구현 상태 (2024년 기준)
-- **전체 완성도**: 90-95% 완료 (Alpha 버전)
+- **전체 완성도**: 92-97% 완료 (Alpha 버전)
 - **핵심 기능**: 모든 주요 기능 구현 완료
-- **신규 기능**: Playwright MCP 웹 자동화 추가
+- **신규 기능**: 
+  - Playwright MCP 웹 자동화 추가
+  - 이중 모드 시스템 (일반/Deep Research 모드)
+  - MCP 출력 제어 옵션 추가
+  - 파일 기반 프롬프트 관리 시스템
 - **상태**: 알파 테스트 단계 (Alpha Testing)
 - **사용 가능**: 즉시 사용 가능한 상태
 
@@ -65,6 +69,26 @@ MUST FOLLOW:
 - 프롬프트 변경은 /prompt 명령어를 통해서만 수행
 - 목적별 전문 프롬프트 활용 (clinical, research, chemistry, regulatory)
 - prompt_manager.py를 통한 중앙집중식 프롬프트 관리
+```
+
+### Rule 7: 이중 모드 시스템 규칙 (신규 v2.0 Alpha)
+```
+MUST FOLLOW:
+- 일반 모드: 기본 AI 답변만 제공, MCP 비활성화
+- Deep Research 모드: MCP 통합 검색 활성화, 다중 데이터베이스 검색
+- 모드 전환은 /mcp (Deep Research) 및 /normal 명령어로만 수행
+- MCP 출력 표시는 show_mcp_output 설정으로 제어
+- 각 모드별 전용 배너 및 UI 제공
+```
+
+### Rule 8: MCP 출력 제어 규칙 (신규 v2.0 Alpha)
+```
+MUST FOLLOW:
+- MCP 검색 과정 출력은 config.show_mcp_output 설정으로 제어
+- /mcpshow 명령어로 실시간 토글 가능
+- 기본값은 False (출력 숨김) - 사용자 경험 개선
+- 디버그 모드와 별도로 동작 (독립적 제어)
+- Deep Research 모드에서만 적용됨
 ```
 
 ## 📋 개발 작업 시 프롬프트 템플릿
@@ -167,9 +191,10 @@ GAIA_LLMs/
 │   │   └── model_adapters.py    # 모델 어댑터
 │   └── 📁 utils/                # 유틸리티
 │       ├── __init__.py
-│       ├── config.py            # 설정 관리
+│       ├── config.py            # 설정 관리 (MCP 출력 제어 추가)
 │       ├── config_manager.py    # 설정 파일 관리
 │       ├── prompt_manager.py    # 프롬프트 관리 (신규)
+│       ├── interface.py         # 사용자 인터페이스 (신규 v2.0 Alpha)
 │       └── text_utils.py        # 텍스트 처리
 ├── 📁 prompts/                  # 프롬프트 템플릿 (신규)
 │   ├── prompt_default.txt       # 기본 신약개발 프롬프트
@@ -434,13 +459,16 @@ GAIA_LLMs/
 
 ### 주요 기능
 - 신약개발 전문 AI 답변
+- **신규!** 이중 모드 시스템 (일반/Deep Research 모드)
 - MCP 통합 (ChEMBL, PubMed, ClinicalTrials.gov)
 - Deep Search 기능
+- **신규!** MCP 출력 제어 옵션 (/mcpshow 명령어)
 - 피드백 루프를 통한 답변 개선
 - 구조화된 연구 보고서 생성
 - 다중 LLM 모델 지원
 - 목적별 전문 프롬프트 시스템
 - **신규!** 웹 자동화 및 브라우저 기반 데이터 수집 (Playwright MCP)
+- **신규!** 사용자 친화적 UI/UX (모드별 배너 및 안내)
 
 ### 설정 항목
 - Ollama 연결 설정
@@ -449,6 +477,7 @@ GAIA_LLMs/
 - 피드백 루프 설정
 - MCP 서버 설정
 - 프롬프트 템플릿 관리 (신규)
+- **신규!** MCP 출력 표시 제어 (show_mcp_output)
 
 ## 📌 중요 참고사항
 
@@ -531,5 +560,47 @@ python main.py --enable-mcp
 - **research**: 문헌 분석 및 과학적 증거 종합 전문가
 - **chemistry**: 의약화학 및 분자 설계 전문가
 - **regulatory**: 글로벌 의약품 규제 및 승인 전문가
+
+### 🔄 이중 모드 시스템 사용법 (신규 v2.0 Alpha)
+
+#### 1. 일반 모드 (Normal Mode)
+```bash
+# 일반 모드 특징
+- 기본 AI 답변만 제공
+- 빠른 응답 속도
+- 신약개발 기본 지식 제공
+- MCP 검색 비활성화
+
+# 사용 예시
+"아스피린의 작용 메커니즘을 설명해주세요"
+"임상시험 1상과 2상의 차이점은?"
+```
+
+#### 2. Deep Research 모드 (Deep Research Mode)
+```bash
+# Deep Research 모드 특징
+- 다중 데이터베이스 동시 검색
+- 논문, 임상시험 데이터 통합 분석
+- Sequential Thinking AI 연구 계획 수립
+- 과학적 근거 기반 상세 답변
+
+# 모드 전환
+/mcp start          # Deep Research 모드 활성화
+/normal             # 일반 모드로 복귀
+
+# 사용 예시
+"아스피린의 약물 상호작용과 새로운 치료제 개발 가능성을 분석해주세요"
+"BRCA1 유전자 타겟을 이용한 유방암 치료제 개발 전략을 분석해주세요"
+```
+
+#### 3. MCP 출력 제어 (신규)
+```bash
+# MCP 검색 과정 표시 토글
+/mcpshow            # 검색 과정 표시/숨김 전환
+
+# 출력 옵션
+- 켜짐: 🔬 통합 MCP Deep Search 수행 중... (실시간 검색 과정 표시)
+- 꺼짐: 백그라운드 검색 후 최종 결과만 표시 (기본값)
+```
 
 이 시스템은 **현재 상태에서도 신약개발 연구에 충분히 활용 가능**하며, Mock 응답을 통해 전체 워크플로우를 체험할 수 있습니다.

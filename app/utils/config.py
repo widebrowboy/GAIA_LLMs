@@ -59,3 +59,5 @@ class Config:
         self.min_references = 2
         self.temperature = 0.7
         self.max_tokens = 2000
+        # MCP 출력 표시 옵션 (기본값: False - 숨김)
+        self.show_mcp_output = False

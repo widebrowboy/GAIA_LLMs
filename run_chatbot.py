@@ -117,7 +117,7 @@ async def run_chatbot_interactive():
                 
                 # 명령어 정규화 - '/' 없이 입력된 명령어도 처리
                 normalized_input = user_input
-                if not user_input.startswith("/") and user_input.split()[0] in ['help', 'mcp', 'model', 'prompt', 'debug', 'exit', 'normal']:
+                if not user_input.startswith("/") and user_input.split()[0] in ['help', 'mcp', 'model', 'prompt', 'debug', 'exit', 'normal', 'mcpshow']:
                     normalized_input = "/" + user_input
                     if chatbot.config.debug_mode:
                         print(f"🐛 [디버그] 명령어 정규화: '{user_input}' → '{normalized_input}'")
@@ -168,9 +168,12 @@ async def run_chatbot_interactive():
                         # 일반 모드로 전환
                         chatbot.switch_to_normal_mode()
                         print("🔄 일반 모드로 전환되었습니다.")
+                    elif normalized_input == "/mcpshow":
+                        # MCP 출력 표시 토글
+                        chatbot.toggle_mcp_output()
                     else:
                         print(f"❌ 알 수 없는 명령어: {normalized_input}")
-                        print("사용 가능한 명령어: /help, /mcp, /model, /prompt, /debug, /normal, /exit")
+                        print("사용 가능한 명령어: /help, /mcp, /model, /prompt, /debug, /normal, /mcpshow, /exit")
                         print("💡 팁: '/' 없이도 명령어를 사용할 수 있습니다 (예: mcp start)")
                 else:
                     # 특별 MCP 명령어 패턴 확인 (추가 안전장치)
@@ -233,7 +236,8 @@ def print_help():
 
 📋 기본 명령어 (유연한 입력 지원):
   /help 또는 help           - 이 도움말 표시
-  /debug 또는 debug         - 디버그 모드 토글 (Deep Search 과정 표시)
+  /debug 또는 debug         - 디버그 모드 토글 (상세 과정 표시)
+  /mcpshow 또는 mcpshow     - MCP 검색 과정 표시 토글 (Deep Research 모드 전용)
   /normal 또는 normal       - 일반 모드로 전환
   /exit 또는 exit           - 챗봇 종료
   /model <이름>             - AI 모델 변경 (gemma3:latest 권장)
@@ -281,11 +285,25 @@ def print_help():
   2. '/debug' 명령어로 디버그 모드 활성화 (권장)
   3. 복잡한 신약개발 질문을 입력하면 자동으로 관련 데이터베이스들을 검색
   
-🧪 Deep Search 질문 예제:
-  "아스피린의 약물 상호작용과 새로운 치료제 개발 가능성을 분석해주세요"
-  "BRCA1 유전자 타겟을 이용한 유방암 치료제 개발 전략을 분석해주세요"
-  "알츠하이머병 치료를 위한 새로운 타겟 발굴 전략을 제시해주세요"
-  "키나제 억제제의 구조 최적화 방법을 분석해주세요"
+🧪 모드별 사용 예제:
+
+┌─ 🧬 일반 모드 예제 ─────────────────────────────────────────────────┐
+│ • "아스피린의 작용 메커니즘을 설명해주세요"                        │
+│ • "EGFR 억제제의 부작용은 무엇인가요?"                            │
+│ • "임상시험 1상과 2상의 차이점은?"                                │
+│ • "신약개발 과정의 주요 단계를 설명해주세요"                      │
+│                                                                   │
+│ 💡 특징: 신속한 AI 답변, 기본적인 신약개발 지식 제공             │
+└───────────────────────────────────────────────────────────────────┘
+
+┌─ 🔬 Deep Research 모드 예제 ──────────────────────────────────────┐
+│ • "아스피린의 약물 상호작용과 새로운 치료제 개발 가능성 분석"     │
+│ • "BRCA1 유전자 타겟을 이용한 유방암 치료제 개발 전략"            │
+│ • "알츠하이머병 치료를 위한 새로운 타겟 발굴 전략"               │
+│ • "키나제 억제제의 구조 최적화 방법과 임상 데이터 분석"          │
+│                                                                   │
+│ 💡 특징: 다중 데이터베이스 검색, 논문/임상시험 데이터 통합 분석  │
+└───────────────────────────────────────────────────────────────────┘
   
 📖 상세 문서:
   - QUICK_START_GUIDE.md        - 5분 빠른 시작 가이드
@@ -294,15 +312,22 @@ def print_help():
   - README.md                   - 전체 시스템 개요
 
 💡 사용 팁:
-  • 디버그 모드를 켜면 각 MCP 서버의 검색 과정을 실시간 확인 가능
-  • 명령어는 '/' 없이도 사용 가능 (예: mcp start, help, debug)
+  • 디버그 모드(/debug): 시스템 전체의 상세한 디버그 정보 표시
+  • MCP 출력 토글(/mcpshow): Deep Research 모드에서 검색 과정 표시/숨김 전환
+  • 명령어는 '/' 없이도 사용 가능 (예: mcp start, help, debug, mcpshow)
   • 공백이 있어도 자동으로 처리됩니다
+  
+🔧 MCP 출력 옵션:
+  • 켜짐: 검색 과정을 실시간으로 확인 (🔬 통합 MCP Deep Search 수행 중...)
+  • 꺼짐: 백그라운드 검색 후 최종 결과만 표시 (기본값)
 
 📝 명령어 사용 예시:
   다음 표현들은 모두 동일하게 작동합니다:
   ✓ /mcp start    ✓ mcp start    ✓ /mcp  start    ✓ mcp  start
   ✓ /help         ✓ help
   ✓ /debug        ✓ debug
+  ✓ /mcpshow      ✓ mcpshow
+  ✓ /normal       ✓ normal
   ✓ /exit         ✓ exit
 """
     print(help_text)

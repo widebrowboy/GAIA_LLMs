@@ -267,7 +267,8 @@ class DrugDevelopmentChatbot:
             return None
         
         try:
-            self.interface.print_thinking("🔬 통합 MCP Deep Search 수행 중...")
+            if self.config.show_mcp_output:
+                self.interface.print_thinking("🔬 통합 MCP Deep Search 수행 중...")
             search_results = []
             
             # 키워드 분석으로 최적 검색 전략 결정
@@ -278,13 +279,14 @@ class DrugDevelopmentChatbot:
             is_chemical_related = any(kw in input_lower for kw in ['화학', '분자', '구조', 'chemical', 'molecule', 'structure', 'smiles'])
             
             # 디버그 정보 출력
-            if self.settings.get("debug_mode", False):
+            if self.settings.get("debug_mode", False) and self.config.show_mcp_output:
                 self.interface.print_thinking(f"🔍 키워드 분석: 약물={is_drug_related}, 타겟={is_target_related}, 질병={is_disease_related}, 화학={is_chemical_related}")
             
             # 1. Sequential Thinking으로 연구 계획 수립
             thinking_success = False
             try:
-                self.interface.print_thinking("🧠 AI 분석 및 연구 계획 수립...")
+                if self.config.show_mcp_output:
+                    self.interface.print_thinking("🧠 AI 분석 및 연구 계획 수립...")
                 
                 # 수정된 매개변수 사용 (enableBranching 제거)
                 thinking_result = await self.mcp_commands.call_tool(
@@ -310,13 +312,15 @@ class DrugDevelopmentChatbot:
                     if thinking_text and len(thinking_text) > 30:  # 최소 30자 이상의 의미있는 내용
                         search_results.append(f"🧠 AI 연구 계획:\n{thinking_text}")
                         thinking_success = True
-                        self.interface.print_thinking("✓ AI 분석 완료")
+                        if self.config.show_mcp_output:
+                            self.interface.print_thinking("✓ AI 분석 완료")
                 
-                if not thinking_success:
+                if not thinking_success and self.config.show_mcp_output:
                     self.interface.print_thinking("⚠️ AI 분석 결과 없음")
                     
             except Exception as e:
-                self.interface.print_thinking(f"🙅 AI 분석 실패: {e}")
+                if self.config.show_mcp_output:
+                    self.interface.print_thinking(f"🙅 AI 분석 실패: {e}")
                 if self.settings.get("debug_mode", False):
                     import traceback
                     self.interface.print_thinking(f"🐛 상세 오류: {traceback.format_exc()}")
@@ -326,7 +330,8 @@ class DrugDevelopmentChatbot:
             # 2. DrugBank 약물 데이터베이스 검색
             if is_drug_related:
                 try:
-                    self.interface.print_thinking("💊 DrugBank 약물 데이터 검색...")
+                    if self.config.show_mcp_output:
+                        self.interface.print_thinking("💊 DrugBank 약물 데이터 검색...")
                     
                     # 질문에서 약물명 추출
                     common_drugs = ['aspirin', 'ibuprofen', 'metformin', 'insulin', 'acetaminophen', '아스피린', '메트포민']
@@ -1264,6 +1269,16 @@ class DrugDevelopmentChatbot:
             self.current_mode = "normal"
             self.mode_banner_shown = False  # 배너 다시 표시하도록
             self._show_mode_banner()
+
+    def toggle_mcp_output(self):
+        """MCP 출력 표시 토글"""
+        self.config.show_mcp_output = not self.config.show_mcp_output
+        status = "켜짐" if self.config.show_mcp_output else "꺼짐"
+        print(f"🔍 MCP 검색 과정 표시가 {status}으로 설정되었습니다.")
+        if self.config.show_mcp_output:
+            print("💡 이제 Deep Research 모드에서 MCP 검색 과정을 실시간 확인할 수 있습니다.")
+        else:
+            print("💡 MCP 검색은 백그라운드에서 수행되며 최종 결과만 표시됩니다.")
 
     def _show_mode_banner(self):
         """현재 모드에 맞는 배너 표시"""
