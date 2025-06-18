@@ -255,6 +255,12 @@ class DrugDevelopmentChatbot:
 
     async def deep_search_with_mcp(self, user_input):
         """MCP를 활용한 통합 Deep Search 수행 - DrugBank, OpenTargets, ChEMBL, BioMCP 모두 활용"""
+        # 일반 모드에서는 MCP Deep Search를 수행하지 않음
+        if hasattr(self, 'current_mode') and self.current_mode == "normal":
+            if self.settings.get("debug_mode", False):
+                self.interface.print_thinking("💊 일반 모드에서는 기본 AI 응답만 제공됩니다")
+            return None
+        
         if not self.mcp_enabled:
             if self.settings.get("debug_mode", False):
                 self.interface.print_thinking("❌ MCP가 비활성화되어 있습니다")
@@ -762,9 +768,9 @@ class DrugDevelopmentChatbot:
         Returns:
             str: 생성된 응답
         """
-        # MCP Deep Search 수행
+        # MCP Deep Search 수행 (Deep Research 모드에서만)
         deep_search_context = None
-        if self.mcp_enabled:
+        if self.mcp_enabled and hasattr(self, 'current_mode') and self.current_mode == "deep_research":
             deep_search_context = await self.deep_search_with_mcp(question)
             
             # MCP 연구를 Deep Search 컨텍스트로만 사용 (중복 출력 방지)
