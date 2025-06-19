@@ -132,6 +132,11 @@ class PromptManager:
         self.prompts.clear()
         self._load_prompts()
     
+    @property
+    def templates(self) -> Dict[str, PromptTemplate]:
+        """프롬프트 템플릿 딕셔너리 반환 (API 호환성을 위한 프로퍼티)"""
+        return self.prompts
+    
     def _get_hardcoded_default(self) -> str:
         """하드코딩된 기본 프롬프트 (파일이 없을 경우 폴백)"""
         return """You are GAIA-BT, an AI assistant specialized in drug development and pharmaceutical research. 

@@ -41,6 +41,9 @@ DEFAULT_FEEDBACK_WIDTH = 2  # Default feedback loop width
 MIN_RESPONSE_LENGTH = 100  # Minimum response length in characters
 MIN_REFERENCES = 2  # Minimum number of references
 
+# Debug mode setting
+DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() in ["true", "1", "yes"]
+
 # Output directory for research results
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "outputs/research")
 
@@ -61,3 +64,5 @@ class Config:
         self.max_tokens = 2000
         # MCP 출력 표시 옵션 (기본값: False - 숨김)
         self.show_mcp_output = False
+        # MCP 활성화 상태 (기본값: False)
+        self.mcp_enabled = False

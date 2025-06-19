@@ -859,6 +859,48 @@ class DrugDevelopmentChatbot:
             self.interface.display_error(error_msg)
             return error_msg
 
+    async def generate_streaming_response(self, question: str):
+        """스트리밍 응답 생성 (API용)"""
+        try:
+            # MCP 통합 검색이 활성화된 경우
+            if self.config.mcp_enabled and self.mcp_commands:
+                # MCP 검색 수행
+                if self.config.show_mcp_output:
+                    yield "🔬 통합 MCP Deep Search 수행 중...\n"
+                
+                mcp_results = await self.mcp_commands.integrated_deep_search(question)
+                
+                # 검색 결과 포맷팅
+                formatted_results = self.mcp_commands.format_integrated_results(mcp_results)
+                
+                if self.config.show_mcp_output:
+                    yield "\n📊 MCP 검색 완료\n"
+                
+                # 향상된 시스템 프롬프트 생성
+                enhanced_system_prompt = f"""{self.system_prompt}
+
+=== 통합 MCP Deep Search 결과 ===
+{formatted_results}
+
+위 MCP 검색 결과를 반드시 활용하여 답변을 생성하세요."""
+                
+                # 스트리밍 응답 생성
+                async for chunk in self.client.generate_stream(
+                    prompt=question,
+                    system_prompt=enhanced_system_prompt
+                ):
+                    yield chunk
+            else:
+                # 일반 모드 스트리밍
+                async for chunk in self.client.generate_stream(
+                    prompt=question,
+                    system_prompt=self.system_prompt
+                ):
+                    yield chunk
+                    
+        except Exception as e:
+            yield f"\n❌ 오류 발생: {str(e)}"
+
     async def process_command(self, command: str) -> bool:
         """
         사용자 명령어 처리

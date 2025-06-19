@@ -80,6 +80,10 @@ class OllamaClient:
             print(f"[OllamaClient] Ollama URL: {self.ollama_url}")
             print(f"[OllamaClient] GPU 파라미터: {self.gpu_params}")
 
+    @property
+    def model_name(self) -> str:
+        """모델 이름 반환 (호환성을 위한 프로퍼티)"""
+        return self.model
 
     def _set_adapter(self, model_name: str):
         """
@@ -354,6 +358,87 @@ class OllamaClient:
             debug_mode: 디버그 모드 활성화 여부
         """
         self.debug_mode = debug_mode
+
+    def _prepare_prompt(self, prompt: str, system_prompt: str = None) -> str:
+        """
+        프롬프트를 준비하고 시스템 프롬프트와 결합
+        
+        Args:
+            prompt: 사용자 프롬프트
+            system_prompt: 시스템 프롬프트
+            
+        Returns:
+            str: 결합된 전체 프롬프트
+        """
+        if system_prompt:
+            return f"{system_prompt}\n\n사용자: {prompt}\n\n어시스턴트:"
+        return prompt
+    
+    def _get_model_params(self, **kwargs) -> dict:
+        """
+        모델 매개변수 가져오기
+        
+        Args:
+            **kwargs: 추가 매개변수
+            
+        Returns:
+            dict: 모델 매개변수
+        """
+        params = {
+            "temperature": kwargs.get("temperature", self.temperature),
+            "num_predict": kwargs.get("max_tokens", self.max_tokens),
+        }
+        
+        # GPU 매개변수 추가
+        params.update(self.gpu_params)
+        
+        return params
+
+    async def generate_stream(self, prompt: str, system_prompt: str = None, **kwargs):
+        """
+        스트리밍 응답 생성
+        
+        Args:
+            prompt: 사용자 프롬프트
+            system_prompt: 시스템 프롬프트
+            **kwargs: 추가 매개변수
+            
+        Yields:
+            str: 생성된 텍스트 청크
+        """
+        if self.debug_mode:
+            print(f"[디버그] 스트리밍 요청 - 모델: {self.model_name}")
+        
+        # 전체 프롬프트 생성
+        full_prompt = self._prepare_prompt(prompt, system_prompt)
+        
+        # 요청 데이터 준비
+        data = {
+            "model": self.model_name,
+            "prompt": full_prompt,
+            "stream": True,
+            **self._get_model_params(**kwargs)
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.ollama_url}/api/generate",
+                    json=data
+                ) as response:
+                    async for line in response.content:
+                        if line:
+                            try:
+                                chunk = json.loads(line)
+                                if "response" in chunk:
+                                    yield chunk["response"]
+                                if chunk.get("done", False):
+                                    break
+                            except json.JSONDecodeError:
+                                continue
+                            
+        except Exception as e:
+            yield f"❌ 스트리밍 오류: {str(e)}"
 
     async def check_availability(self) -> dict:
         """Ollama API 연결 및 모델 가용성 확인"""

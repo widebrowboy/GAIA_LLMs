@@ -82,6 +82,12 @@ class MCPManager:
                 def __init__(self, name):
                     self.name = name
                     self.server_type = 'biomcp'  # BioMCP 툴 지원
+                    self.connected = True
+                    
+                async def disconnect(self):
+                    """Mock disconnect method for compatibility"""
+                    self.connected = False
+                    return True
                     
                 async def call_tool(self, tool_name: str, arguments: dict = None):
                     # BioMCP 툴들 처리
@@ -477,9 +483,8 @@ class MCPManager:
     
     async def cleanup(self):
         """Cleanup all resources"""
-        # Disconnect all clients
-        for client_id in list(self.clients.keys()):
-            await self.remove_client(client_id)
+        # Use safe client stopping method
+        await self.stop_all_clients()
         
         # Stop server
         await self.stop_server()
@@ -530,6 +535,12 @@ class MCPManager:
             def __init__(self, name, server_type):
                 self.name = name
                 self.server_type = server_type
+                self.connected = True
+                
+            async def disconnect(self):
+                """Mock disconnect method for compatibility"""
+                self.connected = False
+                return True
                 
             async def call_tool(self, tool_name: str, arguments: Dict[str, Any] = None):
                 # Mock responses for different tools
@@ -1106,3 +1117,38 @@ CRISPR-Cas9, Prime Editing, Base Editing 등의 차세대 유전자 편집 도�
             }
         else:
             return {"content": [{"type": "text", "text": f"BioRxiv Mock: {tool_name} 기본 응답"}]}
+    
+    async def stop_all_clients(self):
+        """Stop all MCP clients safely"""
+        try:
+            for client_id in list(self.clients.keys()):
+                try:
+                    client = self.clients[client_id]
+                    if hasattr(client, 'disconnect'):
+                        await client.disconnect()
+                    self.logger.info(f"Disconnected client: {client_id}")
+                except Exception as e:
+                    self.logger.warning(f"Error disconnecting client {client_id}: {e}")
+                finally:
+                    # 클라이언트 제거
+                    if client_id in self.clients:
+                        del self.clients[client_id]
+            
+            self.logger.info("All MCP clients stopped successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Error stopping MCP clients: {e}")
+    
+    async def cleanup(self):
+        """Clean up all MCP resources"""
+        try:
+            # 모든 클라이언트 중지
+            await self.stop_all_clients()
+            
+            # 서버 중지
+            await self.stop_server()
+            
+            self.logger.info("MCP Manager cleanup completed")
+            
+        except Exception as e:
+            self.logger.error(f"Error during MCP cleanup: {e}")
