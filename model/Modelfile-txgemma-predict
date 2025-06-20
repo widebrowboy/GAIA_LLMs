@@ -1,4 +1,4 @@
-FROM /home/gaia-bt/workspace/GAIA_LLMs/model/google.txgemma-9b-predict.Q8_0.gguf
+FROM /home/gaia-bt/workspace/GAIA_LLMs/model/google.txgemma-27b-predict.Q4_K_M.gguf
 
 PARAMETER num_gpu 99
 PARAMETER num_thread 8

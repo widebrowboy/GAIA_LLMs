@@ -2,10 +2,15 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
-  experimental: {
-    serverComponentsExternalPackages: ["sharp", "onnxruntime-node"],
+  eslint: {
+    // 개발 중 ESLint 오류를 경고로 처리
+    ignoreDuringBuilds: false,
   },
+  typescript: {
+    // 개발 중 TypeScript 오류를 경고로 처리
+    ignoreBuildErrors: false,
+  },
+  serverExternalPackages: ["sharp", "onnxruntime-node"],
   images: {
     domains: ['localhost'],
     remotePatterns: [

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Beaker, Target, Dna, Heart, Sparkles, Zap, Globe, Activity, Users, ArrowRight, Play, Cpu, Database, Brain } from 'lucide-react';
+import { X, Beaker, Target, Heart, Sparkles, Zap, Globe, Activity, Users, ArrowRight, Play, Cpu, Database, Brain } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 
 interface StartupBannerProps {
@@ -25,12 +25,34 @@ export function StartupBanner({ onClose }: StartupBannerProps) {
     // API에서 현재 설정 가져오기
     const fetchSettings = async () => {
       try {
-        const response = await fetch('/api/system/info');
+        // GAIA-BT API를 통해 시스템 정보 가져오기
+        const response = await fetch('/api/gaia-bt', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: 'status'
+          })
+        });
+        
         const data = await response.json();
-        setCurrentModel('gemma3:latest');
-        setCurrentPrompt('default (신약개발 전문 AI 어시스턴트)');
+        
+        if (data.success && data.status) {
+          setCurrentModel(data.status.model || 'gemma3:latest');
+          const promptType = data.status.prompt_type || 'default';
+          const promptDesc = data.status.prompt_description || '신약개발 전문 AI 어시스턴트';
+          setCurrentPrompt(`${promptType} (${promptDesc})`);
+        } else {
+          // 기본값 설정
+          setCurrentModel('gemma3:latest');
+          setCurrentPrompt('default (신약개발 전문 AI 어시스턴트)');
+        }
       } catch (error) {
         console.error('Failed to fetch settings:', error);
+        // 에러 시 기본값 설정
+        setCurrentModel('gemma3:latest');
+        setCurrentPrompt('default (신약개발 전문 AI 어시스턴트)');
       }
     };
 
@@ -59,16 +81,8 @@ export function StartupBanner({ onClose }: StartupBannerProps) {
   return (
     <div className={`fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       <Card className={`w-full max-w-6xl bg-slate-900/95 backdrop-blur-xl border border-blue-500/20 shadow-2xl transform transition-all duration-500 ${isVisible ? 'scale-100' : 'scale-95'} relative overflow-hidden`}>
-        {/* 배경 애니메이션 효과 */}
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-purple-600/10 to-cyan-600/10"></div>
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-500"></div>
-          
-          {/* 파티클 애니메이션 */}
-          <div className="absolute top-20 left-20 w-2 h-2 bg-blue-400 rounded-full animate-ping opacity-20"></div>
-          <div className="absolute bottom-32 right-32 w-1 h-1 bg-purple-400 rounded-full animate-ping opacity-30" style={{ animationDelay: '1s' }}></div>
-          <div className="absolute top-40 right-40 w-3 h-3 bg-cyan-400 rounded-full animate-ping opacity-15" style={{ animationDelay: '2s' }}></div>
-        </div>
+        {/* 헤더 라인 */}
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-500"></div>
         
         {/* 닫기 버튼 */}
         <button
@@ -86,7 +100,7 @@ export function StartupBanner({ onClose }: StartupBannerProps) {
               <div className="relative group">
                 {/* GAIA-BT 로고 */}
                 <div className="w-24 h-24 bg-gradient-to-br from-blue-500 via-purple-500 to-cyan-500 rounded-2xl flex items-center justify-center relative overflow-hidden shadow-2xl">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-purple-400/20 animate-pulse"></div>
+
                   <div className="relative z-10 text-white">
                     <svg viewBox="0 0 40 40" className="w-12 h-12">
                       {/* DNA 구조 로고 */}
@@ -241,7 +255,7 @@ export function StartupBanner({ onClose }: StartupBannerProps) {
               <div className="group bg-gradient-to-br from-emerald-500/15 to-green-500/15 rounded-xl p-5 border border-emerald-400/30 hover:border-emerald-300/60 transition-all duration-300 cursor-pointer hover:scale-105">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
-                    <Dna className="w-6 h-6 text-white" />
+                    <Brain className="w-6 h-6 text-white" />
                   </div>
                   <div>
                     <h4 className="font-bold text-emerald-200">전문 모드</h4>
@@ -346,15 +360,15 @@ export function StartupBanner({ onClose }: StartupBannerProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6 text-sm">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-sm"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full shadow-sm"></div>
                 <span className="text-green-300 font-medium">Backend API 연결됨</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse shadow-sm"></div>
+                <div className="w-3 h-3 bg-blue-500 rounded-full shadow-sm"></div>
                 <span className="text-blue-300 font-medium">WebUI 준비 완료</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse shadow-sm"></div>
+                <div className="w-3 h-3 bg-amber-500 rounded-full shadow-sm"></div>
                 <span className="text-amber-300 font-medium">MCP 서버 대기</span>
               </div>
             </div>

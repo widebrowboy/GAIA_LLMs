@@ -206,6 +206,21 @@ class ChatbotService:
                     "message": "일반 모드로 전환되었습니다."
                 }
             
+            elif command == "/deep":
+                # Deep Research 모드로 전환 (MCP 시작)
+                if not chatbot.mcp_commands:
+                    return {"error": "MCP 기능을 사용할 수 없습니다"}
+                
+                result = await chatbot.mcp_commands.handle_mcp_command("start")
+                chatbot.config.mcp_enabled = True
+                
+                return {
+                    "type": "mode",
+                    "mode": "deep_research",
+                    "message": "Deep Research 모드로 전환되었습니다. MCP 통합 검색이 활성화됩니다.",
+                    "mcp_enabled": True
+                }
+            
             elif command == "/mcpshow":
                 chatbot.toggle_mcp_output()
                 return {

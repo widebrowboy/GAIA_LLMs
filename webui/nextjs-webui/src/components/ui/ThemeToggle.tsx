@@ -1,20 +1,43 @@
 'use client';
 
-import { useTheme } from 'next-themes';
+import { useState, useEffect } from 'react';
 import { Button } from './Button';
 import { Moon, Sun } from 'lucide-react';
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    // 시스템 테마 감지
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setTheme(mediaQuery.matches ? 'dark' : 'light');
+    
+    const handleChange = () => {
+      setTheme(mediaQuery.matches ? 'dark' : 'light');
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+  };
 
   return (
     <Button
       variant="ghost"
-      size="icon"
-      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+      size="sm"
+      onClick={toggleTheme}
+      className="p-2"
     >
-      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      {theme === 'light' ? (
+        <Moon className="h-4 w-4" />
+      ) : (
+        <Sun className="h-4 w-4" />
+      )}
       <span className="sr-only">테마 변경</span>
     </Button>
   );

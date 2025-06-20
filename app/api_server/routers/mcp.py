@@ -28,24 +28,55 @@ async def get_mcp_status(
     service: ChatbotService = Depends(get_chatbot_service)
 ) -> Dict[str, Any]:
     """MCP 상태 조회"""
-    chatbot = service.get_session(session_id)
-    if not chatbot:
-        raise HTTPException(404, f"세션 {session_id}를 찾을 수 없습니다")
-    
-    servers = []
-    if chatbot.mcp_commands:
-        # MCP 서버 상태 확인
-        for server_name in ["drugbank", "opentargets", "chembl", "biomcp", "sequential-thinking"]:
-            servers.append({
-                "name": server_name,
-                "active": chatbot.mcp_commands.is_server_active(server_name)
-            })
-    
-    return {
-        "enabled": chatbot.config.mcp_enabled,
-        "servers": servers,
-        "show_output": chatbot.config.show_mcp_output
-    }
+    try:
+        chatbot = service.get_session(session_id)
+        if not chatbot:
+            # 세션이 없으면 기본값 반환
+            return {
+                "enabled": False,
+                "servers": [],
+                "show_output": False
+            }
+        
+        servers = []
+        if hasattr(chatbot, 'mcp_commands') and chatbot.mcp_commands:
+            # MCP 서버 상태 확인
+            for server_name in ["drugbank", "opentargets", "chembl", "biomcp", "sequential-thinking"]:
+                try:
+                    is_active = chatbot.mcp_commands.is_server_active(server_name)
+                except:
+                    is_active = False
+                
+                servers.append({
+                    "name": server_name,
+                    "active": is_active
+                })
+        else:
+            # 기본 서버 목록 반환
+            for server_name in ["drugbank", "opentargets", "chembl", "biomcp", "sequential-thinking"]:
+                servers.append({
+                    "name": server_name,
+                    "active": False
+                })
+        
+        return {
+            "enabled": getattr(chatbot.config, 'mcp_enabled', False),
+            "servers": servers,
+            "show_output": getattr(chatbot.config, 'show_mcp_output', False)
+        }
+    except Exception as e:
+        # 오류 발생 시 기본값 반환
+        return {
+            "enabled": False,
+            "servers": [
+                {"name": "drugbank", "active": False},
+                {"name": "opentargets", "active": False},
+                {"name": "chembl", "active": False},
+                {"name": "biomcp", "active": False},
+                {"name": "sequential-thinking", "active": False}
+            ],
+            "show_output": False
+        }
 
 @router.post("/start")
 async def start_mcp(

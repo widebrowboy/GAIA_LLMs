@@ -1,0 +1,233 @@
+/* GAIA-inspired Theme Variables */
+@layer base {
+  :root {
+    /* Light Mode - GAIA Style */
+    --gaia-bg-primary: 255 255 255; /* #ffffff */
+    --gaia-bg-secondary: 248 249 250; /* #f8f9fa */
+    --gaia-bg-tertiary: 243 244 246; /* #f3f4f6 */
+    
+    --gaia-text-primary: 17 24 39; /* #111827 */
+    --gaia-text-secondary: 75 85 99; /* #4b5563 */
+    --gaia-text-tertiary: 156 163 175; /* #9ca3af */
+    
+    --gaia-border: 229 231 235; /* #e5e7eb */
+    --gaia-border-hover: 209 213 219; /* #d1d5db */
+    
+    --gaia-accent: 79 70 229; /* #4f46e5 - Indigo */
+    --gaia-accent-hover: 67 56 202; /* #4338ca */
+    --gaia-accent-light: 224 231 255; /* #e0e7ff */
+    
+    --gaia-success: 34 197 94; /* #22c55e */
+    --gaia-warning: 245 158 11; /* #f59e0b */
+    --gaia-error: 239 68 68; /* #ef4444 */
+    
+    --gaia-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --gaia-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    --gaia-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  }
+  
+  .dark {
+    /* Dark Mode - GAIA Style */
+    --gaia-bg-primary: 17 24 39; /* #111827 */
+    --gaia-bg-secondary: 31 41 55; /* #1f2937 */
+    --gaia-bg-tertiary: 55 65 81; /* #374151 */
+    
+    --gaia-text-primary: 243 244 246; /* #f3f4f6 */
+    --gaia-text-secondary: 209 213 219; /* #d1d5db */
+    --gaia-text-tertiary: 156 163 175; /* #9ca3af */
+    
+    --gaia-border: 55 65 81; /* #374151 */
+    --gaia-border-hover: 75 85 99; /* #4b5563 */
+    
+    --gaia-accent: 99 102 241; /* #6366f1 */
+    --gaia-accent-hover: 129 140 248; /* #818cf8 */
+    --gaia-accent-light: 55 48 163; /* #3730a3 */
+    
+    --gaia-success: 34 197 94; /* #22c55e */
+    --gaia-warning: 245 158 11; /* #f59e0b */
+    --gaia-error: 248 113 113; /* #f87171 */
+  }
+}
+
+/* GAIA-inspired Utility Classes */
+@layer utilities {
+  .gaia-bg-primary {
+    @apply bg-[rgb(var(--claude-bg-primary))] transition-colors duration-200;
+  }
+  
+  .gaia-bg-secondary {
+    @apply bg-[rgb(var(--claude-bg-secondary))] transition-colors duration-200;
+  }
+  
+  .gaia-bg-tertiary {
+    @apply bg-[rgb(var(--claude-bg-tertiary))] transition-colors duration-200;
+  }
+  
+  .gaia-text-primary {
+    @apply text-[rgb(var(--claude-text-primary))];
+  }
+  
+  .gaia-text-secondary {
+    @apply text-[rgb(var(--claude-text-secondary))];
+  }
+  
+  .gaia-text-tertiary {
+    @apply text-[rgb(var(--claude-text-tertiary))];
+  }
+  
+  .gaia-border {
+    @apply border-[rgb(var(--claude-border))];
+  }
+  
+  .gaia-border-hover {
+    @apply hover:border-[rgb(var(--claude-border-hover))];
+  }
+  
+  /* GAIA Button Styles */
+  .gaia-btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2
+           text-sm font-medium transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-[rgb(var(--claude-accent))] focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .gaia-btn-primary {
+    @apply claude-btn bg-[rgb(var(--claude-accent))] text-white
+           hover:bg-[rgb(var(--claude-accent-hover))]
+           active:scale-[0.98];
+  }
+  
+  .gaia-btn-secondary {
+    @apply claude-btn claude-bg-secondary claude-text-primary claude-border border
+           hover:claude-bg-tertiary;
+  }
+  
+  .gaia-btn-ghost {
+    @apply claude-btn claude-text-secondary
+           hover:claude-bg-secondary hover:claude-text-primary;
+  }
+  
+  /* GAIA Card Styles */
+  .gaia-card {
+    @apply claude-bg-primary rounded-xl claude-border border
+           shadow-[var(--claude-shadow-sm)] transition-all duration-200
+           hover:shadow-[var(--claude-shadow-md)];
+  }
+  
+  /* GAIA Input Styles */
+  .gaia-input {
+    @apply w-full rounded-lg claude-bg-primary claude-border border px-4 py-2
+           claude-text-primary placeholder:claude-text-tertiary
+           focus:outline-none focus:ring-2 focus:ring-[rgb(var(--claude-accent))] focus:ring-offset-0
+           transition-all duration-200;
+  }
+  
+  .gaia-textarea {
+    @apply claude-input resize-none;
+  }
+  
+  /* GAIA Message Styles */
+  .gaia-message-user {
+    @apply claude-bg-secondary rounded-2xl px-4 py-3;
+  }
+  
+  .gaia-message-assistant {
+    @apply claude-bg-primary rounded-2xl px-4 py-3;
+  }
+  
+  /* GAIA Scrollbar */
+  .gaia-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .gaia-scrollbar::-webkit-scrollbar-track {
+    @apply claude-bg-secondary rounded-full;
+  }
+  
+  .gaia-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-[rgb(var(--claude-border))] rounded-full
+           hover:bg-[rgb(var(--claude-border-hover))];
+  }
+  
+  /* GAIA Loading Animation */
+  .gaia-loading-dot {
+    @apply w-2 h-2 rounded-full bg-[rgb(var(--claude-accent))];
+    animation: claude-bounce 1.4s ease-in-out infinite;
+  }
+  
+  .gaia-loading-dot:nth-child(1) {
+    animation-delay: 0s;
+  }
+  
+  .gaia-loading-dot:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  
+  .gaia-loading-dot:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+  
+  @keyframes gaia-bounce {
+    0%, 60%, 100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+    30% {
+      transform: translateY(-10px);
+      opacity: 1;
+    }
+  }
+  
+  /* GAIA Gradient Text */
+  .gaia-gradient-text {
+    @apply bg-gradient-to-r from-[rgb(var(--claude-accent))] to-purple-600 
+           bg-clip-text text-transparent;
+  }
+  
+  /* GAIA Glass Effect */
+  .gaia-glass {
+    @apply backdrop-blur-xl bg-white/80 dark:bg-gray-900/80;
+  }
+  
+  /* GAIA Hover Effects */
+  .gaia-hover-lift {
+    @apply transition-transform duration-200 hover:-translate-y-0.5;
+  }
+  
+  .gaia-hover-glow {
+    @apply transition-all duration-300
+           hover:shadow-[0_0_20px_rgba(var(--claude-accent),0.3)];
+  }
+}
+
+/* GAIA Animations */
+@keyframes gaia-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gaia-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.claude-animate-fade-in {
+  animation: claude-fade-in 0.3s ease-out;
+}
+
+.claude-animate-slide-up {
+  animation: claude-slide-up 0.4s ease-out;
+}

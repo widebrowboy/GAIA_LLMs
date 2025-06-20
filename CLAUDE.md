@@ -7,15 +7,7 @@ GAIA-BT v2.0 Alpha는 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신
 - **전체 완성도**: 100% 완료 (Production Ready)
 - **핵심 기능**: 모든 주요 기능 구현 완료 + API 서버 통합
 - **신규 기능**: 
-  - **✅ Modern WebUI v2.1 완성** (참고: nextjs-fastapi-your-chat 패턴 적용)
-    - **Next.js 15 + React 19 + TypeScript** 최신 기술 스택
-    - **글래스모피즘 + 그라디언트 + 애니메이션** 전문가급 UI/UX
-    - **실시간 스트리밍 채팅** (50ms 단어별 점진적 표시)
-    - **원클릭 모드 전환** (일반 ↔ Deep Research)
-    - **모바일 반응형 디자인** + 터치 최적화
-    - **Zustand + LocalStorage** 향상된 상태 관리
-    - **100% 테스트 통과** (10/10 통합 테스트 성공)
-  - **✅ 기존 WebUI 시스템** (Next.js 15 + FastAPI + TypeScript)
+  - **✅ WebUI 시스템** (Next.js 15 + FastAPI + TypeScript)
     - **실시간 스트리밍 채팅** (단어별 점진적 표시)
     - **모드 전환 버튼** (일반 ↔ Deep Research 원클릭)
     - **React 키 중복 오류 완전 해결** (고유 ID 시스템)
@@ -30,10 +22,9 @@ GAIA-BT v2.0 Alpha는 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신
   - MCP 출력 제어 옵션 추가
   - 파일 기반 프롬프트 관리 시스템
 - **상태**: 프로덕션 레디 (Production Ready) + 완전 통합 API 서버
-- **사용 가능**: CLI, Web UI, Modern WebUI, RESTful API 모두 즉시 사용 가능
+- **사용 가능**: CLI, Web UI, RESTful API 모두 즉시 사용 가능
 - **접속 정보**: 
-  - **Modern WebUI**: http://localhost:3001/modern (추천 ⭐)
-  - **기존 WebUI**: http://localhost:3001 (Next.js Frontend)
+  - **WebUI**: http://localhost:3001 (Next.js Frontend)
   - **API**: http://localhost:8000 (FastAPI Backend)
   - **API 문서**: http://localhost:8000/docs (Swagger UI)
   - **API 문서 (대안)**: http://localhost:8000/redoc (ReDoc)
@@ -124,6 +115,10 @@ MUST FOLLOW:
 - CLI 기능과 1:1 호환성 유지 (API 브리지 패턴)
 - 신약개발 특화 컴포넌트 개발 필수
 - 실시간 WebSocket 통신으로 동적 업데이트
+- 모듈식 컴포넌트 아키텍처: 단일 책임 원칙 적용 (v2.0.2)
+- 반응형 레이아웃: 화면 크기별 동적 UI 조정
+- 컴포넌트별 독립적 Props 인터페이스 정의
+- TypeScript 타입 안전성 보장 및 에러 처리 강화
 ```
 
 ### Rule 11: FastAPI 서버 아키텍처 규칙 (신규 v2.0.1)
@@ -161,6 +156,335 @@ MUST FOLLOW:
 - 개발 중 문제 발생 시 server_manager.sh restart 실행
 - 포트 3001 (WebUI), 8000 (API) 전용 사용
 - 서버 중지는 반드시 server_manager.sh stop 사용
+```
+
+### Rule 13: WebUI 레이아웃 아키텍처 규칙 (신규 v2.0.2)
+```
+MUST FOLLOW:
+- 3계층 레이아웃 구조: MainLayout → Header/Sidebar/ChatArea
+- 반응형 디자인: 화면 크기별 자동 UI 조정 (4K~모바일)
+- 동적 사이드바: viewport 기반 자동 표시/숨김 로직
+- 컴포넌트별 독립적 책임: layout, chat, ui 폴더 분리
+- Props 인터페이스: 모든 컴포넌트 간 타입 안전한 데이터 전달
+- 상태 관리: Zustand 중앙집중식 상태 + 로컬 상태 조합
+- 에러 바운더리: 각 컴포넌트별 독립적 에러 처리
+- 접근성: ARIA 라벨 및 키보드 네비게이션 지원
+```
+
+## 🎨 WebUI 레이아웃 아키텍처 상세 가이드 (v2.0.2)
+
+### 📐 전체 레이아웃 구조 (동적 반응형 시스템)
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  MainLayout.tsx (동적 레이아웃 관리)        │
+│  ┌─────────────┐  ┌───────────────────────────────────────┐ │
+│  │             │  │            Header.tsx                 │ │
+│  │   Sidebar   │  │  ┌─────────┐ ┌──────────┐ ┌──────────┐ │ │
+│  │  (동적 크기) │  │  │  Logo   │ │   Mode   │ │  Status  │ │ │
+│  │             │  │  │ & Menu  │ │ Toggle   │ │ & Model  │ │ │
+│  │ w-48~w-96   │  │  └─────────┘ └──────────┘ └──────────┘ │ │
+│  │             │  ├───────────────────────────────────────┤ │
+│  │  ┌────────┐ │  │        ChatArea.tsx (중앙 컨테이너)    │ │
+│  │  │ MCP    │ │  │  ┌─────────────────────────────────┐   │ │
+│  │  │ Status │ │  │  │  WelcomeSection.tsx (동적 그리드) │   │ │ 
+│  │  └────────┘ │  │  │  max-w-sm ~ max-w-screen-2xl   │   │ │
+│  │  ┌────────┐ │  │  │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ │   │ │
+│  │  │ Quick  │ │  │  │  │Card │ │Card │ │Card │ │Card │ │   │ │
+│  │  │Commands│ │  │  │  │ 1-4 │ │ 1-4 │ │ 1-4 │ │ 1-4 │ │   │ │
+│  │  └────────┘ │  │  │  └─────┘ └─────┘ └─────┘ └─────┘ │   │ │
+│  │  ┌────────┐ │  │  └─────────────────────────────────┘   │ │
+│  │  │Settings│ │  │  ┌─────────────────────────────────┐   │ │
+│  │  └────────┘ │  │  │    MessageArea.tsx (스크롤)      │   │ │
+│  └─────────────┘  │  │  (동적 패딩 + 텍스트 크기 조정)  │   │ │
+│                   │  └─────────────────────────────────┘   │ │
+│                   │  ┌─────────────────────────────────┐   │ │
+│                   │  │  InputArea.tsx (하단 고정)      │   │ │
+│                   │  │  (반응형 빠른 명령어 버튼)      │   │ │
+│                   │  └─────────────────────────────────┘   │ │
+│                   └───────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+
+화면 크기별 동적 조정:
+🖥️  8K/4K (2560px+): w-96 sidebar, max-w-screen-2xl, extra-large cards
+🖥️  QHD/4K (1920px+): w-80 sidebar, max-w-6xl, large cards  
+🖥️  대형 (1440px+): w-72 sidebar, max-w-5xl, large cards
+💻  중형 (1200px+): w-64 sidebar, max-w-4xl, normal cards
+💻  소형 (1024px+): w-56 sidebar, max-w-3xl, compact cards
+📱  태블릿 (768px+): w-48 sidebar, max-w-2xl, compact cards
+📱  모바일 (768px-): w-80 overlay, max-w-sm, minimal cards
+```
+
+### 🧩 컴포넌트별 상세 설명
+
+#### 1. MainLayout.tsx (메인 레이아웃 컨테이너) - 동적 반응형 시스템
+```typescript
+// 🎯 주요 기능 및 개선사항
+- 전체 화면 레이아웃 관리 (Flexbox 기반)
+- 지능형 반응형 사이드바 표시/숨김 로직
+- 화면 크기별 실시간 동적 레이아웃 조정
+- 세로/가로 비율 고려한 모바일 오버레이 관리
+- 세션 초기화 및 상태 관리
+- **신규**: 사용 가능한 너비 계산 기반 최적화
+- **신규**: 컨테이너 최대 너비 동적 설정
+
+// 🖥️ 확장된 반응형 브레이크포인트 시스템
+- 8K/4K 초대형 (2560px+): w-96 사이드바 (384px) + max-w-screen-2xl 컨테이너
+- QHD/4K 화면 (1920px+): w-80 사이드바 (320px) + max-w-6xl 컨테이너
+- 대형 화면 (1440px+): w-72 사이드바 (288px) + max-w-5xl 컨테이너  
+- 중형 화면 (1200px+): w-64 사이드바 (256px) + max-w-4xl 컨테이너
+- 소형 데스크톱 (1024px+): w-56 사이드바 (224px) + max-w-3xl 컨테이너
+- 태블릿 (768px+): w-48 사이드바 (192px) + max-w-2xl 컨테이너
+- 모바일 (768px-): w-80 오버레이 (320px) + max-w-sm 컨테이너
+
+// 🧠 지능형 자동 조정 로직
+- 사용 가능한 너비 = 전체 너비 - 사이드바 너비
+- 세로 공간 고려: 세로가 부족하면 사이드바 숨김
+- 사용자 수동 조정 시 자동 조정 비활성화
+- 실시간 리사이즈 감지 및 즉시 적용
+
+// 📐 동적 컨테이너 시스템
+const availableWidth = sidebarVisible ? 
+  width - sidebarWidthInPixels : width;
+
+// 컨테이너별 패딩 및 텍스트 크기 자동 조정
+- extra-large: p-8, text-lg (8K/4K)
+- large: p-6, text-base (QHD/4K)  
+- normal: p-4, text-sm (표준)
+- compact: p-3, text-sm (소형)
+- minimal: p-2, text-xs (모바일)
+```
+
+#### 2. Header.tsx (상단 헤더 배너)
+```typescript
+// 주요 책임
+- GAIA-BT 브랜딩 및 로고 표시
+- 모드 전환 버튼 (일반 ↔ Deep Research)
+- 모델 선택 다이얼로그 (Ollama + API 모델)
+- 프롬프트 타입 변경 (clinical/research/chemistry/regulatory)
+- 시스템 상태 실시간 표시
+- 빠른 명령어 버튼들
+
+// UI 구성 요소
+- 왼쪽: 햄버거 메뉴 + GAIA-BT 로고
+- 중앙: 모드 배지 + 프롬프트 타입 배지  
+- 오른쪽: 현재 모델 + 시스템 상태
+- 하단: 빠른 프롬프트 변경 버튼들
+
+// 상태 관리
+- Zustand: currentSession, updateSessionMode
+- 로컬: currentModel, showModelDialog, isModelChanging
+```
+
+#### 3. Sidebar.tsx (시스템 제어 사이드바)
+```typescript
+// 주요 책임  
+- 시스템 상태 카드 (API 연결, 세션 정보)
+- MCP 서버 상태 모니터링 (6개 서버 상태)
+- 프롬프트 모드 선택 UI
+- 빠른 명령어 버튼 모음
+- 개발자 옵션 (디버그 모드, MCP 출력 제어)
+
+// 상태 표시
+- API 연결: CheckCircle(녹색) / XCircle(빨강)  
+- MCP 서버: running(녹색) / stopped(회색) / error(빨강)
+- 세션 정보: ID 마지막 8자리 + 메시지 수
+
+// 카드 구성
+1. 시스템 상태 카드: API 상태 + 세션 정보
+2. MCP 서버 카드: 6개 서버 상태 + 제어 버튼
+3. 전문 모드 카드: 5개 프롬프트 타입 선택
+4. 빠른 명령어 카드: 자주 사용하는 명령어들
+5. 개발자 옵션 카드: 디버그 및 고급 설정
+```
+
+#### 4. ChatArea.tsx (메인 채팅 영역)
+```typescript
+// 주요 책임
+- 채팅 영역 전체 컨테이너 관리
+- 메시지 전송 로직 통합
+- 환영 섹션 ↔ 메시지 영역 조건부 렌더링
+- 자동 스크롤 관리 (messagesEndRef)
+- 추천 질문 클릭 처리
+
+// 렌더링 로직
+if (messages.length === 0) {
+  return <WelcomeSection />
+} else {
+  return <MessageArea /> + <InputArea />
+}
+
+// Props 전달
+- mainPageLayout: 화면 크기별 레이아웃 설정
+- onSuggestedQuestion: 추천 질문 클릭 핸들러
+- isProcessing: 전송 중 상태
+```
+
+#### 5. WelcomeSection.tsx (환영 메시지)
+```typescript
+// 주요 책임
+- GAIA-BT 환영 메시지 + 로고
+- 현재 모드 및 프롬프트 타입 표시
+- 4개 카테고리 추천 질문 카드
+- 화면 크기별 카드 레이아웃 조정
+- 모드별 안내 메시지
+
+// 추천 질문 카테고리
+1. 신약개발 기초 (💊): 전반적인 신약개발 프로세스
+2. 임상시험 (🏥): 임상시험 설계 및 규제
+3. 의약화학 (⚗️): 분자 설계 및 최적화  
+4. 규제 및 승인 (📋): FDA/글로벌 승인 과정
+
+// 반응형 카드 레이아웃
+- large: p-6, min-h-120px, text-xl
+- normal: p-5, min-h-110px, text-xl  
+- compact: p-4, min-h-100px, text-lg
+- minimal: p-3, min-h-80px, text-lg
+```
+
+#### 6. MessageArea.tsx (메시지 표시)
+```typescript
+// 주요 책임
+- 메시지 목록 렌더링 (사용자 + AI)
+- 마크다운 콘텐츠 파싱 및 표시
+- 메시지 타입별 스타일링
+- 소스 정보 및 에러 표시
+- 스트리밍 인디케이터
+
+// 마크다운 처리
+- 헤딩: # ## ### → h1, h2, h3 태그
+- 리스트: - → li 태그 (ml-4 list-disc)
+- 코드: ``` → 회색 배경 박스
+- 인용: > → 파란색 왼쪽 보더
+- 굵은글씨: **text** → 흰색 bold
+
+// 메시지 카드 스타일
+- 사용자: 오른쪽 정렬, 파란색 배경
+- AI: 왼쪽 정렬, 회색 배경
+- 각 메시지: 타임스탬프 + 상태 아이콘
+```
+
+#### 7. InputArea.tsx (메시지 입력)
+```typescript
+// 주요 책임
+- 멀티라인 텍스트 입력 (자동 높이 조정)
+- 빠른 명령어 버튼 (4개 주요 명령어)
+- 엔터키 전송 / Shift+Enter 줄바꿈
+- 입력 힌트 및 글자 수 제한 (2000자)
+- 명령어 모드 힌트 표시
+
+// 빠른 명령어 버튼
+1. /help - 도움말 표시
+2. /mcp start - Deep Research 모드
+3. /normal - 일반 모드로 전환  
+4. /status - 상태 확인
+
+// 입력 상태 처리
+- 일반 상태: "메시지를 입력하세요..."
+- 처리 중: "AI가 응답하는 중입니다..." + 버튼 비활성화
+- 명령어 모드: 파란색 힌트 박스 표시
+- 글자 수 초과: 노란색 경고 + 전송 버튼 비활성화
+```
+
+### 🔄 상태 관리 흐름
+
+#### Zustand 중앙 상태 (chatStore.ts)
+```typescript
+// 전역 상태
+- sessions: Record<string, ChatSession>
+- currentSessionId: string | null  
+- isLoading: boolean
+- isTyping: boolean
+- systemStatus: { apiConnected, mcpServers, lastHealthCheck }
+
+// 주요 액션
+- createSession(): 새 세션 생성
+- addMessage(): 메시지 추가
+- updateMessage(): 메시지 업데이트
+- updateSessionMode(): 모드 변경
+- updateSessionPromptType(): 프롬프트 타입 변경
+- sendMessage(): 메시지 전송 (API 호출)
+```
+
+#### 로컬 컴포넌트 상태
+```typescript
+// MainLayout.tsx
+- showSidebar: boolean (사이드바 표시/숨김)
+- isMobile: boolean (모바일 디바이스 감지)
+- sidebarWidth: string (동적 사이드바 너비)
+- mainPageLayout: object (페이지 레이아웃 설정)
+
+// Header.tsx  
+- currentModel: string (현재 선택된 모델)
+- showModelDialog: boolean (모델 선택 다이얼로그)
+- isModelChanging: boolean (모델 변경 중 상태)
+- availableModels: array (사용 가능한 모델 목록)
+
+// InputArea.tsx
+- input: string (입력 텍스트)
+- isProcessing: boolean (전송 중 상태)
+```
+
+### 📱 반응형 디자인 상세
+
+#### 화면 크기별 UI 조정
+```typescript
+// 4K/울트라와이드 (1920px+)
+- 사이드바: w-80 (320px), 항상 표시
+- 메인 레이아웃: 2열 가능, large 카드, gap-6
+- 텍스트: text-base, 여유로운 간격
+
+// 대형 화면 (1440px+)  
+- 사이드바: w-72 (288px), 항상 표시
+- 메인 레이아웃: 1열, large 카드, gap-5
+- 텍스트: text-sm, 표준 간격
+
+// 중형 화면 (1200px+)
+- 사이드바: w-64 (256px), 항상 표시  
+- 메인 레이아웃: 1열, normal 카드, gap-4
+- 텍스트: text-sm, 표준 간격
+
+// 태블릿 (768px+)
+- 사이드바: w-56 (224px), 조건부 표시
+- 메인 레이아웃: 1열, compact 카드, gap-3
+- 텍스트: text-xs, 압축 간격
+
+// 모바일 (768px-)
+- 사이드바: 오버레이 모드, 전체 화면
+- 메인 레이아웃: 1열, minimal 카드, gap-2  
+- 텍스트: text-xs, 최소 간격
+```
+
+### 🎨 테마 및 스타일링
+
+#### 색상 시스템
+```css
+/* 배경 그라디언트 */
+- 메인: from-gray-900 via-blue-900 to-indigo-900
+- 카드: bg-white/10 backdrop-blur-sm
+- 사이드바: bg-gray-800 border-gray-700
+
+/* 모드별 색상 */
+- 일반 모드: bg-gray-600 (회색)
+- Deep Research: bg-green-600 (녹색)  
+- 프롬프트 타입: text-blue-200 border-blue-300
+
+/* 상태 색상 */
+- 연결됨: text-green-400 (CheckCircle)
+- 연결 끊김: text-red-400 (XCircle)
+- 처리 중: text-blue-400 (Loader2 애니메이션)
+```
+
+#### 애니메이션 효과
+```css
+/* 전환 애니메이션 */
+- 사이드바: transition-all duration-300
+- 카드 호버: hover:bg-white/15 transition-all
+- 버튼: hover:bg-blue-700 transition-colors
+
+/* 로딩 애니메이션 */  
+- 스피너: animate-spin (Loader2)
+- 스트리밍: animate-pulse (파란색 커서)
+- 카드: hover:scale-105 transform
 ```
 
 ## 📋 개발 작업 시 프롬프트 템플릿
@@ -291,11 +615,16 @@ GAIA_LLMs/
 │   │       ├── 📁 app/          # App Router 구조
 │   │       │   ├── page.tsx     # 메인 페이지 (CLI와 동일한 UX)
 │   │       │   └── test/        # 테스트 페이지
-│   │       ├── 📁 components/   # React 컴포넌트
-│   │       │   ├── 📁 chat/     # 채팅 인터페이스 (완성)
-│   │       │   │   ├── WebChatInterface.tsx    # 메인 채팅 컴포넌트
-│   │       │   │   ├── StartupBanner.tsx       # CLI 스타일 시작 배너
-│   │       │   │   └── SystemStatus.tsx        # 시스템 상태 표시
+│   │       ├── 📁 components/   # React 컴포넌트 (모듈식 분리 완성)
+│   │       │   ├── 📁 layout/   # 레이아웃 컴포넌트 (신규 v2.0.2)
+│   │       │   │   ├── MainLayout.tsx      # 메인 레이아웃 컨테이너
+│   │       │   │   ├── Header.tsx          # GAIA-BT 헤더 배너
+│   │       │   │   └── Sidebar.tsx         # 시스템 제어 사이드바
+│   │       │   ├── 📁 chat/     # 채팅 인터페이스 (모듈식 분리)
+│   │       │   │   ├── ChatArea.tsx        # 메인 채팅 영역
+│   │       │   │   ├── WelcomeSection.tsx  # 환영 메시지 및 추천 질문
+│   │       │   │   ├── MessageArea.tsx     # 메시지 표시 영역
+│   │       │   │   └── InputArea.tsx       # 메시지 입력 영역
 │   │       │   └── 📁 ui/       # shadcn/ui 기본 컴포넌트
 │   │       ├── 📁 store/        # Zustand 상태 관리 (세션/메시지/모드)
 │   │       │   └── chatStore.ts # 채팅 상태 관리
@@ -637,13 +966,33 @@ GAIA_LLMs/
   - ✅ 프로덕션 빌드 지원
   - ✅ 백엔드/프론트엔드 동시 실행
 
-#### 🎯 완성된 주요 컴포넌트
-1. **WebChatInterface**: run_chatbot.py와 동일한 기능의 웹 채팅
-2. **StartupBanner**: CLI 스타일 시작 배너 웹 버전
-3. **SystemStatus**: 실시간 시스템 상태 및 설정 표시
-4. **chatStore**: Zustand 기반 상태 관리
-5. **CLIAdapter**: CLI-Web 브리지 시스템
-6. **run_webui.sh**: 원클릭 실행 스크립트
+#### ✅ Phase 6: 컴포넌트 모듈화 및 코드 분리 - 완료 (신규 v2.0.2)
+- ✅ 6.1 레이아웃 시스템 분리
+  - ✅ MainLayout.tsx - 메인 레이아웃 컨테이너 및 반응형 로직
+  - ✅ Header.tsx - GAIA-BT 헤더 배너, 모드 전환, 모델 선택
+  - ✅ Sidebar.tsx - 시스템 제어 패널, MCP 상태, 설정 관리
+- ✅ 6.2 채팅 시스템 모듈화
+  - ✅ ChatArea.tsx - 메인 채팅 영역 컨테이너
+  - ✅ WelcomeSection.tsx - 환영 메시지 및 추천 질문 카드
+  - ✅ MessageArea.tsx - 메시지 표시 및 마크다운 렌더링
+  - ✅ InputArea.tsx - 메시지 입력 및 빠른 명령어
+- ✅ 6.3 코드 구조 최적화
+  - ✅ 단일 파일 1,700라인 → 6개 모듈로 분리
+  - ✅ 각 컴포넌트별 단일 책임 원칙 적용
+  - ✅ Props 인터페이스 명확화
+  - ✅ TypeScript 타입 안전성 보장
+  - ✅ 재사용 가능한 컴포넌트 아키텍처
+
+#### 🎯 완성된 주요 컴포넌트 (v2.0.2 업데이트)
+1. **MainLayout**: 반응형 레이아웃 컨테이너 및 동적 사이드바 관리
+2. **Header**: GAIA-BT 헤더 배너, 모드 전환, 모델 선택 다이얼로그
+3. **Sidebar**: 시스템 제어 패널, MCP 서버 상태, 설정 관리
+4. **ChatArea**: 메인 채팅 영역 컨테이너 및 메시지 흐름 제어
+5. **WelcomeSection**: 환영 메시지 및 추천 질문 카드 시스템
+6. **MessageArea**: 메시지 표시 및 마크다운 렌더링
+7. **InputArea**: 메시지 입력 및 빠른 명령어 시스템
+8. **chatStore**: Zustand 기반 상태 관리
+9. **run_webui.sh**: 원클릭 실행 스크립트
 
 #### 🚀 즉시 사용 가능한 WebUI 기능 (2024.12.18 업데이트)
 - **웹 브라우저 접속**: http://localhost:3001 (Next.js Frontend)
@@ -853,6 +1202,9 @@ cd webui/nextjs-webui && npm run dev &
 - 빠른 명령어 버튼 
 - 채팅 히스토리 관리
 - 반응형 모바일 지원
+- **동적 사이드바**: 화면 크기에 따른 자동 표시/숨김
+- **반응형 레이아웃**: 페이지 크기별 동적 UI 조정
+- **다중 해상도 지원**: 4K/울트라와이드부터 모바일까지
 ```
 
 #### 📖 Swagger API 문서 (신규 v2.0.1) ✅ COMPLETED
@@ -961,7 +1313,7 @@ cd webui/nextjs-webui && npm run dev &
 
 이 시스템은 **현재 상태에서도 신약개발 연구에 충분히 활용 가능**하며, Mock 응답을 통해 전체 워크플로우를 체험할 수 있습니다.
 
-## 🎉 WebUI v2.0 Alpha 완성 및 주요 성과 (2024.12.18)
+## 🎉 WebUI v2.0 Alpha 완성 및 주요 성과 (2024.12.19 최종 업데이트)
 
 ### ✅ 완성된 핵심 기능들
 1. **실시간 스트리밍 채팅**: 단어별 점진적 응답으로 자연스러운 대화 경험
@@ -971,6 +1323,9 @@ cd webui/nextjs-webui && npm run dev &
 5. **CLI 완전 재현**: StartupBanner & SystemStatus로 CLI 경험 그대로 구현
 6. **FastAPI 백엔드**: CORS 설정, API 문서 자동 생성, 비동기 처리
 7. **Zustand 상태 관리**: 세션, 메시지, 설정의 중앙집중식 관리
+8. **🆕 동적 반응형 레이아웃**: 화면 크기별 최적화된 UI 조정
+9. **🆕 지능형 사이드바**: 자동 표시/숨김 및 동적 크기 조정
+10. **🆕 멀티 해상도 지원**: 4K부터 모바일까지 완벽 대응
 
 ### 🔧 해결된 주요 기술적 문제들
 1. **React Keys 중복 오류**: 고유 ID 생성 시스템 (`msg_${counter}_${timestamp}`)
@@ -978,6 +1333,9 @@ cd webui/nextjs-webui && npm run dev &
 3. **모드 전환**: updateSessionMode 함수 구현으로 상태 동기화
 4. **포트 충돌**: 자동 포트 감지 및 대체 포트 사용
 5. **API 통합**: FastAPI-Next.js 간 완벽한 CORS 설정
+6. **🆕 동적 레이아웃**: 화면 크기별 자동 UI 요소 크기 조정
+7. **🆕 반응형 사이드바**: viewport 기반 자동 표시/숨김 로직
+8. **🆕 멀티 디바이스 최적화**: 모바일 오버레이부터 4K 화면까지 대응
 
 ### 🌐 접속 및 사용 정보
 - **Frontend**: http://localhost:3001 (Next.js 15 + React 19)

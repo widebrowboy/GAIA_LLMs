@@ -11,24 +11,26 @@ interface ChatMessage {
   sources?: string[];
   processing?: boolean;
   streaming?: boolean;
-  searchResults?: any;
-  enhanced?: boolean;
   error?: string;
 }
 
 interface ChatSession {
   id: string;
-  mode: 'normal' | 'mcp' | 'deep_research';
+  mode: 'normal' | 'deep_research';
   prompt_type: 'default' | 'clinical' | 'research' | 'chemistry' | 'regulatory';
   messages: ChatMessage[];
   created_at: number;
   last_activity: number;
   model?: string;
-  settings?: {
-    autoSave: boolean;
-    notifications: boolean;
-    theme: 'dark' | 'light';
-  };
+}
+
+interface SystemStatus {
+  apiConnected: boolean;
+  mcpServers: Array<{ name: string; status: 'running' | 'stopped' | 'error' }>;
+  lastHealthCheck: number;
+  version: string;
+  availableModels: string[];
+  availablePrompts: string[];
 }
 
 interface ChatState {
@@ -38,35 +40,70 @@ interface ChatState {
   isTyping: boolean;
   error: string | null;
   messageIdCounter: number;
-  systemStatus: {
-    apiConnected: boolean;
-    mcpServers: Array<{ name: string; status: 'online' | 'offline' | 'error' }>;
-    lastHealthCheck: number;
-  };
+  systemStatus: SystemStatus;
   
-  // Actions
+  // Core Actions
   createSession: (config?: { mode?: string; prompt_type?: string }) => Promise<string>;
   deleteSession: (sessionId: string) => void;
   setCurrentSession: (sessionId: string) => void;
-  addMessage: (sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => string;
+  addMessage: (sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
-  clearMessages: (sessionId: string) => void;
+  
+  // Message Actions
   sendMessage: (sessionId: string, content: string) => Promise<void>;
-  streamMessage: (sessionId: string, content: string) => Promise<void>;
-  setMode: (sessionId: string, mode: string) => Promise<void>;
-  setPromptType: (sessionId: string, promptType: string) => Promise<void>;
-  updateSessionMode: (sessionId: string, mode: string) => void;
-  updateSessionPromptType: (sessionId: string, promptType: string) => void;
-  updateSystemStatus: (status: Partial<typeof systemStatus>) => void;
-  checkSystemHealth: () => Promise<void>;
-  exportSession: (sessionId: string) => string;
-  importSession: (data: string) => Promise<string>;
+  sendStreamingMessage: (sessionId: string, content: string) => Promise<void>;
+  executeCommand: (sessionId: string, command: string) => Promise<void>;
+  
+  // Session Management
+  updateSessionMode: (sessionId: string, mode: 'normal' | 'deep_research') => Promise<void>;
+  updateSessionPromptType: (sessionId: string, promptType: string) => Promise<void>;
+  updateSessionModel: (sessionId: string, model: string) => Promise<void>;
+  
+  // System Management
+  refreshSystemStatus: () => Promise<void>;
+  toggleDebugMode: () => Promise<void>;
+  checkMCPStatus: () => Promise<void>;
+  
+  // Utility Actions
+  clearError: () => void;
   setLoading: (loading: boolean) => void;
   setTyping: (typing: boolean) => void;
-  setError: (error: string | null) => void;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// API 호출 헬퍼 함수들
+const apiCall = async (endpoint: string, options?: RequestInit) => {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    ...options,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+  }
+  
+  return response.json();
+};
+
+const webUIApiCall = async (endpoint: string, options?: RequestInit) => {
+  const response = await fetch(endpoint, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    ...options,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`WebUI API Error: ${response.status} ${response.statusText}`);
+  }
+  
+  return response.json();
+};
 
 export const useChatStore = create<ChatState>()(
   devtools(
@@ -80,438 +117,456 @@ export const useChatStore = create<ChatState>()(
         messageIdCounter: 0,
         systemStatus: {
           apiConnected: false,
-          mcpServers: [
-            { name: 'BiomCP', status: 'offline' },
-            { name: 'ChEMBL', status: 'offline' },
-            { name: 'DrugBank', status: 'offline' },
-            { name: 'OpenTargets', status: 'offline' },
-            { name: 'Sequential Thinking', status: 'offline' },
-          ],
+          mcpServers: [],
           lastHealthCheck: 0,
+          version: '2.0.0',
+          availableModels: [],
+          availablePrompts: []
         },
 
+        // Core Actions
         createSession: async (config = {}) => {
+          set({ isLoading: true });
+          
           try {
-            // API 서버에 세션 생성 요청
-            const response = await fetch(`${API_BASE_URL}/api/session/create`, {
+            // FastAPI로 세션 생성
+            const sessionData = await apiCall('/api/session/create', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({}),
+              body: JSON.stringify({
+                mode: config.mode || 'normal',
+                prompt_type: config.prompt_type || 'default'
+              })
             });
-
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const sessionData = await response.json();
-            const sessionId = sessionData.session_id;
             
+            const sessionId = sessionData.session_id;
             const newSession: ChatSession = {
               id: sessionId,
-              mode: config.mode as any || 'normal',
-              prompt_type: config.prompt_type as any || 'default',
+              mode: config.mode === 'deep_research' ? 'deep_research' : 'normal',
+              prompt_type: (config.prompt_type as any) || 'default',
               messages: [],
               created_at: Date.now(),
               last_activity: Date.now(),
-              model: sessionData.model || 'Gemma3:27b-it-q4_K_M',
-              settings: {
-                autoSave: true,
-                notifications: true,
-                theme: 'dark',
-              },
+              model: sessionData.model
             };
 
-            set((state) => ({
-              sessions: {
-                ...state.sessions,
-                [sessionId]: newSession,
-              },
+            set(state => ({
+              sessions: { ...state.sessions, [sessionId]: newSession },
               currentSessionId: sessionId,
+              isLoading: false
             }));
 
             return sessionId;
           } catch (error) {
-            console.error('Failed to create session:', error);
             // 폴백: 로컬 세션 생성
-            const sessionId = `session_${Date.now()}`;
-            
+            const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             const newSession: ChatSession = {
               id: sessionId,
-              mode: config.mode as any || 'normal',
-              prompt_type: config.prompt_type as any || 'default',
+              mode: config.mode === 'deep_research' ? 'deep_research' : 'normal',
+              prompt_type: (config.prompt_type as any) || 'default',
               messages: [],
               created_at: Date.now(),
-              last_activity: Date.now(),
-              model: 'Gemma3:27b-it-q4_K_M',
-              settings: {
-                autoSave: true,
-                notifications: true,
-                theme: 'dark',
-              },
+              last_activity: Date.now()
             };
 
-            set((state) => ({
-              sessions: {
-                ...state.sessions,
-                [sessionId]: newSession,
-              },
+            set(state => ({
+              sessions: { ...state.sessions, [sessionId]: newSession },
               currentSessionId: sessionId,
+              isLoading: false,
+              error: `세션 생성 중 API 오류 발생. 로컬 세션으로 생성됨: ${error}`
             }));
 
             return sessionId;
           }
         },
 
-      deleteSession: (sessionId: string) => {
-        set((state) => {
-          const { [sessionId]: deleted, ...remainingSessions } = state.sessions;
-          return {
-            sessions: remainingSessions,
-            currentSessionId: state.currentSessionId === sessionId ? null : state.currentSessionId,
-          };
-        });
-      },
+        deleteSession: (sessionId: string) => {
+          set(state => {
+            const newSessions = { ...state.sessions };
+            delete newSessions[sessionId];
+            
+            const remainingSessions = Object.keys(newSessions);
+            const newCurrentSessionId = state.currentSessionId === sessionId 
+              ? (remainingSessions.length > 0 ? remainingSessions[0] : null)
+              : state.currentSessionId;
 
-      setCurrentSession: (sessionId: string) => {
-        set({ currentSessionId: sessionId });
-      },
+            // API로 세션 삭제 요청 (비동기)
+            apiCall(`/api/session/${sessionId}`, { method: 'DELETE' }).catch(console.error);
 
-      addMessage: (sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
-        const state = get();
-        const id = `msg_${state.messageIdCounter}_${Date.now()}`;
-        const timestamp = Date.now();
-        
-        set((state) => ({
-          messageIdCounter: state.messageIdCounter + 1,
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              messages: [
-                ...state.sessions[sessionId].messages,
-                { ...message, id, timestamp },
-              ],
-              last_activity: timestamp,
-            },
-          },
-        }));
-        
-        return id;
-      },
-
-      updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => {
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              messages: state.sessions[sessionId].messages.map(msg =>
-                msg.id === messageId ? { ...msg, ...updates } : msg
-              ),
-              last_activity: Date.now(),
-            },
-          },
-        }));
-      },
-
-      clearMessages: (sessionId: string) => {
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              messages: [],
-              last_activity: Date.now(),
-            },
-          },
-        }));
-      },
-
-      sendMessage: async (sessionId: string, content: string) => {
-        const { addMessage, setTyping } = get();
-        
-        // 사용자 메시지 추가
-        addMessage(sessionId, {
-          role: 'user',
-          content,
-        });
-
-        setTyping(true);
-
-        // Mock AI 응답 (실제로는 API 호출)
-        setTimeout(() => {
-          const session = get().sessions[sessionId];
-          const isDeepResearch = session?.mode === 'mcp' || session?.mode === 'deep_research';
-          
-          let response = '';
-          if (isDeepResearch) {
-            response = `🔬 Deep Research 분석 결과: "${content}"에 대한 종합적인 과학적 분석을 제공합니다. 
-
-다중 데이터베이스 검색을 통해 다음과 같은 정보를 수집했습니다:
-- PubMed 논문 검색 결과
-- ChEMBL 화합물 데이터
-- 임상시험 정보
-
-과학적 근거를 바탕으로 상세한 답변을 제공합니다.`;
-          } else {
-            response = `신약개발 AI 어시스턴트입니다. "${content}"에 대한 전문적인 분석을 제공합니다. 
-
-추가적인 상세 정보가 필요하시면 Deep Research 모드를 활성화해주세요.`;
-          }
-
-          addMessage(sessionId, {
-            role: 'assistant',
-            content: response,
-            enhanced: isDeepResearch,
-            searchResults: isDeepResearch ? {
-              pubmed: [{ title: 'Example Research Paper', authors: 'Smith et al.', year: 2024 }],
-              chembl: [{ compound: 'Example Compound', activity: 'High' }]
-            } : undefined,
+            return {
+              sessions: newSessions,
+              currentSessionId: newCurrentSessionId
+            };
           });
+        },
 
-          setTyping(false);
-        }, 1000 + Math.random() * 2000);
-      },
+        setCurrentSession: (sessionId: string) => {
+          set({ currentSessionId: sessionId });
+        },
 
-      setMode: async (sessionId: string, mode: string) => {
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              mode: mode as any,
-            },
-          },
-        }));
-      },
+        addMessage: (sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
+          set(state => {
+            const session = state.sessions[sessionId];
+            if (!session) return state;
 
-      setPromptType: async (sessionId: string, promptType: string) => {
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              prompt_type: promptType as any,
-            },
-          },
-        }));
-      },
+            const messageId = `msg_${state.messageIdCounter}_${Date.now()}`;
+            const newMessage: ChatMessage = {
+              ...message,
+              id: messageId,
+              timestamp: Date.now()
+            };
 
-      updateSessionMode: (sessionId: string, mode: string) => {
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              mode: mode as any,
-            },
-          },
-        }));
-      },
-
-      updateSessionPromptType: (sessionId: string, promptType: string) => {
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              prompt_type: promptType as any,
-            },
-          },
-        }));
-      },
-
-      streamMessage: async (sessionId: string, content: string) => {
-        const { addMessage, setTyping, updateMessage } = get();
-        
-        // 사용자 메시지 추가
-        addMessage(sessionId, {
-          role: 'user',
-          content,
-        });
-
-        setTyping(true);
-
-        // 스트리밍 응답 생성
-        const assistantMessageId = addMessage(sessionId, {
-          role: 'assistant',
-          content: '',
-          streaming: true,
-          processing: true,
-        });
-
-        try {
-          const response = await fetch('/api/chat/stream', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: content,
-              session_id: sessionId,
-            }),
+            return {
+              sessions: {
+                ...state.sessions,
+                [sessionId]: {
+                  ...session,
+                  messages: [...session.messages, newMessage],
+                  last_activity: Date.now()
+                }
+              },
+              messageIdCounter: state.messageIdCounter + 1
+            };
           });
+        },
 
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
+        updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => {
+          set(state => {
+            const session = state.sessions[sessionId];
+            if (!session) return state;
 
-          const reader = response.body?.getReader();
-          const decoder = new TextDecoder();
-          let fullResponse = '';
+            const messageIndex = session.messages.findIndex(m => m.id === messageId);
+            if (messageIndex === -1) return state;
 
-          if (reader) {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
+            const updatedMessages = [...session.messages];
+            updatedMessages[messageIndex] = { ...updatedMessages[messageIndex], ...updates };
 
-              const chunk = decoder.decode(value);
-              const lines = chunk.split('\n');
-
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const data = line.slice(6);
-                  if (data === '[DONE]') {
-                    updateMessage(sessionId, assistantMessageId, {
-                      content: fullResponse,
-                      streaming: false,
-                      processing: false,
-                    });
-                    setTyping(false);
-                    return;
-                  }
-                  
-                  if (data.trim()) {
-                    fullResponse += data + ' ';
-                    updateMessage(sessionId, assistantMessageId, {
-                      content: fullResponse,
-                      streaming: true,
-                      processing: true,
-                    });
-                  }
+            return {
+              sessions: {
+                ...state.sessions,
+                [sessionId]: {
+                  ...session,
+                  messages: updatedMessages,
+                  last_activity: Date.now()
                 }
               }
+            };
+          });
+        },
+
+        // Message Actions
+        sendMessage: async (sessionId: string, content: string) => {
+          const { addMessage } = get();
+          
+          // 사용자 메시지 추가
+          addMessage(sessionId, {
+            role: 'user',
+            content,
+            timestamp: Date.now()
+          });
+
+          set({ isTyping: true });
+
+          try {
+            // WebUI API 통해 메시지 전송
+            const response = await webUIApiCall('/api/chat', {
+              method: 'POST',
+              body: JSON.stringify({
+                message: content,
+                sessionId: sessionId
+              })
+            });
+
+            if (response.success) {
+              // AI 응답 추가
+              addMessage(sessionId, {
+                role: 'assistant',
+                content: response.response,
+                mode: response.mode,
+                sources: response.mcpSources,
+                timestamp: Date.now()
+              });
+            } else {
+              throw new Error(response.error || 'Unknown error');
             }
+          } catch (error) {
+            // 에러 메시지 추가
+            addMessage(sessionId, {
+              role: 'assistant',
+              content: `죄송합니다. 메시지 처리 중 오류가 발생했습니다: ${error}`,
+              error: error instanceof Error ? error.message : 'Unknown error',
+              timestamp: Date.now()
+            });
+            
+            set({ error: error instanceof Error ? error.message : 'Unknown error' });
+          } finally {
+            set({ isTyping: false });
           }
-        } catch (error) {
-          console.error('Streaming failed:', error);
-          updateMessage(sessionId, assistantMessageId, {
-            content: `❌ 스트리밍 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`,
-            streaming: false,
-            processing: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
-          setTyping(false);
-        }
-      },
+        },
 
-      updateSystemStatus: (status) => {
-        set((state) => ({
-          systemStatus: {
-            ...state.systemStatus,
-            ...status,
-            lastHealthCheck: Date.now(),
-          },
-        }));
-      },
-
-      checkSystemHealth: async () => {
-        try {
-          const response = await fetch('/api/health');
-          const isConnected = response.ok;
+        sendStreamingMessage: async (sessionId: string, content: string) => {
+          const { addMessage, updateMessage } = get();
           
-          const { updateSystemStatus } = get();
-          updateSystemStatus({
-            apiConnected: isConnected,
-            mcpServers: isConnected ? [
-              { name: 'BiomCP', status: 'online' },
-              { name: 'ChEMBL', status: 'online' },
-              { name: 'DrugBank', status: 'online' },
-              { name: 'OpenTargets', status: 'online' },
-              { name: 'Sequential Thinking', status: 'online' },
-            ] : [
-              { name: 'BiomCP', status: 'offline' },
-              { name: 'ChEMBL', status: 'offline' },
-              { name: 'DrugBank', status: 'offline' },
-              { name: 'OpenTargets', status: 'offline' },
-              { name: 'Sequential Thinking', status: 'offline' },
-            ],
+          // 사용자 메시지 추가
+          addMessage(sessionId, {
+            role: 'user',
+            content,
+            timestamp: Date.now()
           });
-        } catch (error) {
-          const { updateSystemStatus } = get();
-          updateSystemStatus({
-            apiConnected: false,
-            mcpServers: [
-              { name: 'BiomCP', status: 'error' },
-              { name: 'ChEMBL', status: 'error' },
-              { name: 'DrugBank', status: 'error' },
-              { name: 'OpenTargets', status: 'error' },
-              { name: 'Sequential Thinking', status: 'error' },
-            ],
+
+          // AI 응답 메시지 생성 (빈 내용으로 시작)
+          const assistantMessageId = `msg_${get().messageIdCounter}_${Date.now()}`;
+          addMessage(sessionId, {
+            role: 'assistant',
+            content: '',
+            streaming: true,
+            timestamp: Date.now()
           });
-        }
-      },
 
-      exportSession: (sessionId: string) => {
-        const session = get().sessions[sessionId];
-        if (!session) throw new Error('Session not found');
-        
-        const exportData = {
-          version: '2.0',
-          session,
-          exportedAt: Date.now(),
-        };
-        
-        return JSON.stringify(exportData, null, 2);
-      },
+          set({ isTyping: true, messageIdCounter: get().messageIdCounter + 1 });
 
-      importSession: async (data: string) => {
-        try {
-          const parsed = JSON.parse(data);
-          const session = parsed.session;
-          
-          if (!session || !session.id) {
-            throw new Error('Invalid session data');
+          try {
+            // WebUI PUT 엔드포인트를 통한 스트리밍 시뮬레이션
+            const response = await fetch('/api/chat', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                message: content,
+                sessionId: sessionId
+              })
+            });
+
+            if (response.ok) {
+              const fullResponse = await response.text();
+              
+              // 스트리밍 시뮬레이션
+              const words = fullResponse.split(' ');
+              let currentContent = '';
+              
+              for (let i = 0; i < words.length; i++) {
+                currentContent += (i > 0 ? ' ' : '') + words[i];
+                
+                updateMessage(sessionId, assistantMessageId, {
+                  content: currentContent,
+                  streaming: i < words.length - 1
+                });
+                
+                // 80ms 간격으로 단어별 표시
+                if (i < words.length - 1) {
+                  await new Promise(resolve => setTimeout(resolve, 80));
+                }
+              }
+              
+              // 스트리밍 완료
+              updateMessage(sessionId, assistantMessageId, {
+                streaming: false
+              });
+            } else {
+              throw new Error(`HTTP ${response.status}`);
+            }
+          } catch (error) {
+            updateMessage(sessionId, assistantMessageId, {
+              content: `죄송합니다. 스트리밍 메시지 처리 중 오류가 발생했습니다: ${error}`,
+              error: error instanceof Error ? error.message : 'Unknown error',
+              streaming: false
+            });
+            
+            set({ error: error instanceof Error ? error.message : 'Unknown error' });
+          } finally {
+            set({ isTyping: false });
           }
+        },
 
-          // 새로운 ID 생성하여 중복 방지
-          const newSessionId = `imported_${Date.now()}`;
-          const importedSession = {
-            ...session,
-            id: newSessionId,
-            created_at: Date.now(),
-            last_activity: Date.now(),
-          };
+        executeCommand: async (sessionId: string, command: string) => {
+          set({ isLoading: true });
+          
+          try {
+            const response = await apiCall('/api/chat/command', {
+              method: 'POST',
+              body: JSON.stringify({
+                command,
+                session_id: sessionId
+              })
+            });
 
-          set((state) => ({
-            sessions: {
-              ...state.sessions,
-              [newSessionId]: importedSession,
-            },
-            currentSessionId: newSessionId,
-          }));
+            // 명령어 결과를 메시지로 추가
+            get().addMessage(sessionId, {
+              role: 'assistant',
+              content: response.response || response.message || '명령어가 실행되었습니다.',
+              timestamp: Date.now()
+            });
+          } catch (error) {
+            get().addMessage(sessionId, {
+              role: 'assistant',
+              content: `명령어 실행 실패: ${error}`,
+              error: error instanceof Error ? error.message : 'Unknown error',
+              timestamp: Date.now()
+            });
+          } finally {
+            set({ isLoading: false });
+          }
+        },
 
-          return newSessionId;
-        } catch (error) {
-          throw new Error(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      },
+        // Session Management
+        updateSessionMode: async (sessionId: string, mode: 'normal' | 'deep_research') => {
+          try {
+            await apiCall(`/api/system/mode/${mode}`, {
+              method: 'POST',
+              body: JSON.stringify({ session_id: sessionId })
+            });
 
-      setLoading: (loading: boolean) => set({ isLoading: loading }),
-      setTyping: (typing: boolean) => set({ isTyping: typing }),
-      setError: (error: string | null) => set({ error }),
-    }),
-    {
-      name: 'gaia-bt-chat-store',
-      partialize: (state) => ({
-        sessions: state.sessions,
-        currentSessionId: state.currentSessionId,
-        messageIdCounter: state.messageIdCounter,
+            set(state => ({
+              sessions: {
+                ...state.sessions,
+                [sessionId]: {
+                  ...state.sessions[sessionId],
+                  mode,
+                  last_activity: Date.now()
+                }
+              }
+            }));
+          } catch (error) {
+            // 로컬 상태만 업데이트 (폴백)
+            set(state => ({
+              sessions: {
+                ...state.sessions,
+                [sessionId]: {
+                  ...state.sessions[sessionId],
+                  mode,
+                  last_activity: Date.now()
+                }
+              },
+              error: `모드 변경 중 오류 발생: ${error}`
+            }));
+          }
+        },
+
+        updateSessionPromptType: async (sessionId: string, promptType: string) => {
+          try {
+            await apiCall('/api/system/prompt', {
+              method: 'POST',
+              body: JSON.stringify({
+                prompt_type: promptType,
+                session_id: sessionId
+              })
+            });
+
+            set(state => ({
+              sessions: {
+                ...state.sessions,
+                [sessionId]: {
+                  ...state.sessions[sessionId],
+                  prompt_type: promptType as any,
+                  last_activity: Date.now()
+                }
+              }
+            }));
+          } catch (error) {
+            // 로컬 상태만 업데이트 (폴백)
+            set(state => ({
+              sessions: {
+                ...state.sessions,
+                [sessionId]: {
+                  ...state.sessions[sessionId],
+                  prompt_type: promptType as any,
+                  last_activity: Date.now()
+                }
+              },
+              error: `프롬프트 타입 변경 중 오류 발생: ${error}`
+            }));
+          }
+        },
+
+        updateSessionModel: async (sessionId: string, model: string) => {
+          try {
+            await apiCall('/api/system/model', {
+              method: 'POST',
+              body: JSON.stringify({
+                model_name: model,
+                session_id: sessionId
+              })
+            });
+
+            set(state => ({
+              sessions: {
+                ...state.sessions,
+                [sessionId]: {
+                  ...state.sessions[sessionId],
+                  model,
+                  last_activity: Date.now()
+                }
+              }
+            }));
+          } catch (error) {
+            set({ error: `모델 변경 중 오류 발생: ${error}` });
+          }
+        },
+
+        // System Management
+        refreshSystemStatus: async () => {
+          try {
+            const systemInfo = await apiCall('/api/system/info');
+            const mcpStatus = await apiCall('/api/mcp/status');
+
+            set(state => ({
+              systemStatus: {
+                ...state.systemStatus,
+                apiConnected: true,
+                lastHealthCheck: Date.now(),
+                version: systemInfo.version,
+                availableModels: systemInfo.available_models || [],
+                availablePrompts: systemInfo.available_prompts || [],
+                mcpServers: mcpStatus.servers || []
+              },
+              error: null
+            }));
+          } catch (error) {
+            set(state => ({
+              systemStatus: {
+                ...state.systemStatus,
+                apiConnected: false,
+                lastHealthCheck: Date.now()
+              },
+              error: `시스템 상태 확인 실패: ${error}`
+            }));
+          }
+        },
+
+        toggleDebugMode: async () => {
+          try {
+            await apiCall('/api/system/debug', { method: 'POST' });
+          } catch (error) {
+            set({ error: `디버그 모드 토글 실패: ${error}` });
+          }
+        },
+
+        checkMCPStatus: async () => {
+          try {
+            const mcpStatus = await apiCall('/api/mcp/status');
+            set(state => ({
+              systemStatus: {
+                ...state.systemStatus,
+                mcpServers: mcpStatus.servers || []
+              }
+            }));
+          } catch (error) {
+            console.error('MCP 상태 확인 실패:', error);
+          }
+        },
+
+        // Utility Actions
+        clearError: () => set({ error: null }),
+        setLoading: (loading: boolean) => set({ isLoading: loading }),
+        setTyping: (typing: boolean) => set({ isTyping: typing })
       }),
-    }
-  ),
-  { name: 'chat-store' }
+      {
+        name: 'gaia-bt-chat-store',
+        partialize: (state) => ({ 
+          sessions: state.sessions, 
+          currentSessionId: state.currentSessionId,
+          messageIdCounter: state.messageIdCounter
+        })
+      }
+    ),
+    { name: 'gaia-bt-chat-store' }
   )
 );
