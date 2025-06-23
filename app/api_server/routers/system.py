@@ -9,9 +9,23 @@ from pydantic import BaseModel
 from app.api_server.dependencies import get_chatbot_service
 from app.api_server.services.chatbot_service import ChatbotService
 from app.utils.config import OLLAMA_MODEL, DEBUG_MODE
+import httpx
 from app.utils.prompt_manager import get_prompt_manager
 
 router = APIRouter()
+
+# 공통 함수
+async def _get_ollama_models() -> List[str]:
+    """Ollama에서 사용 가능한 모델 목록 조회"""
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            response = await client.get("http://localhost:11434/api/tags")
+            response.raise_for_status()
+            data = response.json()
+            return [model["name"] for model in data.get("models", [])]
+    except Exception:
+        # 기본 모델 목록으로 폴백
+        return ["gemma3:latest", "llama3.2:latest", "mistral:latest"]
 
 class SystemInfo(BaseModel):
     """시스템 정보 모델"""
@@ -25,7 +39,7 @@ class SystemInfo(BaseModel):
 
 class ModelChangeRequest(BaseModel):
     """모델 변경 요청"""
-    model_name: str
+    model: str
     session_id: str = "default"
 
 class PromptChangeRequest(BaseModel):
@@ -40,13 +54,16 @@ async def get_system_info(
     """시스템 정보 조회"""
     prompt_manager = get_prompt_manager()
     
+    # 사용 가능한 모델 목록 동적 조회
+    available_models = await _get_ollama_models()
+    
     return {
         "version": "2.0.0",
         "model": service.current_model,
         "mode": service.current_mode,
         "mcp_enabled": service.mcp_enabled,
         "debug": service.debug_mode,
-        "available_models": ["gemma3:latest", "llama3.2:latest", "mistral:latest"],
+        "available_models": available_models,
         "available_prompts": list(prompt_manager.templates.keys())
     }
 
@@ -61,7 +78,7 @@ async def change_model(
         raise HTTPException(404, f"세션 {request.session_id}를 찾을 수 없습니다")
     
     try:
-        result = await chatbot.change_model(request.model_name)
+        result = await chatbot.change_model(request.model)
         return {
             "success": True,
             "model": chatbot.client.model_name,
@@ -115,6 +132,34 @@ async def change_mode(
         result = await service.process_command("/mcp start", session_id)
     
     return result
+
+@router.get("/models")
+async def get_available_models(
+    service: ChatbotService = Depends(get_chatbot_service)
+) -> Dict[str, Any]:
+    """사용 가능한 모델 목록 가져오기"""
+    models = await _get_ollama_models()
+    
+    return {
+        "models": models,
+        "default": service.current_model,
+        "status": "success"
+    }
+
+@router.get("/health")
+async def health_check(
+    service: ChatbotService = Depends(get_chatbot_service)
+) -> Dict[str, Any]:
+    """시스템 상태 체크 엔드포인트"""
+    prompt_manager = get_prompt_manager()
+    
+    return {
+        "status": "ok",
+        "model": service.current_model,
+        "mode": service.current_mode,
+        "mcp_enabled": service.mcp_enabled,
+        "debug": service.debug_mode
+    }
 
 @router.get("/startup-banner")
 async def get_startup_banner(

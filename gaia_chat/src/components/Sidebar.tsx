@@ -6,7 +6,17 @@ import { useChatContext } from '@/contexts/ChatContext';
 import { useResponsive } from '@/hooks/useResponsive';
 import Image from 'next/image';
 
+// GAIA-BT API 서버 URL (개발 환경에서는 localhost, 프로덕션에서는 적절한 주소로 변경)
 const API_BASE_URL = 'http://localhost:8000';
+
+// API 상태 폴백 값 (API가 다운된 경우 UI에 표시할 기본값)
+const API_FALLBACK_STATUS = {
+  status: 'unknown',
+  model: 'offline',
+  mode: 'normal',
+  mcp_enabled: false,
+  debug: false
+};
 
 interface SystemStatus {
   status: string;
@@ -50,33 +60,124 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   // 시스템 상태 확인
   const checkSystemStatus = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/health`);
+      console.log('시스템 상태 확인 요청 시작...', `${API_BASE_URL}/health`);
+      
+      // AbortSignal.timeout()이 지원되지 않는 경우를 위한 폴백
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log('시스템 상태 응답:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+      
       if (response.ok) {
         const status = await response.json();
+        console.log('서버 상태 정보:', status);
         setSystemStatus(status);
+      } else {
+        console.error('서버 상태 응답 오류:', {
+          status: response.status,
+          statusText: response.statusText
+        });
       }
     } catch (error) {
-      console.error('시스템 상태 확인 실패:', error);
+      // error가 unknown 타입이미로 타입 가드 추가
+      if (error instanceof Error) {
+        console.error('시스템 상태 확인 실패:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+        
+        // 네트워크 에러인 경우 추가 정보 출력
+        if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+          console.error('API 서버 연결 실패. 서버가 실행 중인지 확인하세요.');
+          console.error(`API URL: ${API_BASE_URL}`);
+        }
+      } else {
+        console.error('시스템 상태 확인 실패:', error);
+      }
     }
   };
 
   // 사용 가능한 모델 목록 가져오기
   const fetchAvailableModels = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/system/models`);
+      console.log('모델 목록 요청 시작...', `${API_BASE_URL}/api/system/models`);
+      
+      // AbortSignal.timeout()이 지원되지 않는 경우를 위한 폴백
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(`${API_BASE_URL}/api/system/models`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log('모델 목록 응답:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+      
       if (response.ok) {
         const models = await response.json();
+        console.log('사용 가능한 모델:', models);
         setAvailableModels(models.models || []);
+      } else {
+        console.error('모델 목록 응답 오류:', {
+          status: response.status,
+          statusText: response.statusText
+        });
+        // 기본 모델 목록 설정
+        setAvailableModels([
+          'gemma3-12b:latest',
+          'txgemma-chat:latest',
+          'txgemma-predict:latest',
+          'Gemma3:27b-it-q4_K_M'
+        ]);
       }
     } catch (error) {
-      console.error('모델 목록 가져오기 실패:', error);
+      // error가 unknown 타입이미로 타입 가드 추가
+      if (error instanceof Error) {
+        console.error('모델 목록 가져오기 실패:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+          cause: error.cause
+        });
+        
+        // 네트워크 에러인 경우 추가 정보 출력
+        if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+          console.error('네트워크 연결 실패. API 서버가 실행 중인지 확인하세요.');
+          console.error(`API URL: ${API_BASE_URL}`);
+        }
+      } else {
+        console.error('모델 목록 가져오기 실패:', error);
+      }
       // 기본 모델 목록 설정
       setAvailableModels([
-        'llama3.1:latest',
-        'gemma2:latest', 
-        'qwen2.5:latest',
-        'mistral:latest',
-        'phi3:latest'
+        'gemma3-12b:latest',
+        'txgemma-chat:latest',
+        'txgemma-predict:latest',
+        'Gemma3:27b-it-q4_K_M'
       ]);
     }
   };
@@ -97,10 +198,25 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
 
   // 컴포넌트 마운트 시 상태 확인
   useEffect(() => {
-    checkSystemStatus();
-    fetchAvailableModels();
-    const interval = setInterval(checkSystemStatus, 10000); // 10초마다 상태 확인
-    return () => clearInterval(interval);
+    console.log('컴포넌트 마운트: API 상태 및 모델 목록 확인 시작');
+    
+    // 초기 상태 확인 및 모델 목록 가져오기 (약간의 지연으로 시작)
+    const initTimer = setTimeout(() => {
+      checkSystemStatus();
+      fetchAvailableModels();
+    }, 1000);
+    
+    // 주기적 상태 확인 (10초마다)
+    const interval = setInterval(() => {
+      console.log('주기적 상태 확인 실행');
+      checkSystemStatus();
+    }, 10000);
+    
+    // 클린업 함수
+    return () => {
+      clearTimeout(initTimer);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleNewConversation = async () => {

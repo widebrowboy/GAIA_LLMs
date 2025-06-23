@@ -3,7 +3,7 @@
 ## 📋 프로젝트 개요
 GAIA-BT v2.0 Alpha는 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
 
-## 🎯 현재 구현 상태 (2024년 12월 19일 기준)
+## 🎯 현재 구현 상태 (2025년 6월 23일 기준)
 - **전체 완성도**: 100% 완료 (Production Ready)
 - **핵심 기능**: 모든 주요 기능 구현 완료 + API 서버 통합
 - **신규 기능**: 
@@ -13,6 +13,9 @@ GAIA-BT v2.0 Alpha는 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신
     - **React 키 중복 오류 완전 해결** (고유 ID 시스템)
     - **CLI-Web 완전 통합** (Service Layer Pattern 적용)
     - **StartupBanner & SystemStatus** (CLI 스타일 완전 재현)
+    - **🆕 Sidebar 모드 전환** (사이드바에서 직접 모드 변경 가능)
+    - **🆕 API 엔드포인트 통합** (/api/system/mode/{mode} 지원)
+    - **🆕 프론트엔드 UX 개선** (에러 처리 강화, 상태 표시 개선)
   - **✅ 완전 분리된 RESTful API 서버** (챗봇 기능 완전 분리)
   - **✅ 상세한 Swagger/OpenAPI 문서** (사용 예시 및 코드 샘플 포함)
   - **✅ WebSocket 실시간 통신** (멀티 세션 지원)
@@ -169,6 +172,19 @@ MUST FOLLOW:
 - 상태 관리: Zustand 중앙집중식 상태 + 로컬 상태 조합
 - 에러 바운더리: 각 컴포넌트별 독립적 에러 처리
 - 접근성: ARIA 라벨 및 키보드 네비게이션 지원
+```
+
+### Rule 14: WebUI 모드 전환 및 API 통합 규칙 (신규 v2.0.3)
+```
+MUST FOLLOW:
+- 사이드바에서 직접 모드 전환 가능 (일반 ↔ Deep Research)
+- /api/system/mode/{mode} 엔드포인트를 통한 백엔드 연동
+- 모드 변경 시 실시간 UI 상태 업데이트 (색상, 아이콘, 텍스트)
+- 에러 처리: 네트워크 실패 시 사용자 친화적 메시지 표시
+- 모델 변경 요청: `model` 필드 사용 (기존 `model_name`에서 변경)
+- 모든 API 호출 시 적절한 로딩 상태 표시
+- CORS 설정: 프론트엔드-백엔드 간 완전한 통신 보장
+- TypeScript 타입 안전성: API 응답 구조에 맞는 인터페이스 정의
 ```
 
 ## 🎨 WebUI 레이아웃 아키텍처 상세 가이드 (v2.0.2)

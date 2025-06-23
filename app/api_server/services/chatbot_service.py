@@ -51,7 +51,7 @@ class ChatbotService:
         if session_id in self.sessions:
             return {"error": f"세션 {session_id}가 이미 존재합니다"}
         
-        config = Config(debug_mode=False)
+        config = Config(debug_mode=False, model="gemma3-12b:latest")
         chatbot = DrugDevelopmentChatbot(config)
         
         # API 연결 확인
@@ -270,7 +270,7 @@ class ChatbotService:
             "mcp_enabled": chatbot.config.mcp_enabled,
             "debug": chatbot.config.debug_mode,
             "mcp_output_visible": chatbot.config.show_mcp_output,
-            "available_models": [],  # TODO: 모델 목록 가져오기
+            "available_models": ["gemma3-12b:latest", "txgemma-chat:latest", "txgemma-predict:latest", "Gemma3:27b-it-q4_K_M"],
             "available_prompts": list(self.prompt_manager.templates.keys())
         }
     

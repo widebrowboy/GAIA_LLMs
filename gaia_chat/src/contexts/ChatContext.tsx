@@ -337,13 +337,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       
       if (newMode === 'deep_research') {
         // Deep Research 모드 활성화
-        const response = await fetch(`${API_BASE_URL}/api/mcp/start`, {
+        const response = await fetch(`${API_BASE_URL}/api/system/mode/deep_research`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ 
-            command: "start",
             session_id: sessionId 
           }),
           signal: controller.signal,
@@ -354,25 +353,28 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           setMcpEnabled(true);
           console.log('✅ Deep Research 모드 활성화됨');
         } else {
-          throw new Error(`MCP 시작 실패: ${response.status}`);
+          throw new Error(`Deep Research 모드 전환 실패: ${response.status}`);
         }
       } else {
         // 일반 모드로 전환
-        const response = await fetch(`${API_BASE_URL}/api/mcp/stop`, {
+        const response = await fetch(`${API_BASE_URL}/api/system/mode/normal`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ 
-            command: "stop",
             session_id: sessionId 
           }),
           signal: controller.signal,
         });
         
-        setCurrentMode('normal');
-        setMcpEnabled(false);
-        console.log('✅ 일반 모드로 전환됨');
+        if (response.ok) {
+          setCurrentMode('normal');
+          setMcpEnabled(false);
+          console.log('✅ 일반 모드로 전환됨');
+        } else {
+          throw new Error(`일반 모드 전환 실패: ${response.status}`);
+        }
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
