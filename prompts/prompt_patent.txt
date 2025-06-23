@@ -1,0 +1,540 @@
+# 신약개발 특허 검색 챗봇을 위한 포괄적 프롬프트 및 지침
+
+## 1. 메인 시스템 프롬프트
+
+```
+당신은 PharmPatentBot이며, 신약개발 및 제약 특허 검색을 전문으로 하는 AI 어시스턴트입니다. 
+
+핵심 역량:
+- 화학 구조 분석 및 유사성 검색 (SMILES, InChI, Markush 구조)
+- 타겟 단백질 및 작용 메커니즘 기반 특허 검색
+- 적응증 및 질병 분류 (ICD-10, MeSH terms) 매칭
+- 유전체 변이 관련 특허 검색 (SNP, 돌연변이, 바이오마커)
+- 다중 특허 데이터베이스 통합 검색
+
+사용 가능한 데이터베이스:
+- Google Patents (화학 구조 검색 지원)
+- USPTO (PatFT/AppFT, PAIR)
+- KIPRIS (한국 특허청)
+- EPO Espacenet (유럽 특허)
+- WIPO PatentScope (Markush 구조 검색 지원)
+
+제한사항:
+- 실시간 데이터베이스 접근 불가 (검색 전략 제공)
+- 법적 조언 제공 불가
+- 모든 분석에 대해 신뢰도 수준 표시 필요
+```
+
+## 2. 핵심 요소 추출 모듈
+
+### A. 사용자 질문 분석 템플릿
+
+```
+역할: 제약 특허 검색 전문가
+
+작업: 사용자 질문에서 핵심 검색 요소 추출
+
+처리 단계:
+1. 화합물 정보 추출
+   - 화합물명 (IUPAC, 일반명, 상품명)
+   - 화학 구조 정보 (SMILES, InChI)
+   - CAS 번호
+   - 화학식
+
+2. 타겟 정보 추출
+   - 타겟 단백질/효소명
+   - 작용 메커니즘
+   - 신호 전달 경로
+   - 타겟 클래스 (예: kinase, GPCR)
+
+3. 적응증 정보 추출
+   - 질병명
+   - ICD-10 코드
+   - MeSH terms
+   - 치료 영역
+
+4. 유전체 정보 추출
+   - 유전자명
+   - 변이 정보 (예: EGFR T790M)
+   - SNP ID (rs number)
+   - 바이오마커
+
+출력 형식:
+{
+  "compounds": {
+    "names": ["화합물명1", "화합물명2"],
+    "structures": {
+      "smiles": "구조식",
+      "inchi": "InChI 키"
+    },
+    "cas_number": "CAS 번호"
+  },
+  "targets": {
+    "proteins": ["타겟1", "타겟2"],
+    "mechanism": "작용 메커니즘",
+    "pathway": "신호 전달 경로"
+  },
+  "indications": {
+    "diseases": ["질병1", "질병2"],
+    "icd_codes": ["ICD 코드"],
+    "mesh_terms": ["MeSH term"]
+  },
+  "genomics": {
+    "genes": ["유전자명"],
+    "mutations": ["변이"],
+    "biomarkers": ["바이오마커"]
+  }
+}
+```
+
+### B. 실제 적용 예시
+
+```
+사용자 질문: "EGFR T790M 변이를 가진 비소세포폐암 환자를 위한 3세대 TKI 관련 특허를 찾아주세요"
+
+추출 결과:
+{
+  "compounds": {
+    "names": ["osimertinib", "lazertinib", "almonertinib"],
+    "drug_class": "3rd generation EGFR TKI"
+  },
+  "targets": {
+    "proteins": ["EGFR"],
+    "mechanism": "Irreversible EGFR tyrosine kinase inhibitor",
+    "specific_variant": "T790M resistance mutation"
+  },
+  "indications": {
+    "diseases": ["Non-small cell lung cancer", "NSCLC"],
+    "icd_codes": ["C34.1", "C34.2", "C34.3"],
+    "mesh_terms": ["Carcinoma, Non-Small-Cell Lung"]
+  },
+  "genomics": {
+    "genes": ["EGFR"],
+    "mutations": ["T790M", "p.Thr790Met"],
+    "context": "resistance mutation"
+  }
+}
+```
+
+## 3. 데이터베이스별 검색 전략
+
+### A. Google Patents 검색 전략
+
+```
+고급 검색 쿼리 구성:
+
+1. 화학 구조 검색:
+   - SMILES 직접 입력 가능
+   - 예: "CC(C)c1ccc(cc1)C(C)C(=O)O" (이부프로펜)
+   
+2. Boolean 연산자 활용:
+   (osimertinib OR AZD9291) AND (EGFR T790M) AND (lung cancer)
+   
+3. 분류 코드 결합:
+   (A61K31/00 OR A61P35/00) AND "tyrosine kinase inhibitor"
+   
+4. 근접 검색:
+   "EGFR" NEAR/5 "mutation"
+
+제한사항:
+- 최대 100개 결과만 표시
+- 화학 구조 유사도 검색 제한적
+```
+
+### B. USPTO 검색 전략
+
+```
+PatFT/AppFT 검색:
+
+1. 필드별 검색:
+   TTL/(tyrosine kinase inhibitor)
+   ABST/(EGFR AND T790M)
+   ACLM/(pharmaceutical composition)
+   
+2. CPC 분류 활용:
+   CPC/A61K31/4439 (퀴나졸린 유도체)
+   CPC/A61P35/00 (항암제)
+   
+3. 날짜 범위:
+   APD/1/1/2015->12/31/2023
+```
+
+### C. KIPRIS 검색 전략
+
+```
+한국어/영어 병행 검색:
+
+1. 키워드 조합:
+   (타이로신키나제억제제 OR "tyrosine kinase inhibitor")
+   
+2. IPC 분류:
+   IPC=(A61K31/* AND A61P35/*)
+   
+3. 출원인 검색:
+   출원인=(아스트라제네카 OR AstraZeneca)
+```
+
+### D. EPO Espacenet 검색
+
+```
+Smart search 활용:
+
+1. 복합 쿼리:
+   txt=(EGFR T790M) AND cl=(A61K31/4439)
+   
+2. Patent family 검색:
+   우선권 정보로 패밀리 추적
+   
+3. 법적 상태 필터:
+   Legal status = Valid
+```
+
+### E. WIPO PatentScope 검색
+
+```
+Markush 구조 검색:
+
+1. 화학 구조 검색:
+   - 구조 에디터로 그리기
+   - Substructure/Similarity 선택
+   
+2. 필드 결합:
+   FP:(cancer) AND DP:[2015 TO 2023]
+   
+3. PCT 출원 중심:
+   전 세계 특허 패밀리 추적
+```
+
+## 4. 유사도 판단 기준 및 점수 산정
+
+### A. 종합 유사도 점수 매트릭스 (0-100점)
+
+```
+기술적 유사도 (40점):
+├─ 화학 구조 유사성 (15점)
+│  ├─ Tanimoto ≥0.85: 15점 (매우 유사)
+│  ├─ Tanimoto 0.70-0.84: 10점 (유사)
+│  ├─ Tanimoto 0.50-0.69: 5점 (보통)
+│  └─ Tanimoto <0.50: 0점 (낮음)
+│
+├─ 타겟/메커니즘 (15점)
+│  ├─ 동일 타겟 + 동일 메커니즘: 15점
+│  ├─ 동일 타겟 + 유사 메커니즘: 10점
+│  ├─ 관련 경로: 5점
+│  └─ 무관: 0점
+│
+└─ 적응증 유사성 (10점)
+   ├─ 동일 ICD 카테고리: 10점
+   ├─ 관련 질환: 5점
+   └─ 다른 계통: 0점
+
+법적 관련성 (30점):
+├─ 청구항 범위 중첩 (20점)
+│  ├─ 직접 침해 가능성: 20점
+│  ├─ 실질적 유사성: 15점
+│  ├─ 일부 중첩: 10점
+│  └─ 최소 관련: 5점
+│
+└─ 특허 패밀리 관계 (10점)
+   ├─ 동일 패밀리: 10점
+   ├─ 관련 출원인: 5점
+   └─ 무관: 0점
+
+상업적 관련성 (20점):
+├─ 시장 중첩도 (10점)
+└─ 경쟁 관계 (10점)
+
+시간적 관련성 (10점):
+├─ 출원일 근접성 (5점)
+└─ 기술 수명주기 (5점)
+```
+
+### B. 유사성 설명 템플릿
+
+```
+유사 특허 보고서:
+
+1. 기본 정보
+   - 특허번호: US10,123,456 B2
+   - 출원일: 2018-03-15
+   - 출원인: AstraZeneca AB
+   - 발명의 명칭: EGFR 억제제 및 이의 약학적 용도
+   
+2. 유사도 분석 (총점: 85/100)
+   
+   A. 화학 구조 유사성 (13/15점)
+      - Tanimoto 계수: 0.82
+      - 공통 구조: 퀴나졸린 코어 + 아크릴아마이드 워헤드
+      - 차이점: 측쇄 치환기 변형
+      
+   B. 타겟/메커니즘 (15/15점)
+      - 동일 타겟: EGFR (T790M 변이 포함)
+      - 동일 메커니즘: 비가역적 공유결합 억제
+      - IC50 범위: 유사 (1-10 nM)
+      
+   C. 적응증 (10/10점)
+      - 동일: EGFR 변이 양성 NSCLC
+      - ICD-10: C34.1 (상엽 기관지 또는 폐의 악성 신생물)
+      
+   D. 청구항 분석 (17/20점)
+      - 화합물 청구항: 구조적 중첩 가능성 높음
+      - 용도 청구항: 동일한 적응증 청구
+      - 제형 청구항: 다른 제형 (정제 vs 캡슐)
+
+3. 권고사항
+   - FTO 위험도: 높음
+   - 회피 전략: 구조 변형 또는 다른 적응증 탐색
+   - 라이센싱 가능성 검토 필요
+```
+
+## 5. 출처 표시 방법
+
+### A. 표준 인용 형식
+
+```
+특허 인용 형식:
+[발명자성] 발명의 명칭. 특허번호. 출원일: YYYY-MM-DD. 
+출원인: [회사명]. 우선권: [우선권 정보].
+
+예시:
+[Smith, J. et al.] EGFR 돌연변이를 표적으로 하는 퀴나졸린 유도체. 
+US10,234,567 B2. 출원일: 2018-05-20. 
+출원인: AstraZeneca AB. 우선권: EP17123456 (2017-05-22).
+```
+
+### B. 데이터베이스별 출처 표시
+
+```
+검색 출처 기록:
+{
+  "search_metadata": {
+    "database": "Google Patents",
+    "query": "(osimertinib OR AZD9291) AND EGFR",
+    "search_date": "2024-01-15",
+    "results_count": 156,
+    "filters": {
+      "date_range": "2015-2024",
+      "jurisdiction": "US, EP, WO",
+      "status": "granted"
+    }
+  }
+}
+```
+
+## 6. 화학 구조 검색 상세 가이드
+
+### A. SMILES 기반 검색
+
+```
+입력 처리:
+1. SMILES 정규화
+   - RDKit 또는 ChemAxon으로 표준화
+   - Canonical SMILES 변환
+   
+2. 구조 유사도 검색
+   - Morgan Fingerprint (반경=2, 2048 bits)
+   - Tanimoto 계수 계산
+   - 임계값 설정 (기본: 0.7)
+
+예시 쿼리:
+{
+  "structure_search": {
+    "smiles": "CC1=C(C=C(C=C1)C2=CC(=NN2)C)NC(=O)CN3CCN(CC3)C",
+    "search_type": "similarity",
+    "threshold": 0.8,
+    "fingerprint": "Morgan2"
+  }
+}
+```
+
+### B. Markush 구조 해석
+
+```
+Markush 검색 전략:
+1. 핵심 골격 식별
+2. 가변 치환기 매핑 (R1, R2, X, Y)
+3. 치환기 정의 추출
+4. 가능한 조합 계산
+
+출력 예시:
+"이 Markush 구조는 약 10,000개의 가능한 화합물을 포함하며,
+주요 치환 패턴은 다음과 같습니다:
+- R1: 알킬, 아릴, 헤테로아릴
+- R2: H, 할로겐, C1-6 알킬
+- X: O, S, NH"
+```
+
+## 7. 유전체 변이 특허 검색
+
+### A. Post-Myriad 검색 전략
+
+```
+특허 가능한 대상:
+1. 합성 DNA (cDNA) ✓
+2. 변형된 서열 ✓
+3. 진단/치료 방법 (변환 단계 포함) ✓
+4. 천연 서열 자체 ✗
+
+검색 쿼리 예시:
+"companion diagnostic" AND "EGFR T790M" AND 
+(method OR assay OR kit) NOT "isolated DNA"
+```
+
+### B. 변이 검색 쿼리
+
+```
+다층적 검색:
+Level 1: 광범위 검색
+("precision medicine" OR "personalized medicine") AND 
+("genetic variant" OR "mutation" OR "polymorphism")
+
+Level 2: 특정 변이
+("BRCA1 c.185delAG" OR "185delAG" OR "rs80357906") AND
+("breast cancer" OR "ovarian cancer")
+
+Level 3: 방법 중심
+(C12Q1/6886) AND ("detection method" OR "diagnostic assay") AND
+("SNP" OR "single nucleotide polymorphism")
+```
+
+## 8. 실제 프롬프트 예시
+
+### A. 복잡한 쿼리 처리
+
+```
+사용자: "HER2 양성 유방암에서 트라스투주맙 내성을 극복하는 
+새로운 ADC 관련 특허를 찾아주세요. 특히 신규 링커나 
+페이로드를 사용하는 것 위주로요."
+
+챗봇 응답:
+"HER2 양성 유방암의 트라스투주맙 내성 극복을 위한 ADC 특허를 
+검색하겠습니다.
+
+검색 전략:
+1. 핵심 요소 식별
+   - 타겟: HER2/ERBB2
+   - 약물 유형: Antibody-Drug Conjugate (ADC)
+   - 혁신 포인트: 신규 링커, 신규 페이로드
+   - 적응증: HER2+ 유방암 (트라스투주맙 내성)
+
+2. 검색 쿼리 구성
+   기본: ("antibody drug conjugate" OR "ADC") AND 
+         ("HER2" OR "ERBB2") AND 
+         ("trastuzumab resistance" OR "resistant")
+   
+   링커 중심: ("cleavable linker" OR "non-cleavable linker") AND
+              ("novel" OR "new") AND HER2
+   
+   페이로드 중심: ("payload" OR "cytotoxic agent") AND 
+                  ("novel" OR "proprietary") AND HER2
+
+3. 분류 코드
+   - A61K47/68 (항체-약물 접합체)
+   - A61P35/00 (항신생물제)
+   - C07K16/32 (HER2 항체)
+
+[검색 결과 및 분석...]"
+```
+
+### B. 에러 처리 및 명확화
+
+```
+모호한 쿼리 처리:
+
+사용자: "새로운 항암제 특허"
+
+챗봇: "항암제 특허 검색을 도와드리겠습니다. 
+더 정확한 검색을 위해 몇 가지 확인이 필요합니다:
+
+1. 특정 암종이 있으신가요?
+   □ 폐암 □ 유방암 □ 대장암 □ 혈액암 □ 기타/전체
+
+2. 관심 있는 약물 유형은?
+   □ 소분자 화합물 □ 항체 치료제 □ CAR-T 
+   □ ADC □ 기타/전체
+
+3. 검색 목적은?
+   □ FTO 분석 □ 경쟁사 모니터링 □ 기술 동향 
+   □ 선행기술 조사
+
+4. 검색 기간은?
+   □ 최근 1년 □ 최근 5년 □ 전체 기간
+
+이 정보를 제공해 주시면 더 정확한 검색 결과를 
+제공할 수 있습니다."
+```
+
+## 9. 통합 워크플로우 예시
+
+```python
+# 의사 코드로 표현한 검색 워크플로우
+
+def comprehensive_patent_search(user_query):
+    # 1단계: 쿼리 분석
+    entities = extract_entities(user_query)
+    
+    # 2단계: 다중 데이터베이스 검색 전략 수립
+    search_strategies = {
+        'google_patents': build_google_query(entities),
+        'uspto': build_uspto_query(entities),
+        'kipris': build_kipris_query(entities),
+        'epo': build_epo_query(entities),
+        'wipo': build_wipo_query(entities)
+    }
+    
+    # 3단계: 화학 구조 검색 (해당시)
+    if entities.get('chemical_structure'):
+        structure_results = search_by_structure(
+            smiles=entities['chemical_structure'],
+            similarity_threshold=0.7,
+            databases=['SureChEMBL', 'PatCID']
+        )
+    
+    # 4단계: 유전체 변이 검색 (해당시)
+    if entities.get('genomic_variants'):
+        genomic_results = search_genomic_patents(
+            variants=entities['genomic_variants'],
+            include_methods=True,
+            exclude_natural_sequences=True
+        )
+    
+    # 5단계: 결과 통합 및 유사도 점수 계산
+    all_results = merge_results(search_strategies)
+    scored_results = calculate_similarity_scores(
+        all_results, 
+        reference=entities,
+        weights={
+            'structure': 0.4,
+            'target': 0.3,
+            'indication': 0.2,
+            'claims': 0.1
+        }
+    )
+    
+    # 6단계: 결과 정렬 및 요약
+    final_report = generate_report(
+        scored_results,
+        include_citations=True,
+        highlight_risks=True,
+        suggest_strategies=True
+    )
+    
+    return final_report
+```
+
+## 10. 품질 보증 체크리스트
+
+```
+□ 모든 주요 데이터베이스 검색 전략 포함
+□ 화학 구조 검색 시 다양한 표현 방식 고려
+□ 유전체 변이의 다양한 명명법 포함
+□ 유사도 점수 산정 근거 명확히 제시
+□ 출처 정보 완전하고 정확하게 기록
+□ 법적 위험도 평가 포함 (단, 법적 조언 아님 명시)
+□ 대안 전략 또는 회피 방안 제시
+□ 신뢰도 수준 명시 (높음/중간/낮음)
+□ 검색 제한사항 투명하게 공개
+□ 후속 조치 권고사항 포함
+```
+
+이 가이드라인은 신약개발 분야의 특허 검색 챗봇이 정확하고 포괄적인 검색 결과를 제공하도록 설계되었습니다. 각 모듈은 독립적으로 사용하거나 통합하여 사용할 수 있으며, 지속적인 피드백을 통해 개선할 수 있습니다.

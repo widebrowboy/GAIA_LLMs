@@ -30,10 +30,10 @@ class OllamaClient:
     """
 
     def __init__(self,
-                 model: str = "Gemma3:latest",
+                 model: str = "gemma3-12b:latest",
                  temperature: float = 0.7,
-                 max_tokens: int = 4000,
-                 min_response_length: int = 500,
+                 max_tokens: int = 2000,
+                 min_response_length: int = 300,
                  ollama_url: Optional[str] = None,
                  debug_mode: bool = False):
         """
@@ -102,7 +102,15 @@ class OllamaClient:
             httpx.AsyncClient: 비동기 HTTP 클라이언트 인스턴스
         """
         if self._http_client is None:
-            self._http_client = httpx.AsyncClient(timeout=120.0)
+            # Gemma3:27b-it-q4_K_M 대용량 모델을 위한 최적화된 타임아웃
+            self._http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(
+                    connect=30.0,      # 연결 타임아웃
+                    read=600.0,        # 읽기 타임아웃 (10분)
+                    write=60.0,        # 쓰기 타임아웃
+                    pool=30.0          # 연결 풀 타임아웃
+                )
+            )
         return self._http_client
 
     async def close(self):
@@ -144,6 +152,30 @@ class OllamaClient:
 
         # 모델 이름 추가
         payload["model"] = self.model
+        
+        # 모델별 최적화 설정 적용
+        if self.model == "gemma3-12b:latest":
+            # Gemma3-12B 모델 최적화 (메모리 효율적)
+            payload.setdefault("options", {}).update({
+                "num_predict": 800,    # 적절한 청크 크기
+                "temperature": temp,   # 기본 온도 사용
+                "keep_alive": 300,     # 5분간 메모리 유지
+                "top_p": 0.9,          # 응답 품질 향상
+                "top_k": 40            # 다양성과 품질 균형
+            })
+        elif self.model == "Gemma3:27b-it-q4_K_M":
+            # 대용량 모델 최적화
+            payload.setdefault("options", {}).update({
+                "num_predict": 500,    # 청크 크기 제한
+                "temperature": min(temp, 0.3),  # 안정성을 위해 온도 제한
+                "keep_alive": 600      # 10분간 메모리 유지
+            })
+        elif "txgemma" in self.model:
+            # TxGemma 모델 최적화
+            payload.setdefault("options", {}).update({
+                "num_predict": 1000,
+                "keep_alive": 300
+            })
 
         # 디버깅 로그 추가 (디버그 모드일 때만)
         if self.debug_mode:
@@ -339,6 +371,120 @@ class OllamaClient:
                 results[i] = f"[오류: {result!s}]"
 
         return results
+
+    async def generate_stream(self,
+                             prompt: str,
+                             system_prompt: Optional[str] = None,
+                             temperature: Optional[float] = None,
+                             max_retries: Optional[int] = None):
+        """
+        어댑터 패턴을 사용하여 현재 모델에 맞게 스트리밍 텍스트 생성
+
+        Args:
+            prompt: 입력 프롬프트
+            system_prompt: 시스템 프롬프트 (선택사항)
+            temperature: 생성 온도 (None이면 기본값 사용)
+            max_retries: 최대 재시도 횟수
+
+        Yields:
+            str: 생성된 텍스트 청크
+        """
+        max_retries = max_retries or self.max_retries
+        temp = temperature if temperature is not None else self.temperature
+
+        # 어댑터를 사용하여 현재 모델에 맞는 요청 형식 생성
+        payload, endpoint_path = await self.adapter.format_request(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            temperature=temp,
+            max_tokens=self.max_tokens,
+            gpu_params=self.gpu_params
+        )
+
+        # 모델 이름 추가 및 스트리밍 설정
+        payload["model"] = self.model
+        payload["stream"] = True
+        
+        # 모델별 최적화 설정 적용 (스트리밍용)
+        if self.model == "gemma3-12b:latest":
+            # Gemma3-12B 스트리밍 최적화
+            payload.setdefault("options", {}).update({
+                "num_predict": 300,    # 스트리밍용 중간 청크
+                "temperature": temp,
+                "keep_alive": 300,
+                "top_p": 0.9,
+                "top_k": 40
+            })
+        elif self.model == "Gemma3:27b-it-q4_K_M":
+            # 대용량 모델 스트리밍 최적화
+            payload.setdefault("options", {}).update({
+                "num_predict": 200,    # 스트리밍용 작은 청크
+                "temperature": min(temp, 0.3),
+                "keep_alive": 600
+            })
+        elif "txgemma" in self.model:
+            # TxGemma 모델 스트리밍 최적화
+            payload.setdefault("options", {}).update({
+                "num_predict": 400,
+                "keep_alive": 300
+            })
+
+        if self.debug_mode:
+            print(f"[디버그] OllamaClient.generate_stream 호출: 모델={self.model}")
+
+        # 재시도 메커니즘
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                # HTTP 클라이언트 가져오기
+                client = await self._get_http_client()
+
+                if self.debug_mode:
+                    print(f"[디버그] 스트리밍 API 요청 시작 (시도 {attempt+1}/{max_retries+1})")
+
+                # 스트리밍 API 요청
+                async with client.stream(
+                    "POST",
+                    f"{self.ollama_url}{endpoint_path}",
+                    json=payload,
+                    headers={"Content-Type": "application/json"}
+                ) as response:
+                    response.raise_for_status()
+
+                    async for line in response.aiter_lines():
+                        if line.strip():
+                            try:
+                                chunk = json.loads(line)
+                                if chunk.get("response"):
+                                    yield chunk["response"]
+                                
+                                # 스트림 완료 확인
+                                if chunk.get("done", False):
+                                    break
+                                    
+                            except json.JSONDecodeError:
+                                continue
+
+                # 성공적으로 완료되면 함수 종료
+                if self.debug_mode:
+                    print(f"[디버그] 스트리밍 응답 완료")
+                return
+
+            except Exception as e:
+                last_error = str(e)
+                if self.debug_mode:
+                    print(f"스트리밍 시도 {attempt + 1}/{max_retries + 1} 실패: {last_error}")
+                
+                if attempt < max_retries:
+                    backoff_time = 1 + attempt * 2
+                    print(f"⏱️ {backoff_time}초 후 재시도합니다...")
+                    await asyncio.sleep(backoff_time)
+                else:
+                    print(f"⛔ 최대 재시도 횟수 초과: {last_error}")
+
+        # 모든 시도 실패
+        error_msg = f"스트리밍 요청이 실패했습니다: {last_error}"
+        yield f"[오류: {error_msg}]"
 
     def update_model(self, model_name: str):
         """

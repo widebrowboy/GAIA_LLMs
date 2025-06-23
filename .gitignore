@@ -80,6 +80,7 @@ logs/
 webui/backend/logs/
 webui/nextjs-webui/.next/
 webui/nextjs-webui/out/
+webui/new_page/
 
 # =============================================================================
 # 임시 파일 및 백업

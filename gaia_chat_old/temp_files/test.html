@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAIAGPT 채팅</title>
+    <style>
+        :root {
+            --primary-color: #007AFF;
+            --secondary-color: #E2E8F0;
+            --text-color: #1A202C;
+            --bg-color: #F7FAFC;
+            --light-gray: #EDF2F7;
+            --border-color: #CBD5E0;
+            --user-msg-bg: #F7FAFC;
+            --bot-msg-bg: #EBF8FF;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: var(--bg-color);
+        }
+        
+        .app {
+            display: flex;
+            height: 100vh;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar {
+            width: 300px;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .app-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        
+        .new-chat-button {
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            width: 90%;
+            margin: 16px auto;
+            display: block;
+        }
+        
+        .conversation-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        
+        .conversation-item {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .conversation-item:hover {
+            background-color: var(--light-gray);
+        }
+        
+        .conversation-item.active {
+            background-color: var(--light-gray);
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .conversation-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .conversation-date {
+            font-size: 0.8rem;
+            color: #718096;
+        }
+        
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .chat-title {
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .message-list {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .message {
+            margin-bottom: 16px;
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            position: relative;
+        }
+        
+        .message.user {
+            align-self: flex-end;
+            background-color: var(--primary-color);
+            color: white;
+            border-bottom-right-radius: 0;
+        }
+        
+        .message.assistant {
+            align-self: flex-start;
+            background-color: var(--bot-msg-bg);
+            color: var(--text-color);
+            border-bottom-left-radius: 0;
+        }
+        
+        .message-input-container {
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+        }
+        
+        .message-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            resize: none;
+            margin-right: 12px;
+        }
+        
+        .send-button {
+            padding: 12px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .app {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: 60px;
+                flex-direction: row;
+                align-items: center;
+            }
+            
+            .sidebar-header {
+                width: 100%;
+                border-bottom: none;
+            }
+            
+            .chat-area {
+                height: calc(100vh - 60px);
+            }
+            
+            .conversation-list {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2 class="app-title">GAIAGPT</h2>
+            </div>
+            
+            <button class="new-chat-button">새 대화</button>
+            
+            <div class="conversation-list">
+                <div class="conversation-item active">
+                    <div class="conversation-title">How to be a better person?</div>
+                    <div class="conversation-date">6월 23일</div>
+                </div>
+                <div class="conversation-item">
+                    <div class="conversation-title">Hacking FBI server with linux</div>
+                    <div class="conversation-date">6월 23일</div>
+                </div>
+                <div class="conversation-item">
+                    <div class="conversation-title">How to get rich from youtube as an influencer</div>
+                    <div class="conversation-date">6월 23일</div>
+                </div>
+                <div class="conversation-item">
+                    <div class="conversation-title">Help me with web development tasks from client</div>
+                    <div class="conversation-date">6월 22일</div>
+                </div>
+                <div class="conversation-item">
+                    <div class="conversation-title">REACT NEXTJS Tutorial</div>
+                    <div class="conversation-date">6월 22일</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-area">
+            <div class="chat-header">
+                <h3 class="chat-title">How to be a better person?</h3>
+            </div>
+            
+            <div class="message-list">
+                <div class="message user">
+                    <div>안녕하세요? 더 나은 사람이 되려면 어떻게 해야 할까요?</div>
+                </div>
+                
+                <div class="message assistant">
+                    <div>안녕하세요! 더 나은 사람이 되기 위한 여정은 자기 인식과 꾸준한 개선으로 시작됩니다. 다음과 같은 몇 가지 방법이 도움이 될 수 있습니다:
+                    <br><br>
+                    1. 자기 반성과 인식: 자신의 행동과 생각을 정기적으로 돌아보세요.
+                    <br>
+                    2. 타인에 대한 공감: 다른 사람의 관점과 감정을 이해하려고 노력하세요.
+                    <br>
+                    3. 친절함 실천: 작은 친절한 행동들이 큰 차이를 만들 수 있습니다.
+                    <br><br>
+                    더 구체적인 조언이 필요하시면 말씀해 주세요!</div>
+                </div>
+                
+                <div class="message user">
+                    <div>감사합니다. 자기 반성을 위한 좋은 방법이 있을까요?</div>
+                </div>
+            </div>
+            
+            <div class="message-input-container">
+                <textarea class="message-input" placeholder="메시지를 입력하세요..." rows="1"></textarea>
+                <button class="send-button">전송</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 메시지 전송 기능
+        const messageInput = document.querySelector('.message-input');
+        const sendButton = document.querySelector('.send-button');
+        const messageList = document.querySelector('.message-list');
+        const newChatButton = document.querySelector('.new-chat-button');
+        const conversationItems = document.querySelectorAll('.conversation-item');
+
+        // 메시지 전송 기능
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                // 사용자 메시지 추가
+                const userMessage = document.createElement('div');
+                userMessage.className = 'message user';
+                userMessage.innerHTML = `<div>${message}</div>`;
+                messageList.appendChild(userMessage);
+                
+                // 입력 필드 비우기
+                messageInput.value = '';
+                
+                // 스크롤을 맨 아래로 이동
+                messageList.scrollTop = messageList.scrollHeight;
+                
+                // AI 응답 시뮬레이션 (1초 후)
+                setTimeout(() => {
+                    const responses = [
+                        "좋은 질문입니다. 제가 도와드릴게요...",
+                        "흥미로운 주제네요! 제 생각은 다음과 같습니다...",
+                        "제 분석에 따르면, 다음과 같은 제안을 드릴 수 있습니다...",
+                        "단계별로 살펴보겠습니다..."
+                    ];
+                    
+                    const aiMessage = document.createElement('div');
+                    aiMessage.className = 'message assistant';
+                    aiMessage.innerHTML = `<div>${responses[Math.floor(Math.random() * responses.length)]}</div>`;
+                    messageList.appendChild(aiMessage);
+                    
+                    // 스크롤을 맨 아래로 이동
+                    messageList.scrollTop = messageList.scrollHeight;
+                }, 1000);
+            }
+        }
+        
+        // 새 대화 버튼 클릭
+        newChatButton.addEventListener('click', () => {
+            // 기존 대화 비활성화
+            conversationItems.forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 새 대화 항목 추가
+            const newConversation = document.createElement('div');
+            newConversation.className = 'conversation-item active';
+            
+            const today = new Date();
+            const formattedDate = `${today.getMonth() + 1}월 ${today.getDate()}일`;
+            
+            newConversation.innerHTML = `
+                <div class="conversation-title">새 대화</div>
+                <div class="conversation-date">${formattedDate}</div>
+            `;
+            
+            document.querySelector('.conversation-list').prepend(newConversation);
+            
+            // 메시지 목록 비우기
+            messageList.innerHTML = '';
+            
+            // 대화 제목 변경
+            document.querySelector('.chat-title').textContent = '새 대화';
+        });
+        
+        // 기존 대화 클릭
+        conversationItems.forEach(item => {
+            item.addEventListener('click', () => {
+                // 모든 대화 비활성화
+                conversationItems.forEach(i => i.classList.remove('active'));
+                
+                // 클릭된 대화 활성화
+                item.classList.add('active');
+                
+                // 대화 제목 변경
+                document.querySelector('.chat-title').textContent = item.querySelector('.conversation-title').textContent;
+                
+                // 실제 애플리케이션에서는 여기서 해당 대화의 메시지를 불러옵니다
+            });
+        });
+        
+        // 전송 버튼 클릭 이벤트
+        sendButton.addEventListener('click', sendMessage);
+        
+        // 엔터 키 이벤트
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // 줄바꿈 방지
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

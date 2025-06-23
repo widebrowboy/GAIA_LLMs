@@ -38,7 +38,8 @@ class PromptManager:
             "clinical": "임상시험 및 환자 중심 약물 개발 전문가",
             "research": "문헌 분석 및 과학적 증거 종합 전문가",
             "chemistry": "의약화학 및 분자 설계 전문가",
-            "regulatory": "글로벌 의약품 규제 및 승인 전문가"
+            "regulatory": "글로벌 의약품 규제 및 승인 전문가",
+            "patent": "신약개발 특허 검색 및 분석 전문가"
         }
         
         # 프롬프트 파일 로드

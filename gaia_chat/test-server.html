@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GAIA-GPT Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>🧬 GAIA-GPT 서버 테스트</h1>
+    <div id="status">테스트 중...</div>
+    
+    <script>
+        async function testServer() {
+            const statusDiv = document.getElementById('status');
+            
+            try {
+                const response = await fetch('http://localhost:3001');
+                if (response.ok) {
+                    statusDiv.className = 'status success';
+                    statusDiv.innerHTML = '✅ 서버가 정상적으로 작동중입니다!<br>포트: 3001<br><a href="http://localhost:3001" target="_blank">GAIA-GPT 열기</a>';
+                } else {
+                    statusDiv.className = 'status error';
+                    statusDiv.innerHTML = '❌ 서버 응답 오류: ' + response.status;
+                }
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = '❌ 서버 연결 실패: ' + error.message;
+            }
+        }
+        
+        testServer();
+    </script>
+</body>
+</html>

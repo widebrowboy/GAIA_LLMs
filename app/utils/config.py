@@ -17,12 +17,12 @@ load_dotenv()
 
 # Ollama API settings
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "Gemma3:27b-it-q4_K_M")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3-12b:latest")
 
 # 사용 가능한 모델 목록
 AVAILABLE_MODELS = [
-    "Gemma3:27b-it-q4_K_M",     # 기본 모델 (27B 파라미터, 4비트 양자화)
-    "Gemma3:latest",             # 일반 모델
+    "gemma3-12b:latest",         # 기본 모델 (12B 파라미터, 4비트 양자화) - 메모리 효율적
+    "Gemma3:27b-it-q4_K_M",     # 대용량 모델 (27B 파라미터, 4비트 양자화)
     "txgemma-chat:latest",       # 대화형 모델
     "txgemma-predict:latest",    # 텍스트 생성 모델
 ]
@@ -50,6 +50,18 @@ OUTPUT_DIR = os.getenv("OUTPUT_DIR", "outputs/research")
 # Ensure output directory exists
 Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
+# 프롬프트 관련 설정
+AVAILABLE_PROMPT_TYPES = [
+    "default",     # 기본 신약개발 프롬프트
+    "clinical",    # 임상시험 전문 프롬프트
+    "research",    # 연구 분석 전문 프롬프트
+    "chemistry",   # 의약화학 전문 프롬프트
+    "regulatory",  # 규제 전문 프롬프트
+    "patent"       # 특허 검색 및 분석 전문 프롬프트
+]
+
+DEFAULT_PROMPT_TYPE = "default"
+
 @dataclass
 class Config:
     """챗봇 설정을 관리하는 클래스"""
@@ -66,3 +78,5 @@ class Config:
         self.show_mcp_output = False
         # MCP 활성화 상태 (기본값: False)
         self.mcp_enabled = False
+        # 프롬프트 타입 (기본값: default)
+        self.prompt_type = DEFAULT_PROMPT_TYPE

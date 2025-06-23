@@ -102,7 +102,12 @@ class ChatbotService:
         """일반 응답 생성"""
         chatbot = self.get_session(session_id)
         if not chatbot:
-            return {"error": f"세션 {session_id}를 찾을 수 없습니다"}
+            # 세션이 없으면 자동으로 생성
+            logger.info(f"세션 {session_id}가 없어 자동 생성합니다.")
+            session_result = await self.create_session(session_id)
+            if "error" in session_result:
+                return session_result
+            chatbot = self.get_session(session_id)
         
         try:
             response = await chatbot.generate_response(message, ask_to_save=False)
@@ -123,8 +128,13 @@ class ChatbotService:
         """스트리밍 응답 생성"""
         chatbot = self.get_session(session_id)
         if not chatbot:
-            yield f"오류: 세션 {session_id}를 찾을 수 없습니다"
-            return
+            # 세션이 없으면 자동으로 생성
+            logger.info(f"세션 {session_id}가 없어 자동 생성합니다.")
+            session_result = await self.create_session(session_id)
+            if "error" in session_result:
+                yield f"오류: {session_result['error']}"
+                return
+            chatbot = self.get_session(session_id)
         
         try:
             # 스트리밍 응답 생성
@@ -138,7 +148,12 @@ class ChatbotService:
         """명령어 처리"""
         chatbot = self.get_session(session_id)
         if not chatbot:
-            return {"error": f"세션 {session_id}를 찾을 수 없습니다"}
+            # 세션이 없으면 자동으로 생성
+            logger.info(f"세션 {session_id}가 없어 자동 생성합니다.")
+            session_result = await self.create_session(session_id)
+            if "error" in session_result:
+                return session_result
+            chatbot = self.get_session(session_id)
         
         # 명령어 정규화
         if not command.startswith("/"):

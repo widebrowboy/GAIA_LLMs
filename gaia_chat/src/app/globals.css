@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* 마크다운 추가 스타일링 */
+.prose {
+  max-width: none;
+}
+
+.prose p {
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+.prose ul, .prose ol {
+  margin-bottom: 0.5rem;
+}
+
+.prose li {
+  margin-bottom: 0.25rem;
+}
+
+.prose blockquote {
+  margin: 0.5rem 0;
+  font-style: normal;
+}
+
+.prose pre {
+  margin: 0.5rem 0;
+  border-radius: 0.5rem;
+  background-color: #1f2937 !important;
+}
+
+.prose code {
+  font-size: 0.875rem;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* 테이블 반응형 스타일 */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+}
+
+/* 링크 호버 효과 */
+.prose a:hover {
+  text-decoration: underline;
+}
+
+/* 코드 블록 스타일링 */
+.prose pre code {
+  background: transparent !important;
+  padding: 0 !important;
+  color: #e5e7eb !important;
+}
+
+/* 인라인 코드 스타일링 */
+.prose :not(pre) > code {
+  background-color: #f3f4f6;
+  color: #374151;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* 사용자 정의 스크롤바 */
+.overflow-x-auto::-webkit-scrollbar {
+  height: 6px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 사이드바 애니메이션 */
+.sidebar-transition {
+  transition: transform 0.3s ease-in-out;
+}
+
+/* 모바일 터치 스타일 */
+@media (max-width: 768px) {
+  /* 터치 영역 확대 */
+  button, .cursor-pointer {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* 모바일 스크롤 개선 */
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* 텍스트 선택 방지 (버튼에서) */
+  .select-none {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* 반응형 텍스트 크기 */
+@media (max-width: 640px) {
+  .prose {
+    font-size: 0.875rem;
+  }
+  
+  .prose h1 {
+    font-size: 1.5rem;
+  }
+  
+  .prose h2 {
+    font-size: 1.25rem;
+  }
+  
+  .prose h3 {
+    font-size: 1.125rem;
+  }
+}
+
+/* 포커스 스타일 개선 */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+}
+
+/* 그라디언트 애니메이션 */
+.gradient-animate {
+  background-size: 200% 200%;
+  animation: gradientShift 6s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 모바일 전용 오버레이 애니메이션 */
+.overlay-enter {
+  animation: overlayFadeIn 0.3s ease-out;
+}
+
+.overlay-exit {
+  animation: overlayFadeOut 0.3s ease-out;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes overlayFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
