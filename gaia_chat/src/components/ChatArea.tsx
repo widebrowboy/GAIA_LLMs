@@ -1,11 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Plus, Menu, Edit3, Check, X } from 'lucide-react';
-import { useChatContext } from '@/contexts/ChatContext';
+import { Send, Plus, Menu, Edit2, Check } from 'lucide-react';
+import Image from 'next/image';
+import { useChatContext } from '@/contexts/SimpleChatContext';
 import { useResponsive } from '@/hooks/useResponsive';
 import MessageItem from './MessageItem';
-import Image from 'next/image';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 
 interface ChatAreaProps {
   onToggleSidebar?: () => void;
@@ -17,41 +20,52 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
     currentConversation, 
     sendMessage, 
     isLoading, 
-    currentMode, 
-    createConversation, 
-    conversations, 
-    setConversations, 
-    setCurrentConversation,
+    startNewConversation,
     isModelChanging,
     isModeChanging,
-    isPromptChanging
+    isPromptChanging,
+    isStreaming,
+    streamingResponse,
+    isConnecting,
+    setCurrentConversation
   } = useChatContext();
-  const { isMobile, isDesktop } = useResponsive();
+  const { isMobile } = useResponsive();
   const [message, setMessage] = useState<string>('');
-  const [isTyping, setIsTyping] = useState<boolean>(false);
-  const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
-  const [editTitle, setEditTitle] = useState<string>('');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 메시지 변경 시 스크롤
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [currentConversation?.messages]);
+  }, [currentConversation?.messages, streamingResponse]);
+
+  // 제목 편집 모드 진입 시 포커스
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isEditingTitle]);
+
+  // 현재 대화의 제목이 변경되면 편집 제목 상태 업데이트
+  useEffect(() => {
+    if (currentConversation) {
+      setEditedTitle(currentConversation.title);
+    }
+  }, [currentConversation?.title]);
 
   const handleSendMessage = async () => {
-    // 메시지가 비어있거나, 대화가 없거나, 어떤 작업이 진행 중이면 return
-    if (!message.trim() || !currentConversation || isLoading || isModelChanging || isModeChanging || isPromptChanging) return;
+    if (!message.trim() || isLoading || isModelChanging || isModeChanging || isPromptChanging) return;
     
     const messageToSend = message;
     setMessage('');
-    setIsTyping(true);
     
     try {
       await sendMessage(messageToSend);
     } catch (error) {
       console.error('Failed to send message:', error);
-    } finally {
-      setIsTyping(false);
     }
   };
 
@@ -62,68 +76,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
     }
   };
 
-  // 제목 편집 시작
-  const startEditingTitle = () => {
-    if (currentConversation) {
-      setEditTitle(currentConversation.title);
-      setIsEditingTitle(true);
-    }
-  };
-
-  // 제목 저장
-  const saveTitle = () => {
-    if (currentConversation && editTitle.trim()) {
-      const updatedConversation = {
-        ...currentConversation,
-        title: editTitle.trim()
-      };
-
-      const updatedConversations = conversations.map(conv =>
-        conv.id === currentConversation.id ? updatedConversation : conv
-      );
-
-      setCurrentConversation(updatedConversation);
-      setConversations(updatedConversations);
-
-      // 로컬 스토리지에 저장
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('gaia_gpt_conversations', JSON.stringify(updatedConversations));
-      }
-    }
-    setIsEditingTitle(false);
-  };
-
-  // 제목 편집 취소
-  const cancelEditingTitle = () => {
-    setIsEditingTitle(false);
-    setEditTitle('');
-  };
-
-  // 제목 편집 키 처리
-  const handleTitleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      saveTitle();
-    } else if (e.key === 'Escape') {
-      cancelEditingTitle();
-    }
-  };
-
   if (!currentConversation) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">        
+      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className={`text-center ${isMobile ? 'p-4' : 'p-8'} max-w-md`}>
-          <div className={`${isMobile ? 'mb-4' : 'mb-6'} flex justify-center`}>
-            <Image 
-              src="/gaia-logo.png" 
-              alt="GAIA-GPT Logo" 
-              width={isMobile ? 64 : 96} 
-              height={isMobile ? 64 : 96} 
-              className="opacity-80"
-            />
-          </div>
           <h3 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-gray-800 mb-4`}>
-            GAIA-GPT에 오신 것을 환영합니다
+            환영합니다
           </h3>
           <p className="text-gray-600 mb-6 leading-relaxed">
             신약개발 전문 AI 어시스턴트와 대화를 시작해보세요. 
@@ -142,7 +100,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
           {/* 모바일 새 대화 버튼 */}
           {isMobile && (
             <button
-              onClick={createConversation}
+              onClick={startNewConversation}
               disabled={isLoading || isModelChanging || isModeChanging || isPromptChanging}
               className="mt-6 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-full flex items-center space-x-2 shadow-lg disabled:shadow-none transition-all duration-200"
             >
@@ -158,78 +116,116 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-gradient-to-b from-gray-50 to-white">
-      {/* 채팅 헤더 - 데스크톱에서만 표시 */}
-      {!isMobile && (
-        <div className="border-b border-gray-200 p-4 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            {/* 사이드바 토글 버튼 (데스크톱) */}
-            {onToggleSidebar && (
-              <button
-                onClick={onToggleSidebar}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                title={isSidebarOpen ? "사이드바 숨기기" : "사이드바 보이기"}
-              >
-                <Menu className="w-5 h-5 text-gray-600" />
-              </button>
-            )}
-            {isEditingTitle ? (
-              <div className="flex items-center space-x-2 flex-1">
+    <div className="flex flex-col h-full bg-white">
+      {/* 헤더 */}
+      <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-2">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={onToggleSidebar}
+              className="p-2 hover:bg-gray-100 rounded-md transition-colors duration-200 flex items-center justify-center"
+              title={isSidebarOpen ? "사이드바 숨기기" : "사이드바 표시"}
+              aria-label={isSidebarOpen ? "사이드바 숨기기" : "사이드바 표시"}
+            >
+              <Menu className="w-5 h-5 text-gray-600" />
+            </button>
+            
+            {/* GAIA-GPT 로고 및 타이틀 - 환영 페이지로 이동 */}
+            <div 
+              className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors"
+              onClick={() => setCurrentConversation && setCurrentConversation(null)}
+              title="홈으로 이동"
+            >
+              <Image src="/gaia-mark.png" alt="GAIA-GPT" width={20} height={20} />
+              <span className="font-semibold text-gray-800">GAIA-GPT</span>
+            </div>
+          </div>
+
+          <div className="flex-1">
+            {isEditingTitle && currentConversation ? (
+              <div className="flex items-center space-x-2">
                 <input
+                  ref={titleInputRef}
                   type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  onKeyPress={handleTitleKeyPress}
-                  className="flex-1 text-lg font-semibold text-gray-800 bg-white border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  autoFocus
+                  className="flex-1 text-lg font-semibold text-gray-800 border-b border-blue-500 bg-transparent focus:outline-none"
+                  value={editedTitle}
+                  onChange={(e) => setEditedTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const updatedConversation = {
+                        ...currentConversation,
+                        title: editedTitle.trim() || '새 대화'
+                      };
+                      if (setCurrentConversation) {
+                        setCurrentConversation(updatedConversation);
+                      }
+                      setIsEditingTitle(false);
+                      // 로컬스토리지에 저장
+                      if (typeof window !== 'undefined') {
+                        const conversations = JSON.parse(localStorage.getItem('gaia-gpt-conversations') || '[]');
+                        const updatedConversations = conversations.map((conv: any) => 
+                          conv.id === currentConversation.id ? updatedConversation : conv
+                        );
+                        localStorage.setItem('gaia-gpt-conversations', JSON.stringify(updatedConversations));
+                      }
+                    } else if (e.key === 'Escape') {
+                      setIsEditingTitle(false);
+                      setEditedTitle(currentConversation.title);
+                    }
+                  }}
                 />
                 <button
-                  onClick={saveTitle}
-                  className="p-1 text-green-600 hover:text-green-800 transition-colors"
+                  onClick={() => {
+                    const updatedConversation = {
+                      ...currentConversation,
+                      title: editedTitle.trim() || '새 대화'
+                    };
+                    if (setCurrentConversation) {
+                      setCurrentConversation(updatedConversation);
+                    }
+                    setIsEditingTitle(false);
+                    // 로컬스토리지에 저장
+                    if (typeof window !== 'undefined') {
+                      const conversations = JSON.parse(localStorage.getItem('gaia-gpt-conversations') || '[]');
+                      const updatedConversations = conversations.map((conv: any) => 
+                        conv.id === currentConversation.id ? updatedConversation : conv
+                      );
+                      localStorage.setItem('gaia-gpt-conversations', JSON.stringify(updatedConversations));
+                    }
+                  }}
+                  className="p-1 bg-blue-500 rounded text-white"
                   title="제목 저장"
                 >
                   <Check className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={cancelEditingTitle}
-                  className="p-1 text-red-600 hover:text-red-800 transition-colors"
-                  title="편집 취소"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-2 flex-1">
-                <h3 className="text-lg font-semibold text-gray-800 truncate">
-                  {currentConversation.title}
-                </h3>
-                <button
-                  onClick={startEditingTitle}
-                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                  title="제목 편집"
-                >
-                  <Edit3 className="w-4 h-4" />
-                </button>
-              </div>
+              <h2 
+                className="text-lg font-semibold text-gray-800 truncate flex items-center"
+                onClick={() => {
+                  if (currentConversation) {
+                    setIsEditingTitle(true);
+                    setEditedTitle(currentConversation.title);
+                  }
+                }}
+              >
+                {currentConversation ? (
+                  <>
+                    <span className="cursor-pointer">{currentConversation.title}</span>
+                    <Edit2 className="w-4 h-4 ml-2 text-gray-500 cursor-pointer" />
+                  </>
+                ) : '새 대화'}
+              </h2>
             )}
-            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-              currentMode === 'deep_research' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-gray-100 text-gray-800'
-            }`}>
-              {currentMode === 'deep_research' ? '딥리서치' : '기본'}
-            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-              {currentConversation.messages.length}개 메시지
-            </div>
+
+          <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+            {currentConversation.messages.length}개 메시지
           </div>
         </div>
-        </div>
-      )}
-      
+      </div>
+
       {/* 메시지 목록 */}
       <div className={`flex-1 overflow-y-auto ${isMobile ? 'p-4' : 'p-6'}`}>
         <div className={`${isMobile ? 'max-w-full' : 'max-w-4xl'} mx-auto space-y-6`}>
@@ -237,16 +233,22 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
             <MessageItem key={msg.id} message={msg} />
           ))}
           
-          {isTyping && (
+          {/* 실시간 스트리밍 응답 표시 */}
+          {(isStreaming || isConnecting) && streamingResponse && (
             <div className="flex items-start space-x-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-lg">
                 🧬
               </div>
-              <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              
+              <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm flex-1">
+                <div className="prose prose-sm max-w-none overflow-wrap-anywhere break-words">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight]}
+                  >
+                    {streamingResponse}
+                  </ReactMarkdown>
+                  <span className="inline-block w-2 h-4 bg-blue-500 animate-pulse ml-1"></span>
                 </div>
               </div>
             </div>
@@ -257,7 +259,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
       </div>
       
       {/* 메시지 입력 */}
-      <div className={`border-t border-gray-200 ${isMobile ? 'p-3' : 'p-4'} bg-white/90 backdrop-blur-sm sticky bottom-0`}>
+      <div className={`border-t border-gray-200 ${isMobile ? 'py-3 px-4' : 'py-4 px-6'} bg-white/90 backdrop-blur-sm sticky bottom-0 z-20 pb-[env(safe-area-inset-bottom)]`}>
         <div className={`${isMobile ? 'max-w-full' : 'max-w-4xl'} mx-auto`}>
           <div className="flex items-end space-x-3">
             <div className="flex-1">

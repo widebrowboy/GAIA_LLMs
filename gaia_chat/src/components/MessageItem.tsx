@@ -1,18 +1,18 @@
 'use client';
 
-import React from 'react';
+import React, { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import rehypeRaw from 'rehype-raw';
 import { Message } from '@/types/chat';
 
 interface MessageItemProps {
   message: Message;
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
+const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
   const isUser = message.role === 'user';
+  const isSystem = message.role === 'system';
   const timestamp = new Date(message.timestamp).toLocaleTimeString('ko-KR', {
     hour: '2-digit',
     minute: '2-digit',
@@ -21,107 +21,148 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
   // 마크다운 컴포넌트 커스터마이징
   const markdownComponents = {
     // 헤딩 스타일링
-    h1: ({ children }: { children: React.ReactNode }) => (
-      <h1 className="text-xl font-bold mb-3 text-gray-900 border-b pb-2">{children}</h1>
+    h1: ({ children, ...props }: any) => (
+      <h1 className="text-xl font-bold mb-3 text-gray-900 border-b pb-2" {...props}>{children}</h1>
     ),
-    h2: ({ children }: { children: React.ReactNode }) => (
-      <h2 className="text-lg font-bold mb-2 text-gray-800">{children}</h2>
+    h2: ({ children, ...props }: any) => (
+      <h2 className="text-lg font-bold mb-2 text-gray-800" {...props}>{children}</h2>
     ),
-    h3: ({ children }: { children: React.ReactNode }) => (
-      <h3 className="text-md font-semibold mb-2 text-gray-800">{children}</h3>
+    h3: ({ children, ...props }: any) => (
+      <h3 className="text-md font-semibold mb-2 text-gray-800" {...props}>{children}</h3>
     ),
     
     // 단락 스타일링
-    p: ({ children }: { children: React.ReactNode }) => (
-      <p className="mb-2 leading-relaxed">{children}</p>
+    p: ({ children, ...props }: any) => (
+      <p className="mb-3 leading-relaxed text-sm sm:text-base" {...props}>{children}</p>
     ),
     
     // 리스트 스타일링
-    ul: ({ children }: { children: React.ReactNode }) => (
-      <ul className="list-disc list-inside mb-2 space-y-1 ml-2">{children}</ul>
+    ul: ({ children, ...props }: any) => (
+      <ul className="list-disc pl-5 mb-3 space-y-1" {...props}>{children}</ul>
     ),
-    ol: ({ children }: { children: React.ReactNode }) => (
-      <ol className="list-decimal list-inside mb-2 space-y-1 ml-2">{children}</ol>
+    ol: ({ children, ...props }: any) => (
+      <ol className="list-decimal pl-5 mb-3 space-y-1" {...props}>{children}</ol>
     ),
-    li: ({ children }: { children: React.ReactNode }) => (
-      <li className="text-sm leading-relaxed">{children}</li>
+    li: ({ children, ...props }: any) => (
+      <li className="text-sm sm:text-base leading-relaxed pl-1" {...props}>{children}</li>
     ),
     
     // 코드 블록 스타일링
-    pre: ({ children }: { children: React.ReactNode }) => (
-      <pre className="bg-gray-800 text-gray-100 p-3 rounded-md overflow-x-auto text-sm mb-2 border">
+    pre: ({ children, ...props }: any) => (
+      <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto max-h-96 overflow-y-auto text-xs sm:text-sm mb-4 border border-gray-700 shadow-inner max-w-full" {...props}>
         {children}
       </pre>
     ),
-    code: ({ inline, children }: { inline?: boolean; children: React.ReactNode }) => {
+    code: ({ inline, children, ...props }: any) => {
       if (inline) {
         return (
-          <code className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-sm font-mono">
+          <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded-md text-sm font-mono break-words whitespace-normal" {...props}>
             {children}
           </code>
         );
       }
       return (
-        <code className="text-gray-100 font-mono text-sm">
+        <code className="text-gray-100 font-mono text-xs sm:text-sm break-words whitespace-pre-wrap" {...props}>
           {children}
         </code>
       );
     },
     
     // 인용구 스타일링
-    blockquote: ({ children }: { children: React.ReactNode }) => (
-      <blockquote className="border-l-4 border-blue-400 pl-4 py-2 bg-blue-50 text-gray-700 mb-2 rounded-r">
+    blockquote: ({ children, ...props }: any) => (
+      <blockquote className="border-l-4 border-blue-400 pl-4 py-3 bg-blue-50 text-gray-700 mb-3 rounded-r-md text-sm sm:text-base italic" {...props}>
         {children}
       </blockquote>
     ),
     
     // 테이블 스타일링
-    table: ({ children }: { children: React.ReactNode }) => (
+    table: ({ children, ...props }: any) => (
       <div className="overflow-x-auto mb-2">
-        <table className="min-w-full border border-gray-300 rounded">
+        <table className="min-w-full border border-gray-300 rounded" {...props}>
           {children}
         </table>
       </div>
     ),
-    thead: ({ children }: { children: React.ReactNode }) => (
-      <thead className="bg-gray-100">{children}</thead>
+    thead: ({ children, ...props }: any) => (
+      <thead className="bg-gray-100" {...props}>{children}</thead>
     ),
-    th: ({ children }: { children: React.ReactNode }) => (
-      <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-sm">
+    th: ({ children, ...props }: any) => (
+      <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-sm" {...props}>
         {children}
       </th>
     ),
-    td: ({ children }: { children: React.ReactNode }) => (
-      <td className="border border-gray-300 px-3 py-2 text-sm">
+    td: ({ children, ...props }: any) => (
+      <td className="border border-gray-300 px-3 py-2 text-sm" {...props}>
         {children}
       </td>
     ),
     
     // 링크 스타일링
-    a: ({ href, children }: { href?: string; children: React.ReactNode }) => (
+    a: ({ href, children, ...props }: any) => (
       <a 
         href={href} 
         target="_blank" 
         rel="noopener noreferrer"
         className="text-blue-600 hover:text-blue-800 underline"
+        {...props}
       >
         {children}
       </a>
     ),
     
     // 강조 스타일링
-    strong: ({ children }: { children: React.ReactNode }) => (
-      <strong className="font-bold text-gray-900">{children}</strong>
+    strong: ({ children, ...props }: any) => (
+      <strong className="font-bold text-gray-900" {...props}>{children}</strong>
     ),
-    em: ({ children }: { children: React.ReactNode }) => (
-      <em className="italic text-gray-700">{children}</em>
+    em: ({ children, ...props }: any) => (
+      <em className="italic text-gray-700" {...props}>{children}</em>
     ),
     
     // 수평선 스타일링
-    hr: () => (
-      <hr className="border-gray-300 my-4" />
+    hr: ({ ...props }: any) => (
+      <hr className="border-gray-300 my-4" {...props} />
     ),
   };
+
+  // 시스템 메시지를 위한 별도 렌더링
+  if (isSystem) {
+    return (
+      <div className="flex justify-center mb-6">
+        <div className="max-w-3xl w-full">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg px-6 py-4 shadow-sm">
+            <div className="flex items-center mb-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mr-3">
+                <span className="text-white text-sm font-bold">🤖</span>
+              </div>
+              <span className="text-blue-800 font-medium text-sm">시스템 안내</span>
+              <span className="text-blue-600 text-xs ml-auto">{timestamp}</span>
+            </div>
+            <div className="text-blue-900 leading-relaxed">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={{
+                  ...markdownComponents,
+                  // 시스템 메시지용 스타일 오버라이드
+                  h1: ({ children, ...props }: any) => (
+                    <h1 className="text-lg font-bold mb-2 text-blue-900" {...props}>{children}</h1>
+                  ),
+                  h2: ({ children, ...props }: any) => (
+                    <h2 className="text-md font-bold mb-2 text-blue-800" {...props}>{children}</h2>
+                  ),
+                  strong: ({ children, ...props }: any) => (
+                    <strong className="font-bold text-blue-900" {...props}>{children}</strong>
+                  ),
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
@@ -147,11 +188,13 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
               </p>
             ) : (
               // AI 메시지는 마크다운으로 렌더링
-              <div className="prose prose-sm max-w-none">
+              <div className="prose prose-sm max-w-none break-words overflow-visible">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                  rehypePlugins={[rehypeHighlight]}
                   components={markdownComponents as any}
+                  skipHtml={false}
+                  unwrapDisallowed={false}
                 >
                   {message.content}
                 </ReactMarkdown>
@@ -180,6 +223,8 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
       </div>
     </div>
   );
-};
+});
+
+MessageItem.displayName = 'MessageItem';
 
 export default MessageItem;
