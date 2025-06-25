@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebUI-API 연동 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .loading {
+            display: none;
+            color: #666;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 GAIA-BT WebUI-API 연동 테스트</h1>
+        
+        <div class="test-section">
+            <h3>📡 API 서버 상태 확인</h3>
+            <button onclick="testApiHealth()">헬스 체크 테스트</button>
+            <div id="health-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>ℹ️ 시스템 정보 조회</h3>
+            <button onclick="testSystemInfo()">시스템 정보 가져오기</button>
+            <div id="info-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>💬 채팅 메시지 테스트</h3>
+            <button onclick="testChatMessage()">채팅 메시지 보내기</button>
+            <div id="chat-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔄 모드 전환 테스트</h3>
+            <button onclick="testModeSwitch()">Deep Research 모드 전환</button>
+            <button onclick="testNormalMode()">일반 모드 복원</button>
+            <div id="mode-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 종합 테스트</h3>
+            <button onclick="runAllTests()">모든 테스트 실행</button>
+            <div id="all-result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        const SESSION_ID = 'webui_test_' + Date.now();
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="test-result ${type}">${message}</div>`;
+        }
+
+        function showLoading(elementId) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = '<div class="loading">로딩 중...</div>';
+        }
+
+        async function testApiHealth() {
+            showLoading('health-result');
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('health-result', 
+                        `✅ API 서버 정상<br>
+                        상태: ${data.status}<br>
+                        모델: ${data.model}<br>
+                        모드: ${data.mode}`, 'success');
+                } else {
+                    showResult('health-result', `❌ API 오류: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showResult('health-result', `❌ 연결 실패: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSystemInfo() {
+            showLoading('info-result');
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/system/info`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('info-result', 
+                        `✅ 시스템 정보 조회 성공<br>
+                        버전: ${data.version}<br>
+                        현재 모델: ${data.model}<br>
+                        사용 가능한 모델: ${data.available_models.length}개<br>
+                        프롬프트 타입: ${data.available_prompts.length}개`, 'success');
+                } else {
+                    showResult('info-result', `❌ 시스템 정보 조회 실패: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showResult('info-result', `❌ 요청 실패: ${error.message}`, 'error');
+            }
+        }
+
+        async function testChatMessage() {
+            showLoading('chat-result');
+            try {
+                // 먼저 세션 생성
+                await fetch(`${API_BASE_URL}/api/session/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: SESSION_ID })
+                });
+
+                // 채팅 메시지 전송
+                const response = await fetch(`${API_BASE_URL}/api/chat/message`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: '안녕하세요! 간단한 테스트 메시지입니다.',
+                        session_id: SESSION_ID,
+                        conversation_history: []
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const preview = data.response.substring(0, 200) + '...';
+                    showResult('chat-result', 
+                        `✅ 채팅 메시지 성공<br>
+                        응답 길이: ${data.response.length} 문자<br>
+                        <strong>응답 미리보기:</strong><br>
+                        <pre>${preview}</pre>`, 'success');
+                } else {
+                    showResult('chat-result', `❌ 채팅 실패: ${response.status}<br>${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                showResult('chat-result', `❌ 채팅 오류: ${error.message}`, 'error');
+            }
+        }
+
+        async function testModeSwitch() {
+            showLoading('mode-result');
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/system/mode/deep_research`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: SESSION_ID })
+                });
+
+                if (response.ok) {
+                    showResult('mode-result', '✅ Deep Research 모드 전환 성공', 'success');
+                } else {
+                    showResult('mode-result', `❌ 모드 전환 실패: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showResult('mode-result', `❌ 모드 전환 오류: ${error.message}`, 'error');
+            }
+        }
+
+        async function testNormalMode() {
+            showLoading('mode-result');
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/system/mode/normal`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: SESSION_ID })
+                });
+
+                if (response.ok) {
+                    showResult('mode-result', '✅ 일반 모드 복원 성공', 'success');
+                } else {
+                    showResult('mode-result', `❌ 모드 복원 실패: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showResult('mode-result', `❌ 모드 복원 오류: ${error.message}`, 'error');
+            }
+        }
+
+        async function runAllTests() {
+            showLoading('all-result');
+            let results = [];
+            
+            try {
+                // 헬스 체크
+                const health = await fetch(`${API_BASE_URL}/health`);
+                results.push(`헬스 체크: ${health.ok ? '✅ 성공' : '❌ 실패'}`);
+
+                // 시스템 정보
+                const info = await fetch(`${API_BASE_URL}/api/system/info`);
+                results.push(`시스템 정보: ${info.ok ? '✅ 성공' : '❌ 실패'}`);
+
+                // 세션 생성
+                const session = await fetch(`${API_BASE_URL}/api/session/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: SESSION_ID + '_all' })
+                });
+                results.push(`세션 생성: ${session.ok ? '✅ 성공' : '❌ 실패'}`);
+
+                // 채팅 메시지
+                const chat = await fetch(`${API_BASE_URL}/api/chat/message`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: '종합 테스트 메시지',
+                        session_id: SESSION_ID + '_all',
+                        conversation_history: []
+                    })
+                });
+                results.push(`채팅 메시지: ${chat.ok ? '✅ 성공' : '❌ 실패'}`);
+
+                const allPassed = results.every(r => r.includes('✅'));
+                showResult('all-result', 
+                    `<strong>종합 테스트 결과:</strong><br>
+                    ${results.join('<br>')}<br><br>
+                    <strong>전체 결과: ${allPassed ? '🎉 모든 테스트 통과!' : '⚠️ 일부 테스트 실패'}</strong>`, 
+                    allPassed ? 'success' : 'error');
+            } catch (error) {
+                showResult('all-result', `❌ 종합 테스트 오류: ${error.message}`, 'error');
+            }
+        }
+
+        // 페이지 로드 시 자동으로 헬스 체크
+        window.onload = function() {
+            testApiHealth();
+        };
+    </script>
+</body>
+</html>

@@ -44,13 +44,14 @@ export const useResponsive = (): ResponsiveState => {
       window.addEventListener('resize', updateSize);
       
       // 디바이스 방향 변경 감지 (모바일)
-      window.addEventListener('orientationchange', () => {
+      const handleOrientationChange = () => {
         setTimeout(updateSize, 100);
-      });
+      };
+      window.addEventListener('orientationchange', handleOrientationChange);
 
       return () => {
         window.removeEventListener('resize', updateSize);
-        window.removeEventListener('orientationchange', updateSize);
+        window.removeEventListener('orientationchange', handleOrientationChange);
       };
     }
   }, []);

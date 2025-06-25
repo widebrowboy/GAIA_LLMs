@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebUI API 통신 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .loader {
+            display: none;
+            color: #007bff;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 WebUI API 통신 테스트</h1>
+        
+        <div class="input-group">
+            <input type="text" id="messageInput" placeholder="테스트 메시지를 입력하세요..." value="간단한 테스트 메시지">
+        </div>
+        
+        <button onclick="testAPI()">API 테스트</button>
+        
+        <div class="loader" id="loader">⏳ 처리 중...</div>
+        
+        <div id="status"></div>
+        
+        <div id="response"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        const sessionId = 'test-session-' + Date.now();
+        
+        async function testAPI() {
+            const message = document.getElementById('messageInput').value;
+            const statusDiv = document.getElementById('status');
+            const responseDiv = document.getElementById('response');
+            const loader = document.getElementById('loader');
+            
+            if (!message.trim()) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '❌ 메시지를 입력해주세요.';
+                return;
+            }
+            
+            loader.style.display = 'block';
+            statusDiv.className = '';
+            statusDiv.textContent = '';
+            responseDiv.textContent = '';
+            
+            const startTime = Date.now();
+            
+            try {
+                console.log('📡 API 요청 시작:', {
+                    url: `${API_BASE_URL}/api/chat/message`,
+                    message: message,
+                    session_id: sessionId
+                });
+                
+                const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: sessionId,
+                        stream: true
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                // 스트리밍 응답 처리
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = '';
+                
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = `🌊 스트리밍 중...`;
+                responseDiv.innerHTML = `<strong>AI 응답 (실시간):</strong><br><br>`;
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') {
+                                const elapsedTime = Date.now() - startTime;
+                                statusDiv.innerHTML = `✅ 스트리밍 완료! (${elapsedTime}ms)`;
+                                break;
+                            }
+                            
+                            if (data.trim()) {
+                                fullResponse += data;
+                                responseDiv.innerHTML = `<strong>AI 응답 (실시간):</strong><br><br>${fullResponse}`;
+                            }
+                        }
+                    }
+                }
+                
+                console.log('✅ 스트리밍 응답 완료:', fullResponse);
+                
+            } catch (error) {
+                console.error('❌ API 오류:', error);
+                statusDiv.className = 'status error';
+                statusDiv.textContent = `❌ 오류: ${error.message}`;
+                
+                // 네트워크 오류 상세 정보
+                if (error.message.includes('Failed to fetch')) {
+                    statusDiv.innerHTML += '<br><br>🔍 가능한 원인:<br>- API 서버가 실행되지 않음<br>- CORS 설정 문제<br>- 네트워크 연결 문제';
+                }
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+        
+        // Enter 키로 전송
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                testAPI();
+            }
+        });
+        
+        // 페이지 로드 시 API 상태 확인
+        window.onload = async function() {
+            // 포트 정보 표시
+            document.querySelector('h1').innerHTML = '🧪 WebUI API 통신 테스트 (포트 3003) - 실시간 스트리밍';
+            
+            // 기본 질문을 신약개발 관련으로 변경
+            document.getElementById('messageInput').value = '안녕하세요! 아스피린의 작용 메커니즘에 대해 설명해주세요.';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                if (response.ok) {
+                    console.log('✅ API 서버 연결 확인됨');
+                }
+            } catch (error) {
+                console.warn('⚠️ API 서버 연결 확인 실패:', error);
+            }
+        };
+    </script>
+</body>
+</html>

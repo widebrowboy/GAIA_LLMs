@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Conversation, Message, ChatContextType } from '@/types/chat';
+import { getApiUrl } from '@/config/api';
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
@@ -17,14 +18,11 @@ interface ChatProviderProps {
   children: ReactNode;
 }
 
-// GAIA-BT API 서버 URL
-const API_BASE_URL = 'http://localhost:8000';
-
 // 기본 설정
 const DEFAULT_MODEL = 'gemma3-12b:latest';
 const DEFAULT_MODE = 'normal';
 
-export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
+export const ChatProvider = ({ children }: ChatProviderProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,142 +42,63 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   
   // AbortController 관리
   const [abortController, setAbortController] = useState<AbortController | null>(null);
-
-  // 세션 생성 또는 확인 + 기본 모델 설정
-  const ensureSession = async () => {
+  
+  // 진행 중인 요청 정리 함수
+  const cleanupPendingRequests = async () => {
     try {
-      // 세션 생성
-      const sessionResponse = await fetch(`${API_BASE_URL}/api/session/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ session_id: sessionId }),
-      });
-      
-      if (!sessionResponse.ok) {
-        console.log('세션이 이미 존재하거나 생성에 실패했습니다');
+      if (abortController && !abortController.signal.aborted) {
+        console.log('이전 요청 정리 중...');
+        abortController.abort('사용자 요청으로 정리됨');
+        setAbortController(null);
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
-
-      // 기본 모델 설정
-      try {
-        await fetch(`${API_BASE_URL}/api/system/model`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            model: DEFAULT_MODEL,
-            session_id: sessionId 
-          }),
-        });
-        console.log(`기본 모델 설정: ${DEFAULT_MODEL}`);
-      } catch (modelError) {
-        console.warn('기본 모델 설정 실패:', modelError);
-      }
-      
-    } catch (err) {
-      console.warn('세션 생성 확인 실패:', err);
-    }
-  };
-
-  // 대화 목록 새로고침 (GAIA-BT API에서는 대화 히스토리를 관리하지 않으므로 로컬에서 관리)
-  const refreshConversations = async () => {
-    // 로컬 스토리지에서 대화 목록 복원 (클라이언트 사이드에서만)
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('gaia_gpt_conversations');
-        if (stored) {
-          const data = JSON.parse(stored);
-          setConversations(data);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if (error.name !== 'AbortError') {
+          console.error('요청 정리 중 오류 발생:', error);
         }
-      } catch (err) {
-        console.warn('대화 목록 로드 실패:', err);
+      } else {
+        console.error('요청 정리 중 알 수 없는 오류 발생:', error);
       }
-    }
-  };
-
-  // 새 대화 생성
-  const createConversation = async (title?: string): Promise<Conversation> => {
-    try {
-      setIsLoading(true);
-      
-      const newConversation: Conversation = {
-        id: 'conv_' + Date.now(),
-        title: title || '새 대화',
-        messages: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      const updatedConversations = [newConversation, ...conversations];
-      setConversations(updatedConversations);
-      setCurrentConversation(newConversation);
-      
-      // 로컬 스토리지에 저장 (클라이언트 사이드에서만)
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('gaia_gpt_conversations', JSON.stringify(updatedConversations));
-      }
-      
-      return newConversation;
-    } catch (err) {
-      setError('Failed to create conversation');
-      throw err;
     } finally {
-      setIsLoading(false);
+      setIsWaitingForResponse(false);
+      setWaitingTimer(0);
     }
   };
-
-  // 대화 선택
-  const selectConversation = (id: string) => {
-    const conversation = conversations.find(conv => conv.id === id);
-    if (conversation) {
-      setCurrentConversation(conversation);
-    }
-  };
-
-  // 메시지 전송
-  const sendMessage = async (content: string) => {
-    if (!currentConversation || isLoading) return;
-
-    // 이전 요청이 진행 중이면 취소
-    if (abortController && !abortController.signal.aborted) {
-      abortController.abort();
-    }
-
-    let controller: AbortController | null = null;
-    let timeoutId: NodeJS.Timeout | null = null;
+  
+  // 대기 상태 관리
+  const [waitingTimer, setWaitingTimer] = useState<number>(0);
+  const [isWaitingForResponse, setIsWaitingForResponse] = useState<boolean>(false);
+  
+  // 스트리밍 응답 처리
+  const [streamingResponse, setStreamingResponse] = useState<string>('');
+  const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  
+  // 간단한 스트리밍 메시지 전송 함수
+  const sendStreamingMessage = async (content: string): Promise<void> => {
+    if (!content.trim()) return;
 
     try {
       setIsLoading(true);
       setError(null);
+      setIsStreaming(true);
+      setStreamingResponse('');
+      
+      // 기존 요청 취소
+      await cleanupPendingRequests();
       
       // 새로운 AbortController 생성
-      controller = new AbortController();
+      const controller = new AbortController();
       setAbortController(controller);
       
-      // 사용자 메시지 추가
-      const userMessage: Message = {
-        id: 'msg_' + Date.now(),
-        content,
-        role: 'user',
-        timestamp: new Date(),
-        conversationId: currentConversation.id,
-      };
-
-      // 중단된 신호 체크
-      if (controller.signal.aborted) {
-        throw new Error('요청이 중단되었습니다.');
-      }
-
-      // GAIA-BT API 호출 (타임아웃 추가)
-      timeoutId = setTimeout(() => {
-        if (controller && !controller.signal.aborted) {
-          controller.abort();
-        }
-      }, 30000); // 30초 타임아웃
+      // 메시지 히스토리 구성
+      const conversationHistory = currentConversation?.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      })) || [];
       
-      const response = await fetch(`${API_BASE_URL}/api/chat/message`, {
+      // 스트리밍 요청 시작
+      const response = await fetch(getApiUrl('/api/chat/stream'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,335 +106,279 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         body: JSON.stringify({
           message: content,
           session_id: sessionId,
+          conversation_history: conversationHistory,
         }),
         signal: controller.signal,
       });
       
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (!response.ok) {
+        throw new Error(`스트리밍 요청 실패: ${response.status}`);
       }
-      setAbortController(null);
-
-      if (response.ok) {
-        const data = await response.json();
+      
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      if (!reader) {
+        throw new Error('응답 스트림을 읽을 수 없습니다');
+      }
+      
+      let fullResponse = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
         
-        // AI 응답 메시지 생성
-        const assistantMessage: Message = {
-          id: 'msg_' + (Date.now() + 1),
-          content: data.response || '응답을 받지 못했습니다.',
-          role: 'assistant',
-          timestamp: new Date(),
-          conversationId: currentConversation.id,
-        };
-
-        // 대화 업데이트
-        const updatedConversation = {
-          ...currentConversation,
-          messages: [...currentConversation.messages, userMessage, assistantMessage],
-          updatedAt: new Date(),
-          title: currentConversation.title === '새 대화' && content.length > 0 
-            ? content.length > 30 ? content.substring(0, 30) + '...' : content
-            : currentConversation.title
-        };
-
-        // 대화 목록 업데이트
-        const updatedConversations = conversations.map(conv =>
-          conv.id === currentConversation.id ? updatedConversation : conv
-        );
-
-        setCurrentConversation(updatedConversation);
-        setConversations(updatedConversations);
+        if (done) break;
         
-        // 로컬 스토리지에 저장 (클라이언트 사이드에서만)
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('gaia_gpt_conversations', JSON.stringify(updatedConversations));
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            
+            if (data === '[DONE]') {
+              // 스트리밍 완료
+              setIsStreaming(false);
+              
+              // 메시지를 대화에 추가
+              if (fullResponse.trim()) {
+                addMessageToConversation(content, fullResponse.trim());
+              }
+              
+              setStreamingResponse('');
+              break;
+            } else if (data.trim()) {
+              // 청크 데이터 누적
+              fullResponse += data;
+              setStreamingResponse(fullResponse);
+            }
+          }
         }
         
-      } else {
-        throw new Error(`API 오류: ${response.status}`);
+        if (controller.signal.aborted) {
+          break;
+        }
       }
-    } catch (err) {
-      let errorMsg = '메시지 전송에 실패했습니다.';
       
-      if (err instanceof Error) {
-        if (err.name === 'AbortError') {
-          console.log('메시지 전송이 취소되었습니다.');
-          return; // AbortError는 UI에 표시하지 않음
-        } else if (err.message.includes('NetworkError') || err.message.includes('fetch')) {
-          errorMsg = '네트워크 연결을 확인해주세요.';
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.log('스트리밍 요청이 취소되었습니다');
         } else {
-          errorMsg = `오류: ${err.message}`;
+          console.error('스트리밍 오류:', error);
+          setError(`메시지 전송 실패: ${error.message}`);
         }
-      }
-      
-      setError(errorMsg);
-      console.error('메시지 전송 오류:', err);
-      
-      // AbortError가 아닌 경우에만 오류 메시지 추가
-      if (!(err instanceof Error && err.name === 'AbortError') && currentConversation) {
-        const userMessage: Message = {
-          id: 'msg_' + Date.now(),
-          content,
-          role: 'user',
-          timestamp: new Date(),
-          conversationId: currentConversation.id,
-        };
-        
-        const errorMessage: Message = {
-          id: 'msg_' + (Date.now() + 1),
-          content: `❌ ${errorMsg}`,
-          role: 'assistant',
-          timestamp: new Date(),
-          conversationId: currentConversation.id,
-        };
-        
-        const updatedConversation = {
-          ...currentConversation,
-          messages: [...currentConversation.messages, userMessage, errorMessage],
-          updatedAt: new Date(),
-        };
-        
-        const updatedConversations = conversations.map(conv =>
-          conv.id === currentConversation.id ? updatedConversation : conv
-        );
-        
-        setCurrentConversation(updatedConversation);
-        setConversations(updatedConversations);
-        
-        // 로컬 스토리지에 저장 (클라이언트 사이드에서만)
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('gaia_gpt_conversations', JSON.stringify(updatedConversations));
-        }
+      } else {
+        setError('알 수 없는 오류가 발생했습니다');
       }
     } finally {
-      // cleanup
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
       setIsLoading(false);
+      setIsStreaming(false);
       setAbortController(null);
     }
   };
 
-  // 초기 데이터 로드
-  useEffect(() => {
-    const initializeApp = async () => {
-      await ensureSession();
-      await refreshConversations();
-    };
-    initializeApp();
-  }, []);
-
-  // 컴포넌트 언마운트 시 진행 중인 요청 취소
-  useEffect(() => {
-    return () => {
-      if (abortController) {
-        abortController.abort();
-      }
-    };
-  }, [abortController]);
-
-  // 모드 전환 함수
-  const toggleMode = async () => {
-    if (isModeChanging || isLoading) return; // 이미 진행 중이면 무시
-    
-    let controller: AbortController | null = null;
-    let timeoutId: NodeJS.Timeout | null = null;
+  // 간단한 세션 초기화 함수 (연결 체크 없음)
+  const [sessionInitialized, setSessionInitialized] = useState(false);
+  
+  const ensureSession = async () => {
+    if (sessionInitialized) {
+      return true;
+    }
     
     try {
-      setIsModeChanging(true);
-      setError(null);
-      const newMode = currentMode === 'normal' ? 'deep_research' : 'normal';
-      
-      // AbortController 생성
-      controller = new AbortController();
-      timeoutId = setTimeout(() => {
-        if (controller && !controller.signal.aborted) {
-          controller.abort();
-        }
-      }, 15000); // 15초 타임아웃
-      
-      if (newMode === 'deep_research') {
-        // Deep Research 모드 활성화
-        const response = await fetch(`${API_BASE_URL}/api/system/mode/deep_research`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            session_id: sessionId 
-          }),
-          signal: controller.signal,
-        });
-        
-        if (response.ok) {
-          setCurrentMode('deep_research');
-          setMcpEnabled(true);
-          console.log('✅ Deep Research 모드 활성화됨');
-        } else {
-          throw new Error(`Deep Research 모드 전환 실패: ${response.status}`);
-        }
-      } else {
-        // 일반 모드로 전환
-        const response = await fetch(`${API_BASE_URL}/api/system/mode/normal`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            session_id: sessionId 
-          }),
-          signal: controller.signal,
-        });
-        
-        if (response.ok) {
-          setCurrentMode('normal');
-          setMcpEnabled(false);
-          console.log('✅ 일반 모드로 전환됨');
-        } else {
-          throw new Error(`일반 모드 전환 실패: ${response.status}`);
-        }
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        console.log('모드 전환 요청이 취소되었습니다.');
-        return;
-      }
-      console.error('모드 전환 실패:', err);
-      setError('모드 전환에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      setIsModeChanging(false);
+      console.log('세션 초기화:', sessionId);
+      setSessionInitialized(true);
+      return true;
+    } catch (error: unknown) {
+      console.error('세션 초기화 실패:', error);
+      return false;
     }
   };
 
-  // 모델 변경 함수
-  const changeModel = async (model: string) => {
-    if (isModelChanging || isLoading || model === currentModel) return; // 이미 진행 중이거나 같은 모델이면 무시
+  // 대화에 메시지 추가
+  const addMessageToConversation = (userMessage: string, assistantResponse: string) => {
+    const conversationId = currentConversation?.id || '';
     
-    let controller: AbortController | null = null;
-    let timeoutId: NodeJS.Timeout | null = null;
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: userMessage,
+      timestamp: new Date(),
+      conversationId,
+    };
+
+    const assistantMsg: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: assistantResponse,
+      timestamp: new Date(),
+      conversationId,
+    };
+
+    if (currentConversation) {
+      const updatedConversation = {
+        ...currentConversation,
+        messages: [...currentConversation.messages, userMsg, assistantMsg],
+        lastMessage: assistantMsg,
+        updatedAt: new Date(),
+      };
+
+      setCurrentConversation(updatedConversation);
+      setConversations(prev => 
+        prev.map(conv => conv.id === updatedConversation.id ? updatedConversation : conv)
+      );
+    } else {
+      // 새 대화 생성
+      const newConversation: Conversation = {
+        id: Date.now().toString(),
+        title: userMessage.slice(0, 50) + (userMessage.length > 50 ? '...' : ''),
+        messages: [userMsg, assistantMsg],
+        lastMessage: assistantMsg,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      setCurrentConversation(newConversation);
+      setConversations(prev => [newConversation, ...prev]);
+    }
+  };
+
+  // 메시지 전송 함수
+  const sendMessage = async (content: string): Promise<void> => {
+    await ensureSession();
+    await sendStreamingMessage(content);
+  };
+
+  // 새 대화 시작
+  const startNewConversation = () => {
+    // 새로운 빈 대화 생성
+    const newConversation: Conversation = {
+      id: Date.now().toString(),
+      title: '새 대화',
+      messages: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    setCurrentConversation(newConversation);
+    setConversations(prev => [newConversation, ...prev]);
+    setError(null);
+  };
+
+  // 대화 선택
+  const selectConversation = (conversationId: string) => {
+    if (!conversationId) {
+      // 빈 ID인 경우 환영 페이지로 이동 (currentConversation을 null로 설정)
+      setCurrentConversation(null);
+      setError(null);
+      return;
+    }
     
+    const conversation = conversations.find(conv => conv.id === conversationId);
+    if (conversation) {
+      setCurrentConversation(conversation);
+      setError(null);
+    }
+  };
+
+  // 대화 삭제
+  const deleteConversation = (conversationId: string) => {
+    setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+    if (currentConversation?.id === conversationId) {
+      setCurrentConversation(null);
+    }
+  };
+
+  // 모델 변경
+  const changeModel = async (modelName: string): Promise<boolean> => {
     try {
       setIsModelChanging(true);
-      setError(null);
-      
-      // AbortController 생성
-      controller = new AbortController();
-      timeoutId = setTimeout(() => {
-        if (controller && !controller.signal.aborted) {
-          controller.abort();
-        }
-      }, 10000); // 10초 타임아웃
-      
-      const response = await fetch(`${API_BASE_URL}/api/system/model`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          model,
-          session_id: sessionId 
-        }),
-        signal: controller.signal,
-      });
-      
-      if (response.ok) {
-        setCurrentModel(model);
-        console.log(`✅ 모델이 '${model}'로 변경됨`);
-      } else {
-        throw new Error(`모델 변경 실패: ${response.status}`);
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        console.log('모델 변경 요청이 취소되었습니다.');
-        return;
-      }
-      console.error('모델 변경 실패:', err);
-      setError('모델 변경에 실패했습니다.');
+      setCurrentModel(modelName);
+      return true;
+    } catch (error: unknown) {
+      console.error('모델 변경 실패:', error);
+      return false;
     } finally {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
       setIsModelChanging(false);
     }
   };
 
-  // 프롬프트 타입 변경 함수
-  const changePromptType = async (promptType: string) => {
-    if (isPromptChanging || isLoading || promptType === currentPromptType) return; // 이미 진행 중이거나 같은 프롬프트면 무시
-    
-    let controller: AbortController | null = null;
-    let timeoutId: NodeJS.Timeout | null = null;
-    
+  // 모드 변경
+  const changeMode = async (mode: string): Promise<boolean> => {
+    try {
+      setIsModeChanging(true);
+      setCurrentMode(mode);
+      setMcpEnabled(mode === 'deep_research');
+      return true;
+    } catch (error: unknown) {
+      console.error('모드 변경 실패:', error);
+      return false;
+    } finally {
+      setIsModeChanging(false);
+    }
+  };
+
+  // 프롬프트 변경
+  const changePrompt = async (promptType: string): Promise<boolean> => {
     try {
       setIsPromptChanging(true);
-      setError(null);
-      
-      // AbortController 생성
-      controller = new AbortController();
-      timeoutId = setTimeout(() => {
-        if (controller && !controller.signal.aborted) {
-          controller.abort();
-        }
-      }, 10000); // 10초 타임아웃
-      
-      const response = await fetch(`${API_BASE_URL}/api/system/prompt`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          prompt_type: promptType,
-          session_id: sessionId 
-        }),
-        signal: controller.signal,
-      });
-      
-      if (response.ok) {
-        setCurrentPromptType(promptType);
-        console.log(`✅ 프롬프트 타입이 '${promptType}'로 변경됨`);
-      } else {
-        throw new Error(`프롬프트 변경 실패: ${response.status}`);
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        console.log('프롬프트 변경 요청이 취소되었습니다.');
-        return;
-      }
-      console.error('프롬프트 변경 실패:', err);
-      setError('프롬프트 변경에 실패했습니다.');
+      setCurrentPromptType(promptType);
+      return true;
+    } catch (error: unknown) {
+      console.error('프롬프트 변경 실패:', error);
+      return false;
     } finally {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
       setIsPromptChanging(false);
     }
   };
 
+  // 컴포넌트 마운트 시 세션 초기화
+  useEffect(() => {
+    ensureSession();
+  }, [ensureSession]);
+
   const value: ChatContextType = {
+    // 대화 상태
     conversations,
     currentConversation,
     isLoading,
     error,
+    sessionId,
+    
+    // 시스템 상태
     currentModel,
     currentMode,
     mcpEnabled,
     currentPromptType,
+    
+    // 로딩 상태
     isModelChanging,
     isModeChanging,
     isPromptChanging,
-    createConversation,
-    selectConversation,
+    
+    // 스트리밍 상태
+    isStreaming,
+    streamingResponse,
+    isConnecting: false,
+    
+    // 액션
     sendMessage,
-    refreshConversations,
-    toggleMode,
+    startNewConversation,
+    selectConversation,
+    deleteConversation,
     changeModel,
-    changePromptType,
-    setConversations,
-    setCurrentConversation,
+    changeMode,
+    changePrompt,
+    resetSession: () => {}, // 기본 구현
+    
+    // 대기 상태
+    isWaitingForResponse,
+    waitingTimer,
+    
+    // 연결 상태 (항상 true로 설정)
+    isConnected: true,
+    reconnectAttempts: 0,
   };
 
   return (

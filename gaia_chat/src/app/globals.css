@@ -93,6 +93,7 @@ body {
 }
 
 /* 사용자 정의 스크롤바 */
+/* 수평 스크롤바 */
 .overflow-x-auto::-webkit-scrollbar {
   height: 6px;
 }
@@ -111,9 +112,50 @@ body {
   background: #a8a8a8;
 }
 
-/* 사이드바 애니메이션 */
+/* 수직 스크롤바 */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Firefox 스크롤바 지원 */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+.overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* 사이드바 애니메이션 및 레이아웃 */
 .sidebar-transition {
   transition: transform 0.3s ease-in-out;
+  height: 100vh; /* 뷰포트 전체 높이 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 사이드바 컨테이너 높이 보장 */
+.sidebar-container {
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 모바일 터치 스타일 */

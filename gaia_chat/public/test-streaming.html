@@ -1,0 +1,134 @@
+<\!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스트리밍 API 테스트</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        #output { border: 1px solid #ccc; padding: 10px; margin: 10px 0; height: 300px; overflow-y: auto; }
+        #response { border: 1px solid #007bff; padding: 10px; margin: 10px 0; min-height: 100px; }
+        button { padding: 10px 20px; margin: 5px; }
+        input { padding: 5px; width: 300px; }
+    </style>
+</head>
+<body>
+    <h1>GAIA-BT 스트리밍 API 테스트</h1>
+    
+    <div>
+        <input type="text" id="messageInput" placeholder="메시지를 입력하세요" value="안녕하세요">
+        <button onclick="sendMessage()">메시지 전송</button>
+        <button onclick="clearOutput()">출력 지우기</button>
+    </div>
+    
+    <div>
+        <strong>API 로그:</strong>
+        <div id="output"></div>
+    </div>
+    
+    <div>
+        <strong>받은 응답:</strong>
+        <div id="response"></div>
+    </div>
+
+    <script>
+        function log(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+            document.getElementById('response').innerHTML = '';
+        }
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (\!message) {
+                log('메시지가 비어있습니다');
+                return;
+            }
+            
+            const responseDiv = document.getElementById('response');
+            responseDiv.innerHTML = '';
+            
+            log('메시지 전송 시작: ' + message);
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/chat/stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: 'test_browser_session'
+                    })
+                });
+                
+                log('응답 상태: ' + response.status);
+                
+                if (\!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = '';
+                let chunkCount = 0;
+                
+                log('스트리밍 시작');
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) {
+                        log('스트리밍 완료 (연결 종료)');
+                        break;
+                    }
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            chunkCount++;
+                            
+                            if (data.trim() === '[DONE]') {
+                                log('종료 신호 수신 (' + chunkCount + '개 청크)');
+                                responseDiv.innerHTML = fullResponse || '(응답 없음)';
+                                return;
+                            } else if (data && data.trim()) {
+                                fullResponse += data;
+                                responseDiv.innerHTML = fullResponse + '<span style="animation: blink 1s infinite;">▊</span>';
+                                
+                                if (chunkCount % 10 === 0) {
+                                    log('청크 ' + chunkCount + ' 수신');
+                                }
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                log('오류: ' + error.message);
+                console.error('스트리밍 오류:', error);
+            }
+        }
+        
+        // Enter 키로 전송
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        log('테스트 페이지 로드 완료');
+    </script>
+</body>
+</html>
+EOF < /dev/null

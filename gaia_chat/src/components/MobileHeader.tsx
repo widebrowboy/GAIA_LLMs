@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Menu, MessageCircle, Settings, X, Brain, Shield } from 'lucide-react';
-import { useChatContext } from '@/contexts/ChatContext';
+import { Menu, X, Brain, Shield } from 'lucide-react';
+import ConnectionStatusBadge from './ConnectionStatusBadge';
+import { useChatContext } from '@/contexts/SimpleChatContext';
 import Image from 'next/image';
 
 interface MobileHeaderProps {
@@ -11,7 +12,7 @@ interface MobileHeaderProps {
 }
 
 const MobileHeader: React.FC<MobileHeaderProps> = ({ onMenuToggle, isSidebarOpen }) => {
-  const { currentMode, currentPromptType, toggleMode } = useChatContext();
+  const { currentMode, currentPromptType, toggleMode, createConversation } = useChatContext();
 
   return (
     <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between md:hidden">
@@ -28,7 +29,14 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({ onMenuToggle, isSidebarOpen
           )}
         </button>
         
-        <div className="flex items-center space-x-2">
+        <div 
+          className="flex items-center space-x-2 cursor-pointer" 
+          onClick={() => {
+            // 새 대화 생성(초기화 효과)
+            createConversation?.();
+          }}
+          title="홈으로 이동"
+        >
           <Image 
             src="/gaia-mark.png" 
             alt="GAIA-GPT" 
@@ -40,6 +48,8 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({ onMenuToggle, isSidebarOpen
       </div>
 
       <div className="flex items-center space-x-2">
+        {/* 연결 상태 배지 */}
+        <ConnectionStatusBadge />
         {/* 현재 모드 표시 */}
         <div className={`px-2 py-1 rounded text-xs font-medium ${
           currentMode === 'deep_research' 
@@ -61,7 +71,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({ onMenuToggle, isSidebarOpen
 
         {/* 모드 전환 버튼 */}
         <button
-          onClick={toggleMode}
+          onClick={() => toggleMode?.()}
           className={`p-2 rounded-lg transition-colors ${
             currentMode === 'deep_research'
               ? 'bg-green-100 text-green-600 hover:bg-green-200'

@@ -88,33 +88,51 @@ check_dependencies() {
     echo -e "${GREEN}✅ 의존성 확인 완료${NC}"
 }
 
-# 포트 확인
+# 포트를 사용하는 프로세스 종료
+kill_port_process() {
+    local port=$1
+    local port_name=$2
+    
+    # lsof를 사용하여 포트를 사용하는 프로세스 찾기
+    if command -v lsof &> /dev/null; then
+        local pids=$(lsof -t -i:$port 2>/dev/null)
+        if [ -n "$pids" ]; then
+            echo -e "${YELLOW}⚠️  포트 $port에서 실행 중인 프로세스를 종료합니다...${NC}"
+            for pid in $pids; do
+                kill -TERM $pid 2>/dev/null || true
+                echo -e "${GREEN}✅ 프로세스 (PID: $pid)를 종료했습니다.${NC}"
+            done
+            sleep 1
+        fi
+    else
+        # ss를 사용하여 포트를 사용하는 프로세스 찾기
+        local pid=$(ss -tulpn | grep ":$port " | awk -F'pid=' '{print $2}' | awk -F',' '{print $1}' | head -1)
+        if [ -n "$pid" ]; then
+            echo -e "${YELLOW}⚠️  포트 $port에서 실행 중인 프로세스를 종료합니다...${NC}"
+            kill -TERM $pid 2>/dev/null || true
+            echo -e "${GREEN}✅ 프로세스 (PID: $pid)를 종료했습니다.${NC}"
+            sleep 1
+        fi
+    fi
+}
+
+# 포트 확인 및 정리
 check_ports() {
-    echo -e "${BLUE}🔍 포트 사용 확인 중...${NC}"
+    echo -e "${BLUE}🔍 포트 사용 확인 및 정리 중...${NC}"
     
     # 프론트엔드 포트 설정
-    FRONTEND_PORT=3000
+    FRONTEND_PORT=3002
     if [ "$USE_GAIA_WEBUI" = "true" ]; then
-        FRONTEND_PORT=3001
+        FRONTEND_PORT=3002
     fi
     
-    if ss -tulpn | grep -q ":$FRONTEND_PORT "; then
-        echo -e "${YELLOW}⚠️  포트 $FRONTEND_PORT이 이미 사용 중입니다.${NC}"
-        read -p "계속하시겠습니까? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
-    fi
+    # 프론트엔드 포트 정리
+    kill_port_process $FRONTEND_PORT "Frontend"
     
-    if ss -tulpn | grep -q ":8000 "; then
-        echo -e "${YELLOW}⚠️  포트 8000이 이미 사용 중입니다.${NC}"
-        read -p "계속하시겠습니까? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
-    fi
+    # API 서버 포트 정리
+    kill_port_process 8000 "API Server"
+    
+    echo -e "${GREEN}✅ 포트 정리 완료${NC}"
 }
 
 # Next.js 서버 시작
@@ -128,15 +146,15 @@ start_nextjs() {
         npm install
     fi
     
-    # Next.js 서버 시작
+    # Next.js 서버 시작 (자동 포트 정리 포함)
     if [ "$1" = "dev" ]; then
-        npm run dev &
+        PORT=3002 npm run dev:clean &
     else
-        npm run build && npm start &
+        npm run build && PORT=3002 npm run start:clean &
     fi
     NEXTJS_PID=$!
     
-    echo -e "${GREEN}✅ Next.js 서버가 포트 3000에서 시작되었습니다.${NC}"
+    echo -e "${GREEN}✅ Next.js 서버가 포트 3002에서 시작되었습니다.${NC}"
 }
 
 # 프론트엔드 시작
@@ -144,7 +162,7 @@ start_frontend() {
     if [ "$USE_GAIA_WEBUI" = "true" ]; then
         echo -e "${BLUE}🚀 GAIA-BT Next.js WebUI 시작 중...${NC}"
         cd "$GAIA_WEBUI_DIR"
-        FRONTEND_PORT=3001
+        FRONTEND_PORT=3002
     else
         echo -e "${BLUE}🚀 gaia_chat 프론트엔드 시작 중...${NC}"
         cd "$FRONTEND_DIR"
@@ -183,7 +201,7 @@ start_services() {
     echo ""
     echo -e "${GREEN}🎉 GAIA-BT WebUI가 성공적으로 시작되었습니다!${NC}"
     echo ""
-    echo -e "${CYAN}📱 웹 인터페이스:${NC} http://localhost:$FRONTEND_PORT"
+    echo -e "${CYAN}📱 웹 인터페이스:${NC} http://localhost:3002"
     echo -e "${CYAN}🔗 API 문서:${NC} http://localhost:8000/docs"
     echo -e "${CYAN}⚡ API 엔드포인트:${NC} http://localhost:8000/api"
     echo ""
@@ -270,16 +288,16 @@ check_status() {
     fi
     
     # Next.js 서버 상태
-    if curl -s -o /dev/null http://localhost:3000; then
-        echo -e "${GREEN}✅ Next.js 서버: 정상 동작 (포트 3000)${NC}"
+    if curl -s -o /dev/null http://localhost:3002; then
+        echo -e "${GREEN}✅ Next.js 서버: 정상 동작 (포트 3002)${NC}"
     else
-        echo -e "${RED}❌ Next.js 서버: 중지됨 (포트 3000)${NC}"
+        echo -e "${RED}❌ Next.js 서버: 중지됨 (포트 3002)${NC}"
     fi
     
     echo ""
     echo -e "${CYAN}🔗 접속 URL:${NC}"
-    echo "  • 웹 인터페이스: http://localhost:3000"
-    echo "  • API 엔드포인트: http://localhost:3000/api"
+    echo "  • 웹 인터페이스: http://localhost:3002"
+    echo "  • API 엔드포인트: http://localhost:3002/api"
 }
 
 # 로그 출력
