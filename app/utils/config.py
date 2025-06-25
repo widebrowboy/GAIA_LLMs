@@ -36,10 +36,14 @@ OLLAMA_PARAMS = {
 }
 
 # Research settings
-DEFAULT_FEEDBACK_DEPTH = 2  # Default feedback loop depth
-DEFAULT_FEEDBACK_WIDTH = 2  # Default feedback loop width
-MIN_RESPONSE_LENGTH = 100  # Minimum response length in characters
-MIN_REFERENCES = 2  # Minimum number of references
+DEFAULT_FEEDBACK_DEPTH = 4  # Default feedback loop depth
+DEFAULT_FEEDBACK_WIDTH = 3  # Default feedback loop width
+MIN_RESPONSE_LENGTH = 2000  # Minimum response length in characters
+MIN_REFERENCES = 4  # Minimum number of references
+
+# Conversation context settings
+MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "5"))  # 최대 컨텍스트 메시지 수 (기본: 5개)
+MAX_CONVERSATION_HISTORY = int(os.getenv("MAX_CONVERSATION_HISTORY", "10"))  # 최대 대화 히스토리 저장 수 (기본: 10개)
 
 # Debug mode setting
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() in ["true", "1", "yes"]
@@ -68,12 +72,12 @@ class Config:
     def __init__(self, model: str = "Gemma3:27b-it-q4_K_M", debug_mode: bool = False):
         self.model = model
         self.debug_mode = debug_mode
-        self.feedback_depth = 3
-        self.feedback_width = 5
-        self.min_response_length = 100
-        self.min_references = 2
+        self.feedback_depth = 4
+        self.feedback_width = 3
+        self.min_response_length = 2000
+        self.min_references = 4
         self.temperature = 0.7
-        self.max_tokens = 2000
+        self.max_tokens = 4096
         # MCP 출력 표시 옵션 (기본값: False - 숨김)
         self.show_mcp_output = False
         # MCP 활성화 상태 (기본값: False)

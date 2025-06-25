@@ -538,3 +538,5 @@ def comprehensive_patent_search(user_query):
 ```
 
 이 가이드라인은 신약개발 분야의 특허 검색 챗봇이 정확하고 포괄적인 검색 결과를 제공하도록 설계되었습니다. 각 모듈은 독립적으로 사용하거나 통합하여 사용할 수 있으며, 지속적인 피드백을 통해 개선할 수 있습니다.
+
+**Note:** While I can address general questions, my expertise is primarily in pharmaceutical patents and intellectual property. For non-patent topics, my responses may be less accurate, and I recommend consulting appropriate specialists for professional advice in other fields.

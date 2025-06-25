@@ -10,12 +10,13 @@ import datetime
 import json
 import os
 import sys
+import re
 from pathlib import Path
 import asyncio
 
 # 내부 모듈 임포트
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, AsyncGenerator
 
 from app.api.ollama_client import OllamaClient
 from app.cli.interface import CliInterface
@@ -56,12 +57,26 @@ class DrugDevelopmentChatbot:
         self.config = config
         self.context = []
         self.last_topic = None
+        # 사용자 및 연구 품질 관련 설정 초기화
         self.settings = {
             "debug_mode": config.debug_mode,
-            "mcp_enabled": True
+            "mcp_enabled": True,
+            # 피드백 루프 파라미터
+            "feedback_depth": config.feedback_depth,
+            "feedback_width": config.feedback_width,
+            # 응답 품질 기준
+            "min_response_length": config.min_response_length,
+            "min_references": config.min_references
         }
         self.mcp_enabled = True  # MCP 활성화 상태 추가
-        self.client = OllamaClient(model=config.model)
+        # Ollama 클라이언트 초기화 (config의 파라미터를 명시적으로 전달)
+        self.client = OllamaClient(
+            model=config.model,
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+            min_response_length=config.min_response_length,
+            debug_mode=config.debug_mode,
+        )
         
         # 모드 관리 추가
         self.current_mode = "normal"  # "normal" 또는 "deep_research"
@@ -790,7 +805,11 @@ class DrugDevelopmentChatbot:
 
             # Deep Search 컨텍스트를 포함한 시스템 프롬프트 구성
             enhanced_system_prompt = self.system_prompt
+            references_section = ""
             if deep_search_context:
+                # 참고문헌 섹션 추출 및 생성
+                references_section = self._extract_references_from_context(deep_search_context)
+                
                 enhanced_system_prompt += f"""
 
 🔬 **통합 Deep Research MCP 검색 결과:**
@@ -805,11 +824,25 @@ class DrugDevelopmentChatbot:
 
 위 MCP 통합 데이터를 핵심적으로 활용하여 전문적이고 정확한 신약개발 연구 답변을 생성하세요."""
             
-            # 응답 생성
-            response = await self.client.generate(
-                prompt=question,
-                system_prompt=enhanced_system_prompt
-            )
+            # 응답 생성 (품질 기준을 만족할 때까지 재시도)
+            max_quality_retries = 3
+            attempt = 0
+            response = ""
+            reference_pattern = re.compile(r"\[(?:\d+)\]")
+            
+            while attempt < max_quality_retries:
+                response = await self.client.generate(
+                    prompt=question,
+                    system_prompt=enhanced_system_prompt,
+                    temperature=self.config.temperature  # 명시적 전달
+                )
+                # 품질 검증
+                ref_count = len(reference_pattern.findall(response))
+                if len(response) >= self.settings["min_response_length"] and ref_count >= self.settings["min_references"]:
+                    break  # 품질 기준 통과
+                attempt += 1
+                if self.settings["debug_mode"]:
+                    print(f"[디버그] 응답 품질 미달 - 길이 {len(response)} / 참고문헌 {ref_count}, 재시도 {attempt}")
 
             # 디버깅: 응답 길이 확인 (디버그 모드일 때만)
             if self.settings["debug_mode"]:
@@ -819,6 +852,15 @@ class DrugDevelopmentChatbot:
             # 응답이 비어있는지 확인
             if not response:
                 response = "[응답이 생성되지 않았습니다. 다시 시도해주세요.]"
+
+            # 모든 모드에서 참고문헌 섹션 추가
+            if deep_search_context and references_section:
+                # Deep Research 모드: MCP 검색 결과 기반 참고문헌
+                response = self._append_references_to_response(response, references_section)
+            else:
+                # 기본 모드: 기본 출처 정보 추가
+                basic_references = self._generate_basic_references()
+                response = self._append_references_to_response(response, basic_references)
 
             # 대화 이력에 추가
             self.conversation_history.append({"question": question, "answer": response})
@@ -858,48 +900,183 @@ class DrugDevelopmentChatbot:
 
             self.interface.display_error(error_msg)
             return error_msg
-
-    async def generate_streaming_response(self, question: str):
-        """스트리밍 응답 생성 (API용)"""
+    
+    async def generate_streaming_response(self, question: str) -> AsyncGenerator[str, None]:
+        """
+        스트리밍 방식으로 응답 생성
+        
+        Args:
+            question: 사용자 질문
+            
+        Yields:
+            str: 응답 청크
+        """
+        # MCP Deep Search 수행 (Deep Research 모드에서만)
+        deep_search_context = None
+        if self.mcp_enabled and hasattr(self, 'current_mode') and self.current_mode == "deep_research":
+            deep_search_context = await self.deep_search_with_mcp(question)
+        
         try:
-            # MCP 통합 검색이 활성화된 경우
-            if self.config.mcp_enabled and self.mcp_commands:
-                # MCP 검색 수행
-                if self.config.show_mcp_output:
-                    yield "🔬 통합 MCP Deep Search 수행 중...\n"
-                
-                mcp_results = await self.mcp_commands.integrated_deep_search(question)
-                
-                # 검색 결과 포맷팅
-                formatted_results = self.mcp_commands.format_integrated_results(mcp_results)
-                
-                if self.config.show_mcp_output:
-                    yield "\n📊 MCP 검색 완료\n"
-                
-                # 향상된 시스템 프롬프트 생성
-                enhanced_system_prompt = f"""{self.system_prompt}
+            # Deep Search 컨텍스트를 포함한 시스템 프롬프트 구성
+            enhanced_system_prompt = self.system_prompt
+            if deep_search_context:
+                enhanced_system_prompt += f"""
 
-=== 통합 MCP Deep Search 결과 ===
-{formatted_results}
+🔬 **통합 Deep Research MCP 검색 결과:**
+{deep_search_context}
 
-위 MCP 검색 결과를 반드시 활용하여 답변을 생성하세요."""
-                
-                # 스트리밍 응답 생성
+**📊 MCP 데이터 활용 지침:**
+1. 위 MCP 검색 결과에서 각 데이터베이스의 정보를 구체적으로 인용하세요
+2. DrugBank, OpenTargets, ChEMBL, BioMCP의 데이터를 교차 검증하여 종합적 결론 도출
+3. 각 섹션에서 해당하는 MCP 데이터를 명시적으로 활용 (예: "DrugBank 검색 결과에 따르면...", "OpenTargets 데이터에서 확인된...")
+4. Sequential Thinking의 연구 계획을 바탕으로 체계적인 답변 구성
+5. 검색된 키워드 분석 정보를 활용하여 질문의 핵심 포인트 파악
+
+위 MCP 통합 데이터를 핵심적으로 활용하여 전문적이고 정확한 신약개발 연구 답변을 생성하세요."""
+            
+            # 스트리밍 응답 생성 (OllamaClient에 스트리밍 메서드가 있다고 가정)
+            # 만약 없다면 일반 응답을 청크로 나누어 전송
+            if hasattr(self.client, 'generate_stream'):
                 async for chunk in self.client.generate_stream(
                     prompt=question,
-                    system_prompt=enhanced_system_prompt
+                    system_prompt=enhanced_system_prompt,
+                    temperature=self.settings.get("temperature", 0.7)
                 ):
                     yield chunk
             else:
-                # 일반 모드 스트리밍
-                async for chunk in self.client.generate_stream(
+                # 스트리밍이 지원되지 않는 경우 일반 응답을 한 번에 전송
+                response = await self.client.generate(
                     prompt=question,
-                    system_prompt=self.system_prompt
-                ):
-                    yield chunk
+                    system_prompt=enhanced_system_prompt,
+                    temperature=self.settings.get("temperature", 0.7)
+                )
+                # 응답을 작은 청크로 나누어 전송 (스트리밍 효과)
+                chunk_size = 50  # 한 번에 보낼 문자 수
+                for i in range(0, len(response), chunk_size):
+                    yield response[i:i + chunk_size]
+                    await asyncio.sleep(0.01)  # 약간의 지연 추가
                     
         except Exception as e:
-            yield f"\n❌ 오류 발생: {str(e)}"
+            import traceback
+            error_msg = f"스트리밍 응답 생성 중 오류 발생: {e!s}"
+            if self.settings["debug_mode"]:
+                print(f"\n[오류 상세 정보]\n{traceback.format_exc()}")
+            yield error_msg
+
+    def _extract_references_from_context(self, deep_search_context: str) -> str:
+        """Deep Search 결과에서 참고문헌 정보를 추출하여 구조화"""
+        if not deep_search_context:
+            return ""
+        
+        references = []
+        databases_used = set()
+        
+        try:
+            # 사용된 데이터베이스 식별
+            if "DrugBank" in deep_search_context:
+                databases_used.add("DrugBank")
+            if "OpenTargets" in deep_search_context:
+                databases_used.add("OpenTargets")
+            if "ChEMBL" in deep_search_context:
+                databases_used.add("ChEMBL")
+            if "BioMCP" in deep_search_context or "PubMed" in deep_search_context:
+                databases_used.add("BioMCP/PubMed")
+            if "BioRxiv" in deep_search_context:
+                databases_used.add("BioRxiv")
+            if "ClinicalTrials" in deep_search_context:
+                databases_used.add("ClinicalTrials.gov")
+            if "Sequential Thinking" in deep_search_context:
+                databases_used.add("Sequential Thinking AI")
+            
+            # DOI나 PMID 링크 추출
+            import re
+            
+            # DOI 패턴 (예: doi:10.1000/xyz123 또는 https://doi.org/10.1000/xyz123)
+            doi_pattern = r'(?:doi:|https://doi\.org/)([0-9]+\.[0-9]+/[^\s]+)'
+            dois = re.findall(doi_pattern, deep_search_context, re.IGNORECASE)
+            
+            # PMID 패턴 (예: PMID: 12345678)
+            pmid_pattern = r'PMID:\s*([0-9]+)'
+            pmids = re.findall(pmid_pattern, deep_search_context, re.IGNORECASE)
+            
+            # ChEMBL ID 패턴 (예: CHEMBL123456)
+            chembl_pattern = r'CHEMBL[0-9]+'
+            chembls = re.findall(chembl_pattern, deep_search_context, re.IGNORECASE)
+            
+            # DrugBank ID 패턴 (예: DB00001)
+            drugbank_pattern = r'DB[0-9]+'
+            drugbanks = re.findall(drugbank_pattern, deep_search_context, re.IGNORECASE)
+            
+            # 참고문헌 구성
+            ref_count = 1
+            
+            # 데이터베이스 참조 추가
+            for db in sorted(databases_used):
+                if db == "DrugBank":
+                    references.append(f"[{ref_count}] DrugBank Database. Available at: https://go.drugbank.com/")
+                elif db == "OpenTargets":
+                    references.append(f"[{ref_count}] Open Targets Platform. Available at: https://www.opentargets.org/")
+                elif db == "ChEMBL":
+                    references.append(f"[{ref_count}] ChEMBL Database. Available at: https://www.ebi.ac.uk/chembl/")
+                elif db == "BioMCP/PubMed":
+                    references.append(f"[{ref_count}] PubMed Database via BioMCP. Available at: https://pubmed.ncbi.nlm.nih.gov/")
+                elif db == "BioRxiv":
+                    references.append(f"[{ref_count}] bioRxiv Preprint Server. Available at: https://www.biorxiv.org/")
+                elif db == "ClinicalTrials.gov":
+                    references.append(f"[{ref_count}] ClinicalTrials.gov Database. Available at: https://clinicaltrials.gov/")
+                elif db == "Sequential Thinking AI":
+                    references.append(f"[{ref_count}] Sequential Thinking AI Analysis (MCP-based research planning)")
+                ref_count += 1
+            
+            # DOI 링크 추가
+            for doi in set(dois):
+                references.append(f"[{ref_count}] DOI: {doi}. Available at: https://doi.org/{doi}")
+                ref_count += 1
+            
+            # PMID 링크 추가
+            for pmid in set(pmids):
+                references.append(f"[{ref_count}] PubMed ID: {pmid}. Available at: https://pubmed.ncbi.nlm.nih.gov/{pmid}/")
+                ref_count += 1
+            
+            # ChEMBL ID 추가
+            for chembl in set(chembls):
+                references.append(f"[{ref_count}] ChEMBL ID: {chembl}. Available at: https://www.ebi.ac.uk/chembl/compound_report_card/{chembl}/")
+                ref_count += 1
+            
+            # DrugBank ID 추가
+            for drugbank in set(drugbanks):
+                references.append(f"[{ref_count}] DrugBank ID: {drugbank}. Available at: https://go.drugbank.com/drugs/{drugbank}")
+                ref_count += 1
+            
+        except Exception as e:
+            if self.settings.get("debug_mode", False):
+                print(f"[디버그] 참고문헌 추출 중 오류: {e}")
+        
+        return references
+
+    def _generate_basic_references(self) -> list:
+        """기본 모드용 참고문헌 생성"""
+        basic_references = [
+            "• **GAIA-BT AI System** - 신약개발 전문 지식 기반",
+            "• **의약품 규제 가이드라인** - FDA, EMA, PMDA 공식 문서",
+            "• **임상시험 데이터베이스** - ClinicalTrials.gov",
+            "• **의학 문헌** - PubMed, 의학 교과서 및 연구 논문",
+            "• **제약 업계 표준** - ICH 가이드라인, GMP 기준",
+        ]
+        return basic_references
+
+    def _append_references_to_response(self, response: str, references: list) -> str:
+        """응답에 참고문헌 섹션 추가"""
+        if not references:
+            return response
+            
+        references_text = "\n\n### 📚 참고문헌\n"
+        for i, ref in enumerate(references, 1):
+            references_text += f"{i}. {ref}\n"
+        
+        return response + references_text
+    
+    # 이 메서드들은 generate_response 함수 내부에서 사용됨
 
     async def process_command(self, command: str) -> bool:
         """

@@ -10,7 +10,7 @@ from datetime import datetime
 import logging
 
 from app.cli.chatbot import DrugDevelopmentChatbot, Config
-from app.utils.config import OLLAMA_MODEL
+from app.utils.config import OLLAMA_MODEL, MAX_CONVERSATION_CONTEXT, MAX_CONVERSATION_HISTORY
 from app.utils.prompt_manager import get_prompt_manager
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class ChatbotService:
         for session_id, chatbot in self.sessions.items():
             if chatbot.mcp_commands and chatbot.config.mcp_enabled:
                 try:
-                    await chatbot.mcp_commands.stop_all_servers()
+                    await chatbot.mcp_commands.stop_mcp()
                 except Exception as e:
                     logger.error(f"세션 {session_id} MCP 종료 오류: {e}")
         
@@ -86,7 +86,7 @@ class ChatbotService:
         # MCP 서버 종료
         if chatbot.mcp_commands and chatbot.config.mcp_enabled:
             try:
-                await chatbot.mcp_commands.stop_all_servers()
+                await chatbot.mcp_commands.stop_mcp()
             except Exception as e:
                 logger.error(f"MCP 종료 오류: {e}")
         
@@ -98,7 +98,7 @@ class ChatbotService:
         """세션 가져오기"""
         return self.sessions.get(session_id)
     
-    async def generate_response(self, session_id: str, message: str) -> Dict[str, Any]:
+    async def generate_response(self, session_id: str, message: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
         """일반 응답 생성"""
         chatbot = self.get_session(session_id)
         if not chatbot:
@@ -110,11 +110,53 @@ class ChatbotService:
             chatbot = self.get_session(session_id)
         
         try:
+            # 대화 히스토리가 제공된 경우 챗봇의 컨텍스트를 업데이트
+            if conversation_history:
+                # 기존 컨텍스트 초기화
+                chatbot.context = []
+                chatbot.conversation_history = []
+                
+                # 최근 메시지만 처리하도록 제한 (성능 및 메모리 최적화)
+                recent_history = conversation_history[-MAX_CONVERSATION_CONTEXT * 2:] if len(conversation_history) > MAX_CONVERSATION_CONTEXT * 2 else conversation_history
+                
+                # 대화 히스토리를 챗봇에 복원
+                for i, msg in enumerate(recent_history):
+                    if msg.get('role') == 'user':
+                        # 사용자 메시지를 컨텍스트에 추가
+                        chatbot.context.append(msg.get('content', ''))
+                        # 짝을 이루는 assistant 응답이 있는지 확인
+                        if i + 1 < len(recent_history) and recent_history[i + 1].get('role') == 'assistant':
+                            assistant_msg = recent_history[i + 1]
+                            # 대화 히스토리에 질문-답변 쌍 추가
+                            chatbot.conversation_history.append({
+                                "question": msg.get('content', ''),
+                                "answer": assistant_msg.get('content', '')
+                            })
+                
+                # 컨텍스트가 설정된 최대값을 초과하면 최근 것만 유지
+                if len(chatbot.context) > MAX_CONVERSATION_CONTEXT:
+                    chatbot.context = chatbot.context[-MAX_CONVERSATION_CONTEXT:]
+                
+                # 대화 히스토리도 설정된 최대값으로 제한
+                if len(chatbot.conversation_history) > MAX_CONVERSATION_HISTORY:
+                    chatbot.conversation_history = chatbot.conversation_history[-MAX_CONVERSATION_HISTORY:]
+                
+                logger.info(f"세션 {session_id}: {len(chatbot.context)}개의 컨텍스트, {len(chatbot.conversation_history)}개의 대화 히스토리 복원됨")
+            
             response = await chatbot.generate_response(message, ask_to_save=False)
+            
+            # 현재 프롬프트 내용을 포함하여 디버깅에 도움
+            current_prompt = self.prompt_manager.get_prompt(chatbot.current_prompt_type)
+            
             return {
                 "response": response,
                 "mode": "deep_research" if chatbot.config.mcp_enabled else "normal",
-                "model": chatbot.client.model_name
+                "model": chatbot.client.model_name,
+                "prompt_type": chatbot.current_prompt_type,
+                "debug_info": {
+                    "system_prompt_length": len(current_prompt) if current_prompt else 0,
+                    "system_prompt_preview": current_prompt[:200] + "..." if current_prompt and len(current_prompt) > 200 else current_prompt
+                } if hasattr(chatbot.config, 'debug') and chatbot.config.debug else None
             }
         except Exception as e:
             logger.error(f"응답 생성 오류: {e}")

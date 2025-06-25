@@ -4,7 +4,7 @@ Chat Router - 채팅 관련 API 엔드포인트
 
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 
 from app.api_server.dependencies import get_chatbot_service
@@ -30,6 +30,14 @@ class ChatRequest(BaseModel):
     stream: bool = Field(
         default=False,
         description="스트리밍 응답 여부 (이 엔드포인트에서는 미지원)"
+    )
+    conversation_history: Optional[List[Dict[str, str]]] = Field(
+        default=None,
+        description="대화 히스토리 (role과 content를 포함하는 메시지 목록)",
+        example=[
+            {"role": "user", "content": "안녕하세요"},
+            {"role": "assistant", "content": "안녕하세요! 신약개발에 대해 무엇을 도와드릴까요?"}
+        ]
     )
 
     class Config:
@@ -169,7 +177,7 @@ async def send_message(
         # 스트리밍 응답은 별도 엔드포인트 사용
         raise HTTPException(400, "스트리밍은 /stream 엔드포인트를 사용하세요")
     
-    result = await service.generate_response(request.session_id, request.message)
+    result = await service.generate_response(request.session_id, request.message, request.conversation_history)
     
     if "error" in result:
         raise HTTPException(400, result["error"])

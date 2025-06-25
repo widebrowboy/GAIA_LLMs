@@ -60,9 +60,6 @@ class ModelAdapter:
         Returns:
             str: 파싱된 응답 텍스트
         """
-        # 디버깅용 출력
-        print(f"[디버그 응답] 응답 키: {list(response.keys())}")
-
         # response 키가 있으면 사용, 없으면 다른 키(예: text, content 등) 확인
         if "response" in response:
             return response.get("response", "").strip()
@@ -72,7 +69,6 @@ class ModelAdapter:
             return response.get("text", "").strip()
         else:
             # 응답이 비어있으면 기본 메시지 반환
-            print(f"[경고] 응답에서 텍스트를 찾을 수 없습니다: {str(response)[:200]}")
             return "[응답을 파싱할 수 없습니다. 다시 시도해주세요.]"
 
     @staticmethod

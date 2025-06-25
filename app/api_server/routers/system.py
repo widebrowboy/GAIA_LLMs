@@ -10,6 +10,7 @@ from app.api_server.dependencies import get_chatbot_service
 from app.api_server.services.chatbot_service import ChatbotService
 from app.utils.config import OLLAMA_MODEL, DEBUG_MODE
 import httpx
+from app.utils.ollama_manager import ensure_single_model_running
 from app.utils.prompt_manager import get_prompt_manager
 
 router = APIRouter()
@@ -78,7 +79,14 @@ async def change_model(
         raise HTTPException(404, f"세션 {request.session_id}를 찾을 수 없습니다")
     
     try:
+        # 1) Chatbot 내부 모델 교체
         result = await chatbot.change_model(request.model)
+        # 2) Ollama 프로세스 보장 – 요청한 모델만 실행되도록 관리
+        try:
+            from app.utils.ollama_manager import ensure_models_running
+            await ensure_models_running(["gemma3-12b:latest", chatbot.client.model_name])
+        except Exception as proc_err:
+            raise HTTPException(500, f"모델 프로세스 관리 실패: {proc_err}")
         return {
             "success": True,
             "model": chatbot.client.model_name,
@@ -98,6 +106,11 @@ async def change_prompt(
         raise HTTPException(404, f"세션 {request.session_id}를 찾을 수 없습니다")
     
     try:
+        # 프롬프트 매니저 다시 로드하여 최신 프롬프트 파일 적용
+        from app.utils.prompt_manager import get_prompt_manager
+        prompt_manager = get_prompt_manager()
+        prompt_manager.reload_prompts()
+        
         result = await chatbot.change_prompt(request.prompt_type)
         return {
             "success": True,

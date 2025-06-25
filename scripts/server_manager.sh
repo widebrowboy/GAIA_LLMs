@@ -13,6 +13,14 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# 서버 정보
+API_PORT=8000
+WEBUI_PORT=3003
+API_URL="http://localhost:${API_PORT}"
+WEBUI_URL="http://localhost:${WEBUI_PORT}"
+API_LOG="/tmp/gaia-bt-api.log"
+WEBUI_LOG="/tmp/gaia-bt-webui.log"
+
 # 로고 출력
 print_banner() {
     echo -e "${CYAN}"
@@ -32,6 +40,89 @@ check_port() {
         echo "$pids"
     else
         echo ""
+    fi
+}
+
+# 포트 대기 함수
+wait_for_port_free() {
+    local port=$1
+    local max_wait=10
+    local wait_count=0
+    
+    while [ $wait_count -lt $max_wait ]; do
+        if [ -z "$(check_port $port)" ]; then
+            return 0
+        fi
+        echo -e "${YELLOW}⏳ 포트 $port 해제 대기 중... ($wait_count/$max_wait)${NC}"
+        sleep 1
+        wait_count=$((wait_count + 1))
+    done
+    
+    return 1
+}
+
+# 서버 준비 대기 함수
+wait_for_servers() {
+    local max_wait=30
+    local api_ready=false
+    local webui_ready=false
+    local wait_count=0
+    
+    echo -e "${YELLOW}⏳ 서버 준비 대기 중...${NC}"
+    
+    while [ $wait_count -lt $max_wait ]; do
+        # API 서버 확인
+        if ! $api_ready && curl -s $API_URL/health > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ API 서버($API_PORT) 준비 완료${NC}"
+            api_ready=true
+        fi
+        
+        # WebUI 서버 확인
+        if ! $webui_ready && curl -s $WEBUI_URL > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ WebUI 서버($WEBUI_PORT) 준비 완료${NC}"
+            webui_ready=true
+        fi
+        
+        # 둘 다 준비되면 종료
+        if $api_ready && $webui_ready; then
+            return 0
+        fi
+        
+        sleep 1
+        wait_count=$((wait_count + 1))
+        
+        # 10초마다 상태 표시
+        if [ $((wait_count % 10)) -eq 0 ]; then
+            echo -e "${YELLOW}⏳ 서버 준비 대기 중... ($wait_count/$max_wait)${NC}"
+        fi
+    done
+    
+    # 타임아웃
+    echo -e "${YELLOW}⚠️ 일부 서버가 준비되지 않았습니다. 브라우저는 오픈되지만 완전히 동작하지 않을 수 있습니다.${NC}"
+    return 1
+}
+
+# 브라우저 열기 함수
+open_browser() {
+    local url=${1:-$WEBUI_URL}
+    local wait=${2:-false}
+    
+    # 지정된 경우 서버 준비 대기
+    if $wait; then
+        wait_for_servers
+    fi
+    
+    echo -e "${CYAN}🌐 브라우저에서 WebUI 열기: $url${NC}"
+    
+    # 다양한 브라우저 지원
+    if command -v xdg-open > /dev/null; then
+        xdg-open $url > /dev/null 2>&1 &
+    elif command -v gnome-open > /dev/null; then
+        gnome-open $url > /dev/null 2>&1 &
+    elif command -v open > /dev/null; then
+        open $url > /dev/null 2>&1 &
+    else
+        echo -e "${YELLOW}⚠️ 자동으로 브라우저를 열 수 없습니다. 수동으로 접속하세요: $url${NC}"
     fi
 }
 
@@ -111,7 +202,7 @@ stop_all_servers() {
     done
     
     # 포트별 정리
-    kill_port_processes 3001 "Next.js WebUI"
+    kill_port_processes 3003 "Next.js WebUI"
     kill_port_processes 8000 "FastAPI Backend"
     
     echo -e "${GREEN}✅ 모든 서버 중지 완료${NC}"
@@ -138,9 +229,15 @@ start_api_server() {
         pip install uvicorn fastapi
     fi
     
-    # API 서버 시작
+    # 포트 사용 가능 대기
+    if ! wait_for_port_free 8000; then
+        echo -e "${RED}❌ 포트 8000이 계속 사용 중입니다${NC}"
+        return 1
+    fi
+    
+    # API 서버 시작 (Deep Research용 30분 타임아웃)
     echo -e "${CYAN}🔗 API 서버 시작: http://localhost:8000${NC}"
-    nohup python -m uvicorn app.api_server.main:app --reload --host 0.0.0.0 --port 8000 > /tmp/gaia-bt-api.log 2>&1 &
+    nohup python -m uvicorn app.api_server.main:app --reload --host 0.0.0.0 --port 8000 --timeout-keep-alive 1800 --timeout-graceful-shutdown 60 > /tmp/gaia-bt-api.log 2>&1 &
     local api_pid=$!
     
     # 시작 확인
@@ -161,10 +258,10 @@ start_webui_server() {
     echo -e "${BLUE}🌐 Next.js WebUI 서버 시작 중...${NC}"
     
     # 포트 정리
-    kill_port_processes 3001 "Next.js WebUI"
+    kill_port_processes 3003 "Next.js WebUI"
     
     # 작업 디렉토리 확인
-    local webui_dir="/home/gaia-bt/workspace/GAIA_LLMs/webui/nextjs-webui"
+    local webui_dir="/home/gaia-bt/workspace/GAIA_LLMs/gaia_chat"
     if [ ! -d "$webui_dir" ]; then
         echo -e "${RED}❌ WebUI 디렉토리를 찾을 수 없습니다: $webui_dir${NC}"
         return 1
@@ -184,22 +281,36 @@ start_webui_server() {
         npm install
     fi
     
-    # WebUI 서버 시작
-    echo -e "${CYAN}🔗 WebUI 서버 시작: http://localhost:3001${NC}"
-    nohup npm run dev -- --hostname 0.0.0.0 --port 3001 > /tmp/gaia-bt-webui.log 2>&1 &
-    local webui_pid=$!
-    
-    # 시작 확인
-    sleep 5
-    if kill -0 $webui_pid 2>/dev/null; then
-        echo -e "${GREEN}✅ Next.js WebUI 서버 시작 완료 (PID: $webui_pid)${NC}"
-        echo -e "${CYAN}🌐 웹 인터페이스: http://localhost:3001${NC}"
-        return 0
-    else
-        echo -e "${RED}❌ Next.js WebUI 서버 시작 실패${NC}"
-        echo -e "${YELLOW}📄 로그 확인: tail -f /tmp/gaia-bt-webui.log${NC}"
+    # 포트 사용 가능 대기
+    if ! wait_for_port_free 3003; then
+        echo -e "${RED}❌ 포트 3003이 계속 사용 중입니다${NC}"
         return 1
     fi
+    
+    # WebUI 서버 시작
+    echo -e "${CYAN}🔗 WebUI 서버 시작: http://localhost:3003${NC}"
+    nohup npm run dev -- --hostname 0.0.0.0 --port 3003 > /tmp/gaia-bt-webui.log 2>&1 &
+    local webui_pid=$!
+    
+    # 시작 확인 (더 긴 대기 시간)
+    local wait_count=0
+    while [ $wait_count -lt 10 ]; do
+        if kill -0 $webui_pid 2>/dev/null; then
+            # 포트 열림 확인
+            if [ ! -z "$(check_port 3003)" ]; then
+                echo -e "${GREEN}✅ Next.js WebUI 서버 시작 완료 (PID: $webui_pid)${NC}"
+                echo -e "${CYAN}🌐 웹 인터페이스: http://localhost:3003${NC}"
+                return 0
+            fi
+        fi
+        echo -e "${YELLOW}⏳ WebUI 서버 시작 대기 중... ($wait_count/10)${NC}"
+        sleep 1
+        wait_count=$((wait_count + 1))
+    done
+    
+    echo -e "${RED}❌ Next.js WebUI 서버 시작 실패${NC}"
+    echo -e "${YELLOW}📄 로그 확인: tail -f /tmp/gaia-bt-webui.log${NC}"
+    return 1
 }
 
 # 서버 상태 확인
@@ -230,14 +341,14 @@ check_server_status() {
     echo ""
     
     # WebUI 서버 상태
-    local webui_pids=$(check_port 3001)
+    local webui_pids=$(check_port 3003)
     if [ ! -z "$webui_pids" ]; then
         echo -e "${GREEN}✅ Next.js WebUI: 실행 중 (PID: $webui_pids)${NC}"
-        echo -e "   🌐 WebUI: http://localhost:3001"
+        echo -e "   🌐 WebUI: http://localhost:3003"
         
         # Health check
         if command -v curl >/dev/null 2>&1; then
-            local webui_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001 2>/dev/null)
+            local webui_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3003 2>/dev/null)
             if [ "$webui_status" = "200" ]; then
                 echo -e "   💚 Status: 정상"
             else
@@ -288,9 +399,12 @@ show_help() {
     echo ""
     echo -e "${GREEN}기본 명령어:${NC}"
     echo "  start          - 모든 서버 시작 (API + WebUI)"
+    echo "  start-all      - 모든 서버 시작 후 브라우저 자동 실행"
     echo "  stop           - 모든 서버 중지"
     echo "  restart        - 모든 서버 재시작"
+    echo "  restart-all    - 모든 서버 재시작 후 브라우저 자동 실행"
     echo "  status         - 서버 상태 확인"
+    echo "  open           - WebUI를 브라우저에서 열기"
     echo ""
     echo -e "${GREEN}개별 서버 제어:${NC}"
     echo "  start-api      - FastAPI 서버만 시작"
@@ -308,9 +422,9 @@ show_help() {
     echo "  logs-webui     - WebUI 로그 확인"
     echo ""
     echo -e "${GREEN}접속 정보:${NC}"
-    echo "  📱 WebUI: http://localhost:3001"
-    echo "  🔗 API: http://localhost:8000"
-    echo "  📖 API 문서: http://localhost:8000/docs"
+    echo "  📱 WebUI: $WEBUI_URL"
+    echo "  🔗 API: $API_URL"
+    echo "  📖 API 문서: $API_URL/docs"
 }
 
 # 메인 함수
@@ -320,9 +434,29 @@ main() {
     case "${1:-start}" in
         "start")
             stop_all_servers
-            start_api_server && start_webui_server
+            # 포트 완전 해제 확인
             sleep 2
-            check_server_status
+            if start_api_server && start_webui_server; then
+                sleep 2
+                check_server_status
+            else
+                echo -e "${RED}❌ 서버 시작 실패${NC}"
+                exit 1
+            fi
+            ;;
+        "start-all")
+            stop_all_servers
+            # 포트 완전 해제 확인
+            sleep 2
+            if start_api_server && start_webui_server; then
+                sleep 2
+                check_server_status
+                # 브라우저 자동 실행
+                open_browser $WEBUI_URL true
+            else
+                echo -e "${RED}❌ 서버 시작 실패${NC}"
+                exit 1
+            fi
             ;;
         "stop")
             stop_all_servers
@@ -334,6 +468,18 @@ main() {
             sleep 2
             check_server_status
             ;;
+        "restart-all")
+            stop_all_servers
+            sleep 2
+            start_api_server && start_webui_server
+            sleep 2
+            check_server_status
+            # 브라우저 자동 실행
+            open_browser $WEBUI_URL true
+            ;;
+        "open")
+            open_browser $WEBUI_URL false
+            ;;
         "status")
             check_server_status
             ;;
@@ -342,14 +488,14 @@ main() {
             start_api_server
             ;;
         "start-webui")
-            kill_port_processes 3001 "Next.js WebUI"
+            kill_port_processes 3003 "Next.js WebUI"
             start_webui_server
             ;;
         "stop-api")
             kill_port_processes 8000 "FastAPI Backend"
             ;;
         "stop-webui")
-            kill_port_processes 3001 "Next.js WebUI"
+            kill_port_processes 3003 "Next.js WebUI"
             ;;
         "kill-port")
             if [ -z "$2" ]; then
@@ -359,7 +505,7 @@ main() {
             kill_port_processes "$2" "Port $2"
             ;;
         "clean-ports")
-            kill_port_processes 3001 "Next.js WebUI"
+            kill_port_processes 3003 "Next.js WebUI"
             kill_port_processes 8000 "FastAPI Backend"
             ;;
         "logs")

@@ -5,6 +5,9 @@ GAIA-BT FastAPI Application
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.responses import StreamingResponse
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
@@ -35,6 +38,13 @@ async def lifespan(app: FastAPI):
     # 서비스 초기화
     chatbot_service = ChatbotService()
     await chatbot_service.initialize()
+
+    # Ollama 기본 모델(gemma3-12b:latest) 상시 실행 보장
+    try:
+        from app.utils.ollama_manager import ensure_models_running
+        await ensure_models_running(["gemma3-12b:latest"])
+    except Exception as e:
+        logger.warning(f"기본 모델 실행 보장 실패: {e}")
     
     websocket_manager = WebSocketManager()
     
@@ -60,14 +70,31 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# UTF-8 인코딩 강제 설정을 위한 미들웨어
+class UTF8EncodingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        
+        # JSON 응답에 UTF-8 인코딩 명시
+        if isinstance(response, JSONResponse):
+            response.headers["Content-Type"] = "application/json; charset=utf-8"
+        # 스트리밍 응답에 UTF-8 인코딩 명시 (SSE)
+        elif isinstance(response, StreamingResponse) and response.media_type == "text/event-stream":
+            response.headers["Content-Type"] = "text/event-stream; charset=utf-8"
+        
+        return response
+
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 프로덕션에서는 구체적인 도메인 지정
+    allow_origins=["*"],  # 모든 오리진 허용 (개발용)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# UTF-8 인코딩 미들웨어 추가
+app.add_middleware(UTF8EncodingMiddleware)
 
 # 전역 예외 처리기
 @app.exception_handler(Exception)
@@ -122,15 +149,27 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """헬스 체크 엔드포인트"""
+    """헬스 체크 엔드포인트
+
+    우선 순위
+    1. 실제로 *running* 상태인 Ollama 모델 목록을 조회해 표시
+    2. 실행 중인 모델이 없으면 ChatbotService 의 current_model 사용
+    """
     service = app.state.chatbot_service
-    
+
+    from app.utils.ollama_manager import list_running_models  # 늦은 import 로 의존 최소화
+    running = await list_running_models()
+
+    # 첫 번째 실행 모델(가장 최근에 띄운 모델)을 대표값으로 사용
+    current_model = running[-1] if running else (service.current_model if service else None)
+
     return {
         "status": "healthy",
-        "model": service.current_model if service else None,
+        "model": current_model,
         "mode": service.current_mode if service else None,
         "mcp_enabled": service.mcp_enabled if service else False,
-        "debug": service.debug_mode if service else False
+        "debug": service.debug_mode if service else False,
+        "running_models": running  # UI에서 목록으로도 활용 가능하도록 추가
     }
 
 @app.websocket("/ws/{session_id}")
@@ -184,6 +223,176 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     except Exception as e:
         logger.error(f"WebSocket 오류: {e}")
         manager.disconnect(session_id)
+
+async def test_ollama_model_response(model_name: str = "gemma3-12b:latest") -> dict:
+    """Ollama 모델과 실제 대화 테스트를 통한 연결 상태 확인"""
+    try:
+        from app.utils.ollama_manager import list_running_models, start_model
+        
+        # 1. 모델이 실행 중인지 확인
+        running_models = await list_running_models()
+        if model_name not in running_models:
+            logger.info(f"모델 '{model_name}' 실행되지 않음, 시작 시도 중...")
+            await start_model(model_name)
+            running_models = await list_running_models()
+        
+        # 2. 실제 모델 응답 테스트
+        service = app.state.chatbot_service
+        if service and service.sessions:
+            # 기본 세션의 클라이언트 사용
+            default_session = service.sessions.get("default")
+            if default_session and hasattr(default_session, 'client'):
+                test_message = "Hello"
+                
+                # 간단한 응답 테스트 (타임아웃 10초)
+                import asyncio
+                try:
+                    response = await asyncio.wait_for(
+                        default_session.client.generate(test_message),
+                        timeout=10.0
+                    )
+                    
+                    if response and len(response.strip()) > 0:
+                        return {
+                            "model_ready": True,
+                            "model_name": model_name,
+                            "running_models": running_models,
+                            "test_success": True,
+                            "response_length": len(response)
+                        }
+                    else:
+                        return {
+                            "model_ready": False,
+                            "model_name": model_name,
+                            "running_models": running_models,
+                            "test_success": False,
+                            "error": "Empty response from model"
+                        }
+                        
+                except asyncio.TimeoutError:
+                    return {
+                        "model_ready": False,
+                        "model_name": model_name,
+                        "running_models": running_models,
+                        "test_success": False,
+                        "error": "Model response timeout"
+                    }
+                    
+            else:
+                return {
+                    "model_ready": False,
+                    "model_name": model_name,
+                    "running_models": running_models,
+                    "test_success": False,
+                    "error": "Default session client not available"
+                }
+                
+        else:
+            return {
+                "model_ready": False,
+                "model_name": model_name,
+                "running_models": running_models,
+                "test_success": False,
+                "error": "ChatbotService not available"
+            }
+            
+    except Exception as e:
+        logger.error(f"Ollama 모델 테스트 오류: {e}")
+        return {
+            "model_ready": False,
+            "model_name": model_name,
+            "running_models": [],
+            "test_success": False,
+            "error": str(e)
+        }
+
+@app.websocket("/ws/status/{session_id}")
+async def status_websocket_endpoint(websocket: WebSocket, session_id: str):
+    """연결 상태 모니터링 전용 WebSocket 엔드포인트"""
+    await websocket.accept()
+    
+    connected = True
+    try:
+        import asyncio
+        
+        while connected:
+            # 서버 상태 정보 수집
+            try:
+                service = app.state.chatbot_service
+                
+                # 실제 모델 대화 가능 상태 테스트
+                model_test_result = await test_ollama_model_response()
+                
+                status_data = {
+                    "type": "status_update",
+                    "timestamp": int(asyncio.get_event_loop().time()),
+                    "server_healthy": True,
+                    "model_ready": model_test_result.get("model_ready", False),
+                    "ollama_models": model_test_result.get("running_models", []),
+                    "current_model": model_test_result.get("model_name"),
+                    "mode": service.current_mode if service else "normal",
+                    "mcp_enabled": service.mcp_enabled if service else False,
+                    "connected_sessions": len(app.state.websocket_manager.active_connections) if app.state.websocket_manager else 0,
+                    "test_result": {
+                        "success": model_test_result.get("test_success", False),
+                        "error": model_test_result.get("error"),
+                        "response_length": model_test_result.get("response_length", 0)
+                    }
+                }
+                
+                # WebSocket 연결 상태 확인 후 전송
+                if connected and websocket.client_state.value == 1:  # CONNECTED
+                    try:
+                        await websocket.send_json(status_data)
+                    except Exception as send_error:
+                        logger.warning(f"Status WebSocket 전송 실패: {send_error}")
+                        connected = False
+                        break
+                else:
+                    connected = False
+                    break
+                
+            except Exception as e:
+                # 서버 오류 시 상태 정보
+                error_data = {
+                    "type": "status_update",
+                    "timestamp": int(asyncio.get_event_loop().time()),
+                    "server_healthy": False,
+                    "model_ready": False,
+                    "error": str(e),
+                    "ollama_models": [],
+                    "current_model": None,
+                    "test_result": {
+                        "success": False,
+                        "error": str(e)
+                    }
+                }
+                
+                # WebSocket 연결 상태 확인 후 전송
+                if connected and websocket.client_state.value == 1:  # CONNECTED
+                    try:
+                        await websocket.send_json(error_data)
+                    except Exception as send_error:
+                        logger.warning(f"Error WebSocket 전송 실패: {send_error}")
+                        connected = False
+                        break
+                else:
+                    connected = False
+                    break
+            
+            # 10초마다 상태 업데이트 (모델 테스트 포함으로 간격 증가)
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                connected = False
+                break
+            
+    except WebSocketDisconnect:
+        logger.info(f"Status WebSocket 연결 해제: {session_id}")
+        connected = False
+    except Exception as e:
+        logger.error(f"Status WebSocket 오류: {e}")
+        connected = False
 
 if __name__ == "__main__":
     import uvicorn
