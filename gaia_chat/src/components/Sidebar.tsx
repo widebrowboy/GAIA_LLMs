@@ -8,13 +8,6 @@ import { formatDate } from '../utils/helpers';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getApiUrl } from '@/config/api';
 
-interface SystemStatus {
-  status: string;
-  model: string;
-  mode: string;
-  mcp_enabled: boolean;
-  debug: boolean;
-}
 
 interface SidebarProps {
   onClose?: () => void;
@@ -63,7 +56,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   
   const { isDesktop } = useResponsive();
 
-  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [showSystemStatus, setShowSystemStatus] = useState(true);
   const [showExpertPrompts, setShowExpertPrompts] = useState(false);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
@@ -93,25 +85,13 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           mcp_enabled: status.mcp_enabled || mcpEnabled || false,
           debug: status.debug || false
         };
-        setSystemStatus(normalizedStatus);
+        // 상태 업데이트 로직 제거 (현재는 컨텍스트에서 관리)
       } else {
-        setSystemStatus({
-          status: 'error',
-          model: currentModel || 'offline',
-          mode: currentMode || 'normal', 
-          mcp_enabled: mcpEnabled || false,
-          debug: false
-        });
+        // 에러 상태 처리 (현재는 컨텍스트에서 관리)
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return;
-      setSystemStatus({
-        status: 'offline',
-        model: currentModel || 'offline',
-        mode: currentMode || 'normal',
-        mcp_enabled: mcpEnabled || false,
-        debug: false
-      });
+      // 오프라인 상태 처리 (현재는 컨텍스트에서 관리)
     } finally {
       clearTimeout(timeoutId);
     }
@@ -325,7 +305,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               {currentMode === 'deep_research' ? '딥리서치' : '기본'}
             </div>
             <div className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
-              {currentPromptType === 'default' ? '기본' :
+              {currentPromptType === 'default' ? '일반' :
                currentPromptType === 'patent' ? '특허' :
                currentPromptType === 'clinical' ? '임상' :
                currentPromptType === 'research' ? '연구' :
@@ -413,9 +393,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             <div className="flex justify-between">
               <span>MCP:</span>
               <span className={`font-medium ${
-                mcpEnabled || systemStatus?.mcp_enabled ? 'text-green-600' : 'text-gray-600'
+                currentMode === 'deep_research' ? 'text-green-600' : 'text-gray-600'
               }`}>
-                {mcpEnabled || systemStatus?.mcp_enabled ? '활성화' : '비활성화'}
+                {currentMode === 'deep_research' ? '활성화' : '비활성화'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -446,7 +426,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         {showExpertPrompts && (
           <div className="grid grid-cols-2 gap-2">
             {[
-              { key: 'default', label: '기본모드' },
+              { key: 'default', label: '일반모드' },
               { key: 'patent', label: '특허검색' },
               { key: 'clinical', label: '임상시험' },
               { key: 'research', label: '연구분석' },
