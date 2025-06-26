@@ -15,22 +15,6 @@ interface SidebarProps {
   onToggle?: () => void;
 }
 
-// 스크롤바 스타일 CSS 클래스 추가
-const scrollbarStyles = `
-  .thin-scrollbar::-webkit-scrollbar {
-    width: 4px;
-  }
-  .thin-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .thin-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgba(156, 163, 175, 0.5);
-    border-radius: 20px;
-  }
-  .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(156, 163, 175, 0.8);
-  }
-`;
 
 const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   console.log('💡 Sidebar 컴포넌트 렌더링 시작');
@@ -77,14 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       });
       
       if (response.ok) {
-        const status = await response.json();
-        const normalizedStatus = {
-          status: status.status || 'healthy',
-          model: status.model || currentModel || 'unknown',
-          mode: status.mode || currentMode || 'normal',
-          mcp_enabled: status.mcp_enabled || mcpEnabled || false,
-          debug: status.debug || false
-        };
+        await response.json();
         // 상태 업데이트 로직 제거 (현재는 컨텍스트에서 관리)
       } else {
         // 에러 상태 처리 (현재는 컨텍스트에서 관리)
