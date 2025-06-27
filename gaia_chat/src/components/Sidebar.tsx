@@ -284,26 +284,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           setDetailedModels(immediateModels.map(name => ({ name, parameter_size: '12B' })));
           console.log('✅ 폴백 데이터 설정 완료 - 모델 수:', immediateModels.length);
           
-          // 간단한 연결 테스트 (백그라운드)
-          console.log('🧪 백그라운드 연결 테스트 시작...');
-          try {
-            const testController = new AbortController();
-            setTimeout(() => testController.abort(), 2000); // 2초 타임아웃
-            
-            const testUrl = 'http://localhost:8000/health';
-            console.log('🌐 테스트 URL:', testUrl);
-            const testResponse = await fetch(testUrl, { signal: testController.signal });
-            console.log('✅ 연결 테스트 성공:', {
-              status: testResponse.status,
-              ok: testResponse.ok
-            });
-          } catch (testError) {
-            if (testError instanceof Error && testError.name === 'AbortError') {
-              console.log('⏰ 연결 테스트 타임아웃 (정상)');
-            } else {
-              console.error('❌ 연결 테스트 실패:', testError);
-            }
-          }
+          // 연결 테스트 제거 - 직접 API 호출로 진행
+          console.log('🚀 연결 테스트 생략 - 직접 API 호출로 진행');
           
           // 백그라운드에서 실제 API 호출 시도
           console.log('📡 백그라운드 API 호출로 실제 데이터 가져오기 시도');
@@ -313,12 +295,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             
             console.log('📡 fetch 호출 시작...');
             
-            // AbortController로 타임아웃 설정
+            // AbortController 설정 (컴포넌트 언마운트 시에만 취소)
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => {
-              console.warn('⏰ fetch 타임아웃 (5초)');
-              controller.abort();
-            }, 5000);
+            // 타임아웃 제거 - 자연스러운 네트워크 타임아웃에 의존
+            console.log('🐛 AbortController 설정 완료 (자동 취소 방지)');
             
             const response = await fetch(url, {
               method: 'GET',
@@ -329,8 +309,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               cache: 'no-cache',
               signal: controller.signal
             });
-            
-            clearTimeout(timeoutId);
             
             console.log('📥 fetch 응답 수신:', {
               status: response.status,
@@ -375,9 +353,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               console.error('❌ 오류 내용:', errorText);
             }
           } catch (fetchError) {
-            // AbortError (타임아웃) 감지 - 정상적인 상황으로 처리
+            // AbortError 감지 - 컴포넌트 언마운트 또는 취소로 인한 정상적인 상황
             if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-              console.log('⏰ API 호출 타임아웃 (정상) - 폴백 데이터 유지');
+              console.log('🏃‍♂️ API 호출 취소됨 (컴포넌트 상태 변경) - 폴백 데이터 유지');
             } else {
               console.error('❌ API 호출 실패:', fetchError);
               console.warn('🔄 네트워크 오류 - 폴백 데이터 유지');
@@ -401,6 +379,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     
     return () => {
       mounted = false;
+      console.log('🏁 Sidebar useEffect cleanup - 컴포넌트 언마운트 또는 재실행');
     };
   }, []); // 빈 의존성 배열로 한 번만 실행
 
@@ -644,9 +623,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         </div>
         
         {showSystemStatus && (
-          <div className="space-y-2 text-xs">
+          <div className="space-y-2 text-xs text-black">
             <div className="flex justify-between items-center">
-              <span>서버 연결:</span>
+              <span className="text-black">서버 연결:</span>
               <div className="flex items-center space-x-1">
                 <div className={`w-2 h-2 rounded-full ${
                   serverConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
@@ -659,7 +638,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               </div>
             </div>
             <div className="flex justify-between items-center">
-              <span>모델:</span>
+              <span className="text-black">모델:</span>
               <div className="flex items-center space-x-2">
                 <div className={`w-2 h-2 rounded-full ${
                   ollamaRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
@@ -679,7 +658,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               </div>
             </div>
             <div className="flex justify-between">
-              <span>MCP:</span>
+              <span className="text-black">MCP:</span>
               <span className={`font-medium ${
                 currentMode === 'deep_research' ? 'text-green-600' : 'text-gray-600'
               }`}>
@@ -687,7 +666,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               </span>
             </div>
             <div className="flex justify-between">
-              <span>모드:</span>
+              <span className="text-black">모드:</span>
               <span className={`font-medium ${
                 currentMode === 'deep_research' ? 'text-green-600' : 'text-blue-600'
               }`}>
@@ -695,7 +674,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               </span>
             </div>
             <div className="flex justify-between">
-              <span>사용 가능한 모델:</span>
+              <span className="text-black">사용 가능한 모델:</span>
               <div className="flex items-center space-x-2">
                 <span className={`font-medium ${
                   availableModels.length > 0 ? 'text-green-600' : 'text-gray-600'
@@ -901,7 +880,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               </div>
             </div>
             <div className="flex justify-between">
-              <span>실행 중인 모델:</span>
+              <span className="text-black">실행 중인 모델:</span>
               <span className={`font-medium ${
                 runningModels.length > 0 ? 'text-green-600' : 'text-gray-600'
               }`}>

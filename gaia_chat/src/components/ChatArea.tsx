@@ -351,7 +351,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
           <div className="flex items-end space-x-3">
             <div className="flex-1">
               <textarea
-                className="w-full resize-none border-2 border-emerald-300/50 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-emerald-50/30 disabled:from-gray-100 disabled:to-gray-200 disabled:cursor-not-allowed placeholder-emerald-600/70"
+                className="w-full resize-none border-2 border-emerald-300/50 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-emerald-50/30 disabled:from-gray-100 disabled:to-gray-200 disabled:cursor-not-allowed placeholder-gray-500 text-black"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
