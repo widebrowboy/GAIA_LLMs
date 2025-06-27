@@ -80,6 +80,129 @@ class OllamaClient:
             print(f"[OllamaClient] Ollama URL: {self.ollama_url}")
             print(f"[OllamaClient] GPU 파라미터: {self.gpu_params}")
 
+    async def check_ollama_connection(self) -> Dict[str, Any]:
+        """
+        Ollama 서비스 연결 상태 확인
+        
+        Returns:
+            Dict[str, Any]: 연결 상태 정보
+                - connected: bool - 연결 가능 여부
+                - error: str - 오류 메시지 (연결 실패 시)
+                - models: List[str] - 사용 가능한 모델 목록
+                - running_models: List[str] - 실행 중인 모델 목록
+        """
+        try:
+            client = await self._get_http_client()
+            
+            # 1. Ollama 서비스 상태 확인
+            try:
+                response = await client.get(f"{self.ollama_url}/api/tags", timeout=5.0)
+                response.raise_for_status()
+                models_data = response.json()
+                available_models = [model["name"] for model in models_data.get("models", [])]
+            except Exception as e:
+                return {
+                    "connected": False,
+                    "error": f"Ollama 서비스에 연결할 수 없습니다: {str(e)}",
+                    "models": [],
+                    "running_models": []
+                }
+            
+            # 2. 실행 중인 모델 확인
+            try:
+                response = await client.get(f"{self.ollama_url}/api/ps", timeout=5.0)
+                response.raise_for_status()
+                ps_data = response.json()
+                running_models = [model["name"] for model in ps_data.get("models", [])]
+            except Exception:
+                running_models = []
+            
+            # 3. 현재 모델이 사용 가능한지 확인
+            if self.model not in available_models:
+                return {
+                    "connected": True,
+                    "error": f"모델 '{self.model}'이 Ollama에 설치되어 있지 않습니다. 설치된 모델: {available_models}",
+                    "models": available_models,
+                    "running_models": running_models
+                }
+            
+            return {
+                "connected": True,
+                "error": None,
+                "models": available_models,
+                "running_models": running_models,
+                "current_model_running": self.model in running_models
+            }
+            
+        except Exception as e:
+            return {
+                "connected": False,
+                "error": f"Ollama 연결 확인 중 오류 발생: {str(e)}",
+                "models": [],
+                "running_models": []
+            }
+
+    async def ensure_model_running(self) -> Dict[str, Any]:
+        """
+        현재 모델이 실행 중인지 확인하고 필요시 시작
+        
+        Returns:
+            Dict[str, Any]: 실행 결과
+                - success: bool - 성공 여부
+                - message: str - 결과 메시지
+                - model_started: bool - 모델이 새로 시작되었는지 여부
+        """
+        try:
+            # 연결 상태 확인
+            status = await self.check_ollama_connection()
+            if not status["connected"]:
+                return {
+                    "success": False,
+                    "message": status["error"],
+                    "model_started": False
+                }
+            
+            # 현재 모델이 실행 중인지 확인
+            if self.model in status["running_models"]:
+                return {
+                    "success": True,
+                    "message": f"모델 '{self.model}'이 이미 실행 중입니다.",
+                    "model_started": False
+                }
+            
+            # 모델 시작 시도
+            client = await self._get_http_client()
+            
+            # 간단한 ping 요청으로 모델 시작
+            ping_payload = {
+                "model": self.model,
+                "prompt": "ping",
+                "stream": False,
+                "options": {
+                    "num_predict": 1
+                }
+            }
+            
+            response = await client.post(
+                f"{self.ollama_url}/api/generate",
+                json=ping_payload,
+                timeout=60.0  # 모델 로딩을 위한 충분한 시간
+            )
+            response.raise_for_status()
+            
+            return {
+                "success": True,
+                "message": f"모델 '{self.model}'을 성공적으로 시작했습니다.",
+                "model_started": True
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"모델 '{self.model}' 시작 실패: {str(e)}",
+                "model_started": False
+            }
+
     @property
     def model_name(self) -> str:
         """모델 이름 반환 (호환성을 위한 프로퍼티)"""
@@ -180,6 +303,24 @@ class OllamaClient:
                 "keep_alive": -1,
                 "stream": True
             })
+
+        # 1. Ollama 연결 상태 및 모델 확인 (사전 검증)
+        connection_check = await self.check_ollama_connection()
+        if not connection_check["connected"]:
+            error_msg = f"❌ Ollama 연결 실패: {connection_check['error']}"
+            print(error_msg)
+            return f"[연결 오류] {connection_check['error']}"
+        
+        # 모델이 실행되지 않은 경우 자동 시작 시도
+        if not connection_check.get("current_model_running", False):
+            print(f"🔄 모델 '{self.model}'이 실행되지 않음. 자동 시작 시도 중...")
+            start_result = await self.ensure_model_running()
+            if not start_result["success"]:
+                error_msg = f"❌ 모델 시작 실패: {start_result['message']}"
+                print(error_msg)
+                return f"[모델 시작 오류] {start_result['message']}"
+            else:
+                print(f"✅ {start_result['message']}")
 
         # 디버깅 로그 추가 (디버그 모드일 때만)
         if self.debug_mode:
@@ -392,6 +533,26 @@ class OllamaClient:
             str: 생성된 텍스트 청크
         """
         print(f"🔄 질의 시작: {prompt[:50]}...")
+        
+        # 1. Ollama 연결 상태 및 모델 확인 (사전 검증)
+        connection_check = await self.check_ollama_connection()
+        if not connection_check["connected"]:
+            error_msg = f"❌ Ollama 연결 실패: {connection_check['error']}"
+            print(error_msg)
+            yield f"[연결 오류] {connection_check['error']}"
+            return
+        
+        # 모델이 실행되지 않은 경우 자동 시작 시도
+        if not connection_check.get("current_model_running", False):
+            print(f"🔄 모델 '{self.model}'이 실행되지 않음. 자동 시작 시도 중...")
+            start_result = await self.ensure_model_running()
+            if not start_result["success"]:
+                error_msg = f"❌ 모델 시작 실패: {start_result['message']}"
+                print(error_msg)
+                yield f"[모델 시작 오류] {start_result['message']}"
+                return
+            else:
+                print(f"✅ {start_result['message']}")
         
         temp = temperature if temperature is not None else self.temperature
         

@@ -289,6 +289,16 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
                 try {
                   const jsonData = JSON.parse(data);
                   const content = jsonData.content || jsonData.response || jsonData.text || data;
+                  
+                  // 오류 메시지 감지 및 처리
+                  if (content.includes('[연결 오류]') || content.includes('[모델 시작 오류]')) {
+                    console.error('Ollama 연결/모델 오류 감지:', content);
+                    setError(`Ollama 연결 문제가 발생했습니다: ${content}`);
+                    setIsStreaming(false);
+                    setIsConnecting(false);
+                    return;
+                  }
+                  
                   fullResponse += content;
                   responseChunks.push(content);
                   
@@ -302,6 +312,16 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
                 } catch {
                   // JSON이 아닌 일반 텍스트인 경우
                   const content = data;
+                  
+                  // 오류 메시지 감지 및 처리 (일반 텍스트)
+                  if (content.includes('[연결 오류]') || content.includes('[모델 시작 오류]')) {
+                    console.error('Ollama 연결/모델 오류 감지:', content);
+                    setError(`Ollama 연결 문제가 발생했습니다: ${content}`);
+                    setIsStreaming(false);
+                    setIsConnecting(false);
+                    return;
+                  }
+                  
                   fullResponse += content;
                   responseChunks.push(content);
                   setStreamingResponse(fullResponse);
@@ -310,6 +330,16 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
             } else if (line.trim() !== '') {
               // 'data:' 접두사가 없는 유효한 라인도 처리
               const content = line.trim();
+              
+              // 오류 메시지 감지 및 처리 (일반 라인)
+              if (content.includes('[연결 오류]') || content.includes('[모델 시작 오류]')) {
+                console.error('Ollama 연결/모델 오류 감지:', content);
+                setError(`Ollama 연결 문제가 발생했습니다: ${content}`);
+                setIsStreaming(false);
+                setIsConnecting(false);
+                return;
+              }
+              
               fullResponse += content;
               responseChunks.push(content);
               setStreamingResponse(fullResponse);
@@ -514,9 +544,39 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
     return true;
   };
 
-  // 로컬 스토리지에서 대화 복원
+  // 시스템 시작 시 기본 모델 자동 시작
+  const initializeSystem = async () => {
+    try {
+      console.log(' 시스템 초기화 중...');
+      
+      // 기본 모델 시작 API 호출
+      const response = await fetch(`${API_BASE_URL}/api/system/startup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          console.log(` 시스템 초기화 성공: ${result.message}`);
+          if (result.model) {
+            setCurrentModel(result.model);
+          }
+        } else {
+          console.warn('시스템 초기화 실패:', result.error);
+        }
+      }
+    } catch (error) {
+      console.warn('시스템 초기화 오류:', error);
+    }
+  };
+
+  // 로컬 스토리지에서 대화 복원 및 시스템 초기화
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // 시스템 초기화 (모델 시작)
+      initializeSystem();
+      
       try {
         const savedConversations = localStorage.getItem('gaia_gpt_conversations');
         if (savedConversations) {
@@ -634,7 +694,13 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
     setConversations,
     setCurrentConversation,
     toggleMode,
-    createConversation
+    createConversation,
+    
+    // 상태 설정 함수들 (Sidebar에서 필요)
+    setCurrentModel,
+    setCurrentMode,
+    setMcpEnabled,
+    setCurrentPromptType
   };
 
   return (

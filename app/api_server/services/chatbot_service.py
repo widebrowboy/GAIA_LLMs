@@ -179,12 +179,35 @@ class ChatbotService:
             chatbot = self.get_session(session_id)
         
         try:
+            # Ollama 연결 상태 확인
+            connection_status = await chatbot.client.check_ollama_connection()
+            if not connection_status["connected"]:
+                error_msg = f"[연결 오류] {connection_status['error']}"
+                logger.error(error_msg)
+                yield error_msg
+                return
+            
+            # 모델이 실행되지 않은 경우 자동 시작
+            if not connection_status.get("current_model_running", False):
+                logger.info(f"모델 '{chatbot.client.model}'이 실행되지 않음. 자동 시작 시도 중...")
+                start_result = await chatbot.client.ensure_model_running()
+                if not start_result["success"]:
+                    error_msg = f"[모델 시작 오류] {start_result['message']}"
+                    logger.error(error_msg)
+                    yield error_msg
+                    return
+                else:
+                    logger.info(f"✅ {start_result['message']}")
+            
             # 스트리밍 응답 생성
             async for chunk in chatbot.generate_streaming_response(message):
                 yield chunk
         except Exception as e:
             logger.error(f"스트리밍 응답 오류: {e}")
-            yield f"오류: {str(e)}"
+            if "connection" in str(e).lower() or "ollama" in str(e).lower():
+                yield f"[연결 오류] Ollama 서비스 연결 실패: {str(e)}"
+            else:
+                yield f"오류: {str(e)}"
     
     async def process_command(self, command: str, session_id: str) -> Dict[str, Any]:
         """명령어 처리"""

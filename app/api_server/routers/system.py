@@ -278,6 +278,57 @@ async def health_check(
         "debug": service.debug_mode
     }
 
+@router.post("/startup")
+async def system_startup(
+    service: ChatbotService = Depends(get_chatbot_service)
+) -> Dict[str, Any]:
+    """시스템 시작 시 기본 모델 자동 시작"""
+    try:
+        # 기본 세션이 없으면 생성
+        chatbot = service.get_session("default")
+        if not chatbot:
+            session_result = await service.create_session("default")
+            if "error" in session_result:
+                return {"success": False, "error": session_result["error"]}
+            chatbot = service.get_session("default")
+        
+        # Ollama 연결 상태 확인 및 모델 시작
+        if chatbot:
+            connection_status = await chatbot.client.check_ollama_connection()
+            if connection_status["connected"]:
+                if not connection_status.get("current_model_running", False):
+                    # 모델이 실행되지 않은 경우 자동 시작
+                    start_result = await chatbot.client.ensure_model_running()
+                    if start_result["success"]:
+                        return {
+                            "success": True,
+                            "message": f"기본 모델 '{service.current_model}' 시작 완료",
+                            "model": service.current_model,
+                            "model_started": start_result["model_started"]
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "error": start_result["message"]
+                        }
+                else:
+                    return {
+                        "success": True,
+                        "message": f"모델 '{service.current_model}' 이미 실행 중",
+                        "model": service.current_model,
+                        "model_started": False
+                    }
+            else:
+                return {
+                    "success": False,
+                    "error": connection_status["error"]
+                }
+        
+        return {"success": False, "error": "세션 생성 실패"}
+    
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @router.get("/startup-banner")
 async def get_startup_banner(
     service: ChatbotService = Depends(get_chatbot_service)

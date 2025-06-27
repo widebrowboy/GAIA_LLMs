@@ -69,4 +69,9 @@ export interface ChatContextType {
   // MobileHeader 컴포넌트에서 사용하는 함수들 (선택적)
   toggleMode?: () => Promise<boolean | undefined>;
   createConversation?: (name?: string) => Promise<Conversation>;
+  // Sidebar 컴포넌트에서 사용하는 상태 설정 함수들 (선택적)
+  setCurrentModel?: (model: string) => void;
+  setCurrentMode?: (mode: string) => void;
+  setMcpEnabled?: (enabled: boolean) => void;
+  setCurrentPromptType?: (promptType: string) => void;
 }

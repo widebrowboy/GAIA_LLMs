@@ -35,7 +35,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     changeModel,
     isModelChanging,
     isModeChanging,
-    isPromptChanging
+    isPromptChanging,
+    setCurrentModel,
+    setCurrentMode,
+    setMcpEnabled,
+    setCurrentPromptType
   } = useChatContext();
   
   const { isDesktop } = useResponsive();
@@ -68,7 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         const data = await response.json();
         
         // 현재 선택된 모델 업데이트
-        if (data.current_model) {
+        if (data.current_model && setCurrentModel) {
           setCurrentModel(data.current_model);
         }
         
@@ -116,7 +120,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         
         // 실행 상태도 업데이트
         setOllamaRunning(data.current_model_running || false);
-        if (data.current_model) {
+        if (data.current_model && setCurrentModel) {
           setCurrentModel(data.current_model);
         }
       } else {
