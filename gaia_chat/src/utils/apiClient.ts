@@ -31,19 +31,6 @@ export class ApiClient {
     return ApiClient.instance;
   }
 
-  private getFetch(): any {
-    // 다양한 환경에서 fetch API 확보 - 타입 체크 우회
-    if (typeof globalThis !== 'undefined' && globalThis.fetch) {
-      return globalThis.fetch.bind(globalThis);
-    }
-    if (typeof window !== 'undefined' && (window as any).fetch) {
-      return (window as any).fetch.bind(window);
-    }
-    if (typeof global !== 'undefined' && (global as any).fetch) {
-      return (global as any).fetch.bind(global);
-    }
-    throw new Error('Fetch API를 찾을 수 없습니다. 브라우저 환경이 아닙니다.');
-  }
 
   private async sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -63,9 +50,9 @@ export class ApiClient {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.warn(`⏰ API 요청 타임아웃 (30초): ${fullUrl}`);
+      console.warn(`⏰ API 요청 타임아웃 (10초): ${fullUrl}`);
       controller.abort();
-    }, 30000);
+    }, 10000); // 10초로 단축
 
     try {
       const fetchOptions: RequestInit = {
@@ -80,9 +67,8 @@ export class ApiClient {
 
       console.log(`📡 fetch 호출 중: ${fullUrl}`, fetchOptions);
       
-      // 안전한 fetch API 사용
-      const fetchFn = this.getFetch();
-      const response = await fetchFn(fullUrl, fetchOptions);
+      // @ts-ignore - fetch API 타입 오류 완전 우회
+      const response = await fetch(fullUrl, fetchOptions);
       
       console.log(`📥 응답 받음: ${fullUrl}`, {
         status: response.status,
@@ -151,28 +137,34 @@ export class ApiClient {
   }
 
   // 간단한 fallback fetch (타입 오류 우회)
-  async simpleFetch(endpoint: string): Promise<any> {
+  async simpleFetch(endpoint: string, method: string = 'GET'): Promise<any> {
     try {
       const url = getApiUrl(endpoint);
-      console.log(`🔧 SimpleFetch 사용: ${url}`);
+      console.log(`🔧 SimpleFetch 사용: ${method} ${url}`);
       
       // @ts-ignore - 타입 체크 우회
       const response = await fetch(url, {
-        method: 'GET',
+        method: method,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
-        }
+        },
+        // POST일 때만 body 추가 (필요한 경우)
+        ...(method === 'POST' ? { body: JSON.stringify({}) } : {})
       });
+      
+      console.log(`📋 SimpleFetch 응답: ${response.status} ${response.statusText}`);
       
       if (response.ok) {
         const data = await response.json();
         return { success: true, data };
       } else {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error(`❌ SimpleFetch HTTP 오류: ${response.status}`, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
     } catch (error) {
-      console.error('SimpleFetch 오류:', error);
+      console.error('💥 SimpleFetch 예외:', error);
       return { success: false, error: error instanceof Error ? error.message : '알 수 없는 오류' };
     }
   }
@@ -199,22 +191,21 @@ export class ApiClient {
   // 모델 시작
   async startModel(modelName: string) {
     const encodedName = encodeURIComponent(modelName);
-    return this.fetchWithRetry(`/api/system/models/${encodedName}/start`, {
-      method: 'POST',
-    });
+    console.log(`🚀 모델 시작 요청: ${modelName} -> ${encodedName}`);
+    return this.simpleFetch(`/api/system/models/${encodedName}/start`, 'POST');
   }
 
   // 모델 중지
   async stopModel(modelName: string) {
     const encodedName = encodeURIComponent(modelName);
-    return this.fetchWithRetry(`/api/system/models/${encodedName}/stop`, {
-      method: 'POST',
-    });
+    console.log(`🛑 모델 중지 요청: ${modelName} -> ${encodedName}`);
+    return this.simpleFetch(`/api/system/models/${encodedName}/stop`, 'POST');
   }
 
   // 시스템 상태 확인
   async checkHealth() {
-    return this.fetchWithRetry('/health');
+    console.log(`💊 Health 체크 요청`);
+    return this.simpleFetch('/health');
   }
 }
 
