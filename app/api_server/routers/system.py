@@ -12,6 +12,9 @@ from app.utils.config import OLLAMA_MODEL, DEBUG_MODE
 import httpx
 from app.utils.ollama_manager import ensure_single_model_running
 from app.utils.prompt_manager import get_prompt_manager
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -271,6 +274,11 @@ async def start_model(
     """특정 모델 시작"""
     try:
         import httpx
+        from urllib.parse import unquote
+        
+        # URL 디코딩 (FastAPI가 자동으로 하지만 명시적으로 처리)
+        decoded_model_name = unquote(model_name)
+        logger.info(f"모델 시작 요청: 원본={model_name}, 디코딩={decoded_model_name}")
         
         # Ollama API를 통해 모델 시작
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -278,7 +286,7 @@ async def start_model(
             response = await client.post(
                 "http://localhost:11434/api/generate",
                 json={
-                    "model": model_name,
+                    "model": decoded_model_name,  # 디코딩된 이름 사용
                     "prompt": "Hello",
                     "stream": False,
                     "keep_alive": "5m"  # 5분간 메모리에 유지
@@ -288,21 +296,22 @@ async def start_model(
             if response.status_code == 200:
                 # 현재 모델로 설정
                 if hasattr(service, 'update_current_model'):
-                    service.update_current_model(model_name)
+                    service.update_current_model(decoded_model_name)
                 
                 return {
                     "success": True,
-                    "message": f"모델 '{model_name}' 시작 완료",
-                    "model": model_name
+                    "message": f"모델 '{decoded_model_name}' 시작 완료",
+                    "model": decoded_model_name
                 }
             else:
                 return {
                     "success": False,
                     "error": f"모델 시작 실패: HTTP {response.status_code}",
-                    "model": model_name
+                    "model": decoded_model_name
                 }
                 
     except Exception as e:
+        logger.error(f"모델 시작 중 오류: {str(e)}", exc_info=True)
         return {
             "success": False,
             "error": f"모델 시작 중 오류: {str(e)}",

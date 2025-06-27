@@ -7,6 +7,7 @@ import { useChatContext } from '@/contexts/SimpleChatContext';
 import { formatDate } from '../utils/helpers';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getApiUrl } from '@/config/api';
+import { apiClient } from '@/utils/apiClient';
 
 
 interface SidebarProps {
@@ -51,15 +52,16 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [showModelDialog, setShowModelDialog] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [serverConnected] = useState(true);
+  const [serverConnected, setServerConnected] = useState(true);
   const [ollamaRunning, setOllamaRunning] = useState(false);
   const [detailedModels, setDetailedModels] = useState<any[]>([]);
   const [runningModels, setRunningModels] = useState<any[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // 실제 Ollama 모델 상태 확인 - 새로운 API 사용
   const checkSystemStatus = useCallback(async () => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);  // 타임아웃을 10초로 증가
     
     try {
       // GAIA-BT API 서버를 통해 정확한 모델 상태 확인
@@ -100,29 +102,45 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   const fetchAvailableModels = useCallback(async () => {
     setIsLoadingModels(true);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);  // 타임아웃을 10초로 증가
     
     try {
-      const response = await fetch(getApiUrl('/api/system/models/detailed'), {
+      const apiUrl = getApiUrl('/api/system/models/detailed');
+      console.log('📡 API 호출 URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal
       });
       
+      console.log('📡 응답 상태:', response.status);
+      
       if (response.ok) {
-        const data = await response.json();
-        // 설치된 모델 목록만 추출
-        const modelNames = data.available?.map((model: any) => model.name) || [];
-        setAvailableModels(modelNames);
+        const text = await response.text();
+        console.log('📄 원본 응답:', text);
         
-        // 상세 모델 정보 저장
-        setDetailedModels(data.available || []);
-        setRunningModels(data.running || []);
-        
-        // 실행 상태도 업데이트
-        setOllamaRunning(data.current_model_running || false);
-        if (data.current_model && setCurrentModel) {
-          setCurrentModel(data.current_model);
+        try {
+          const data = JSON.parse(text);
+          console.log('🎯 모델 상세 정보 수신:', data);
+          
+          // 설치된 모델 목록만 추출
+          const modelNames = data.available?.map((model: any) => model.name) || [];
+          console.log('📋 추출된 모델 이름들:', modelNames);
+          setAvailableModels(modelNames);
+          
+          // 상세 모델 정보 저장
+          setDetailedModels(data.available || []);
+          setRunningModels(data.running || []);
+          
+          // 실행 상태도 업데이트
+          setOllamaRunning(data.current_model_running || false);
+          if (data.current_model && setCurrentModel) {
+            setCurrentModel(data.current_model);
+          }
+        } catch (parseError) {
+          console.error('❌ JSON 파싱 오류:', parseError);
+          console.error('❌ 원본 텍스트:', text);
         }
       } else {
         const fallbackModels = [
@@ -134,7 +152,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         setAvailableModels(fallbackModels);
       }
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') return;
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('⏱️ 모델 정보 가져오기 타임아웃');
+        return;
+      }
+      console.error('❌ 모델 정보 가져오기 실패:', error);
       const fallbackModels = [
         'gemma3-12b:latest',
         'txgemma-chat:latest',
@@ -189,51 +211,90 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     let mounted = true;
     
     const doInitialLoad = async () => {
-      if (mounted) {
-        await checkSystemStatus();
-        await fetchAvailableModels();
+      if (mounted && !isInitialized) {
+        console.log('🚀 Sidebar 초기 로드 시작');
+        try {
+          // API 서버 연결 확인
+          const testResponse = await fetch(getApiUrl('/health'));
+          if (!testResponse.ok) {
+            console.error('❌ API 서버 연결 실패');
+            setServerConnected(false);
+            return;
+          }
+          
+          await checkSystemStatus();
+          await fetchAvailableModels();
+          
+          setIsInitialized(true);
+          console.log('✅ Sidebar 초기 로드 완료');
+          console.log('📊 현재 상태:', {
+            availableModels: availableModels.length,
+            detailedModels: detailedModels.length,
+            runningModels: runningModels.length
+          });
+        } catch (error) {
+          console.error('❌ 초기 로드 중 오류:', error);
+          setServerConnected(false);
+        }
       }
     };
     
-    doInitialLoad();
+    // 약간의 지연을 두고 실행
+    const timer = setTimeout(doInitialLoad, 500);
     
-    // 시스템 상태 업데이트 이벤트 리스너 추가
+    return () => {
+      clearTimeout(timer);
+      mounted = false;
+    };
+  }, [isInitialized]); // 의존성 배열 간소화
+
+  // 시스템 상태 업데이트 이벤트 리스너
+  useEffect(() => {
     const handleSystemStatusUpdate = (event: CustomEvent) => {
-      if (mounted) {
-        const data = event.detail;
-        console.log('📡 Sidebar에서 시스템 상태 업데이트 수신:', data);
-        
-        // 상태 업데이트
-        if (data.available) {
-          const modelNames = data.available.map((model: any) => model.name) || [];
-          setAvailableModels(modelNames);
-          setDetailedModels(data.available);
-        }
-        
-        if (data.running) {
-          setRunningModels(data.running);
-        }
-        
-        if (data.current_model && setCurrentModel) {
-          setCurrentModel(data.current_model);
-        }
-        
-        setOllamaRunning(data.current_model_running || false);
+      const data = event.detail;
+      console.log('📡 Sidebar에서 시스템 상태 업데이트 수신:', data);
+      
+      // 상태 업데이트
+      if (data.available) {
+        const modelNames = data.available.map((model: any) => model.name) || [];
+        setAvailableModels(modelNames);
+        setDetailedModels(data.available);
       }
+      
+      if (data.running) {
+        setRunningModels(data.running);
+      }
+      
+      if (data.current_model && setCurrentModel) {
+        setCurrentModel(data.current_model);
+      }
+      
+      setOllamaRunning(data.current_model_running || false);
     };
     
     window.addEventListener('systemStatusUpdate', handleSystemStatusUpdate as EventListener);
     
     return () => {
-      mounted = false;
       window.removeEventListener('systemStatusUpdate', handleSystemStatusUpdate as EventListener);
     };
-  }, [checkSystemStatus, fetchAvailableModels, setCurrentModel]);
+  }, [setCurrentModel]);
 
   // 모델 다이얼로그 열릴 때 모델 목록 새로고침
   useEffect(() => {
     if (showModelDialog) {
-      fetchAvailableModels();
+      console.log('📋 모델 다이얼로그 열림 - 모델 목록 새로고침');
+      // 기존 상태 초기화 후 새로고침
+      setIsLoadingModels(true);
+      setAvailableModels([]);
+      setDetailedModels([]);
+      setRunningModels([]);
+      
+      // 약간의 지연 후 실행
+      const timer = setTimeout(() => {
+        fetchAvailableModels();
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
   }, [showModelDialog, fetchAvailableModels]);
 
@@ -405,14 +466,21 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           </button>
           <button
             onClick={async () => {
+              console.log('🔄 새로고침 버튼 클릭');
               if (typeof refreshSystemStatus === 'function') {
                 try {
+                  console.log('🔄 refreshSystemStatus 호출');
                   await refreshSystemStatus();
+                  console.log('🔄 checkSystemStatus 호출');
                   await checkSystemStatus();
+                  console.log('🔄 fetchAvailableModels 호출');
                   await fetchAvailableModels();
+                  console.log('✅ 새로고침 완료');
                 } catch (error) {
-                  console.warn('시스템 상태 새로고침 오류:', error);
+                  console.error('❌ 시스템 상태 새로고침 오류:', error);
                 }
+              } else {
+                console.warn('⚠️ refreshSystemStatus 함수를 찾을 수 없습니다');
               }
             }}
             className="ml-2 p-2 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-100 rounded-lg transition-colors"
@@ -646,7 +714,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           <div className="flex items-center justify-center space-x-2 mb-1">
             <span className="text-sm">🧬</span>
             <p className="text-xs font-bold bg-gradient-to-r from-emerald-700 to-blue-700 bg-clip-text text-transparent">
-              GAIA-BT v3.6
+              GAIA-BT v3.7
             </p>
           </div>
           <p className="text-xs text-emerald-600 font-medium">
@@ -671,8 +739,23 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             
             <div className="space-y-2 mb-4">
               <p className="text-sm text-gray-600">사용할 AI 모델을 선택하세요:</p>
-              <div className="text-xs text-gray-500 mb-2">
-                사용 가능한 모델: {availableModels.length}개 {isLoadingModels && '(로딩 중...)'}
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                <span>사용 가능한 모델: {availableModels.length}개 {isLoadingModels && '(로딩 중...)'}</span>
+                <button 
+                  onClick={async () => {
+                    console.log('🔄 모델 목록 수동 새로고침');
+                    setIsLoadingModels(true);
+                    try {
+                      await fetchAvailableModels();
+                    } catch (error) {
+                      console.error('❌ 모델 목록 가져오기 실패:', error);
+                    }
+                  }}
+                  className="text-blue-500 hover:text-blue-700 transition-colors"
+                  disabled={isLoadingModels}
+                >
+                  <RefreshCw className={`w-3 h-3 ${isLoadingModels ? 'animate-spin' : ''}`} />
+                </button>
               </div>
               {isLoadingModels ? (
                 <div className="text-center text-gray-500 py-4">
@@ -712,9 +795,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                               e.stopPropagation();
                               try {
                                 const action = isRunning ? 'stop' : 'start';
-                                const response = await fetch(getApiUrl(`/api/system/models/${model.name}/${action}`), {
+                                const encodedModelName = encodeURIComponent(model.name);
+                                const response = await fetch(getApiUrl(`/api/system/models/${encodedModelName}/${action}`), {
                                   method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' }
+                                  headers: { 'Content-Type': 'application/json' },
+                                  signal: AbortSignal.timeout(30000)  // 30초 타임아웃
                                 });
                                 
                                 if (response.ok) {
