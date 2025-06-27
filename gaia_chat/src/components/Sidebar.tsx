@@ -58,105 +58,44 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   const [runningModels, setRunningModels] = useState<any[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // 실제 Ollama 모델 상태 확인 - 새로운 API 사용
-  const checkSystemStatus = useCallback(async () => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);  // 타임아웃을 10초로 증가
-    
-    try {
-      // GAIA-BT API 서버를 통해 정확한 모델 상태 확인
-      const response = await fetch(getApiUrl('/api/system/models/detailed'), {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        // 현재 선택된 모델 업데이트
-        if (data.current_model && setCurrentModel) {
-          setCurrentModel(data.current_model);
-        }
-        
-        // 실행 상태 업데이트
-        setOllamaRunning(data.current_model_running || false);
-        
-        return true;
-      } else {
-        setOllamaRunning(false);
-      }
-      
-      return true;
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') return true;
-      console.warn('모델 상태 확인 실패:', error);
-      setOllamaRunning(false);
-      return true;
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }, []);
-
-  // 사용 가능한 모델 목록 가져오기 - 상세 정보 포함
-  const fetchAvailableModels = useCallback(async () => {
+  // API 클라이언트를 사용한 모델 정보 가져오기
+  const fetchModelsWithApiClient = useCallback(async () => {
     setIsLoadingModels(true);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);  // 타임아웃을 10초로 증가
     
     try {
-      const apiUrl = getApiUrl('/api/system/models/detailed');
-      console.log('📡 API 호출 URL:', apiUrl);
+      console.log('📡 API 클라이언트로 모델 정보 요청');
+      const result = await apiClient.getModelsDetailed();
       
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal
-      });
-      
-      console.log('📡 응답 상태:', response.status);
-      
-      if (response.ok) {
-        const text = await response.text();
-        console.log('📄 원본 응답:', text);
+      if (result.success && result.data) {
+        console.log('🎯 모델 상세 정보 수신:', result.data);
         
-        try {
-          const data = JSON.parse(text);
-          console.log('🎯 모델 상세 정보 수신:', data);
-          
-          // 설치된 모델 목록만 추출
-          const modelNames = data.available?.map((model: any) => model.name) || [];
-          console.log('📋 추출된 모델 이름들:', modelNames);
-          setAvailableModels(modelNames);
-          
-          // 상세 모델 정보 저장
-          setDetailedModels(data.available || []);
-          setRunningModels(data.running || []);
-          
-          // 실행 상태도 업데이트
-          setOllamaRunning(data.current_model_running || false);
-          if (data.current_model && setCurrentModel) {
-            setCurrentModel(data.current_model);
-          }
-        } catch (parseError) {
-          console.error('❌ JSON 파싱 오류:', parseError);
-          console.error('❌ 원본 텍스트:', text);
+        // 설치된 모델 목록만 추출
+        const modelNames = result.data.available?.map((model: any) => model.name) || [];
+        console.log('📋 추출된 모델 이름들:', modelNames);
+        setAvailableModels(modelNames);
+        
+        // 상세 모델 정보 저장
+        setDetailedModels(result.data.available || []);
+        setRunningModels(result.data.running || []);
+        
+        // 실행 상태도 업데이트
+        setOllamaRunning(result.data.current_model_running || false);
+        if (result.data.current_model && setCurrentModel) {
+          setCurrentModel(result.data.current_model);
         }
       } else {
+        console.error('❌ 모델 정보 가져오기 실패:', result.error);
+        // 에러 시 폴백 모델 목록 사용
         const fallbackModels = [
           'gemma3-12b:latest',
-          'txgemma-chat:latest', 
+          'txgemma-chat:latest',
           'txgemma-predict:latest',
           'Gemma3:27b-it-q4_K_M'
         ];
         setAvailableModels(fallbackModels);
       }
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log('⏱️ 모델 정보 가져오기 타임아웃');
-        return;
-      }
-      console.error('❌ 모델 정보 가져오기 실패:', error);
+      console.error('❌ 모델 정보 가져오기 예외:', error);
       const fallbackModels = [
         'gemma3-12b:latest',
         'txgemma-chat:latest',
@@ -165,14 +104,47 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       ];
       setAvailableModels(fallbackModels);
     } finally {
-      clearTimeout(timeoutId);
       setIsLoadingModels(false);
     }
-  }, []);
+  }, [setCurrentModel]);
+
+  // 실제 Ollama 모델 상태 확인 - API 클라이언트 사용
+  const checkSystemStatus = useCallback(async () => {
+    try {
+      console.log('🔍 시스템 상태 확인 중...');
+      const result = await apiClient.getModelsDetailed();
+      
+      if (result.success && result.data) {
+        console.log('✅ 시스템 상태 확인 성공:', result.data);
+        
+        // 현재 선택된 모델 업데이트
+        if (result.data.current_model && setCurrentModel) {
+          setCurrentModel(result.data.current_model);
+        }
+        
+        // 실행 상태 업데이트
+        setOllamaRunning(result.data.current_model_running || false);
+        
+        return true;
+      } else {
+        console.error('❌ 시스템 상태 확인 실패:', result.error);
+        setOllamaRunning(false);
+      }
+      
+      return true;
+    } catch (error) {
+      console.warn('모델 상태 확인 실패:', error);
+      setOllamaRunning(false);
+      return true;
+    }
+  }, [setCurrentModel]);
+
+  // fetchAvailableModels를 fetchModelsWithApiClient로 대체
+  const fetchAvailableModels = fetchModelsWithApiClient;
 
   const handleOpenModelDialog = async () => {
     setShowModelDialog(true);
-    await fetchAvailableModels();
+    await fetchModelsWithApiClient();
   };
 
   const handleModelChange = async (modelName: string) => {
@@ -215,15 +187,15 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         console.log('🚀 Sidebar 초기 로드 시작');
         try {
           // API 서버 연결 확인
-          const testResponse = await fetch(getApiUrl('/health'));
-          if (!testResponse.ok) {
-            console.error('❌ API 서버 연결 실패');
+          const healthResult = await apiClient.checkHealth();
+          if (!healthResult.success) {
+            console.error('❌ API 서버 연결 실패:', healthResult.error);
             setServerConnected(false);
             return;
           }
           
           await checkSystemStatus();
-          await fetchAvailableModels();
+          await fetchModelsWithApiClient();
           
           setIsInitialized(true);
           console.log('✅ Sidebar 초기 로드 완료');
@@ -473,8 +445,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                   await refreshSystemStatus();
                   console.log('🔄 checkSystemStatus 호출');
                   await checkSystemStatus();
-                  console.log('🔄 fetchAvailableModels 호출');
-                  await fetchAvailableModels();
+                  console.log('🔄 fetchModelsWithApiClient 호출');
+                  await fetchModelsWithApiClient();
                   console.log('✅ 새로고침 완료');
                 } catch (error) {
                   console.error('❌ 시스템 상태 새로고침 오류:', error);
@@ -744,9 +716,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                 <button 
                   onClick={async () => {
                     console.log('🔄 모델 목록 수동 새로고침');
-                    setIsLoadingModels(true);
                     try {
-                      await fetchAvailableModels();
+                      await fetchModelsWithApiClient();
                     } catch (error) {
                       console.error('❌ 모델 목록 가져오기 실패:', error);
                     }
@@ -795,28 +766,28 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                               e.stopPropagation();
                               try {
                                 const action = isRunning ? 'stop' : 'start';
-                                const encodedModelName = encodeURIComponent(model.name);
-                                const response = await fetch(getApiUrl(`/api/system/models/${encodedModelName}/${action}`), {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  signal: AbortSignal.timeout(30000)  // 30초 타임아웃
-                                });
+                                console.log(`🎯 모델 ${action} 요청: ${model.name}`);
                                 
-                                if (response.ok) {
-                                  const result = await response.json();
-                                  console.log(`모델 ${action} 결과:`, result);
+                                const result = isRunning 
+                                  ? await apiClient.stopModel(model.name)
+                                  : await apiClient.startModel(model.name);
+                                
+                                if (result.success) {
+                                  console.log(`✅ 모델 ${action} 성공:`, result.data);
                                   
                                   // 상태 새로고침
                                   if (typeof refreshSystemStatus === 'function') {
                                     await refreshSystemStatus();
                                   }
                                   await checkSystemStatus();
-                                  await fetchAvailableModels();
+                                  await fetchModelsWithApiClient();
                                 } else {
-                                  console.error(`모델 ${action} 실패:`, response.status);
+                                  console.error(`❌ 모델 ${action} 실패:`, result.error);
+                                  alert(`모델 ${action === 'start' ? '시작' : '중지'}에 실패했습니다: ${result.error}`);
                                 }
                               } catch (error) {
-                                console.error(`모델 ${action} 오류:`, error);
+                                console.error(`❌ 모델 ${action} 오류:`, error);
+                                alert(`모델 제어 중 오류가 발생했습니다: ${error}`);
                               }
                             }}
                             className={`text-xs px-2 py-1 rounded-md transition-colors ${
@@ -854,7 +825,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                 취소
               </button>
               <button
-                onClick={fetchAvailableModels}
+                onClick={fetchModelsWithApiClient}
                 disabled={isModelChanging}
                 className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
