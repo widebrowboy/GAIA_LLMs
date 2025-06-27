@@ -58,13 +58,56 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   const [runningModels, setRunningModels] = useState<any[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // 디버그용 직접 fetch 테스트
+  const testDirectFetch = useCallback(async () => {
+    console.log('🧪 직접 fetch 테스트 시작');
+    try {
+      const url = getApiUrl('/api/system/models/detailed');
+      console.log('🌐 테스트 URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+      
+      console.log('📥 직접 fetch 응답:', {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ 직접 fetch 성공 데이터:', data);
+        return data;
+      } else {
+        console.error('❌ 직접 fetch HTTP 오류:', response.status);
+      }
+    } catch (error) {
+      console.error('💥 직접 fetch 예외:', error);
+    }
+    return null;
+  }, []);
+
   // API 클라이언트를 사용한 모델 정보 가져오기
   const fetchModelsWithApiClient = useCallback(async () => {
     setIsLoadingModels(true);
     
     try {
       console.log('📡 API 클라이언트로 모델 정보 요청');
+      
+      // 먼저 직접 fetch로 테스트
+      const directResult = await testDirectFetch();
+      
       const result = await apiClient.getModelsDetailed();
+      
+      console.log('🔍 결과 비교:', {
+        directFetch: directResult,
+        apiClient: result
+      });
       
       if (result.success && result.data) {
         console.log('🎯 모델 상세 정보 수신:', result.data);
@@ -85,14 +128,28 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         }
       } else {
         console.error('❌ 모델 정보 가져오기 실패:', result.error);
-        // 에러 시 폴백 모델 목록 사용
-        const fallbackModels = [
-          'gemma3-12b:latest',
-          'txgemma-chat:latest',
-          'txgemma-predict:latest',
-          'Gemma3:27b-it-q4_K_M'
-        ];
-        setAvailableModels(fallbackModels);
+        
+        // 직접 fetch 결과가 있으면 사용
+        if (directResult && directResult.available) {
+          console.log('🔄 직접 fetch 결과로 폴백');
+          const modelNames = directResult.available.map((model: any) => model.name) || [];
+          setAvailableModels(modelNames);
+          setDetailedModels(directResult.available || []);
+          setRunningModels(directResult.running || []);
+          setOllamaRunning(directResult.current_model_running || false);
+          if (directResult.current_model && setCurrentModel) {
+            setCurrentModel(directResult.current_model);
+          }
+        } else {
+          // 최후 폴백
+          const fallbackModels = [
+            'gemma3-12b:latest',
+            'txgemma-chat:latest',
+            'txgemma-predict:latest',
+            'Gemma3:27b-it-q4_K_M'
+          ];
+          setAvailableModels(fallbackModels);
+        }
       }
     } catch (error) {
       console.error('❌ 모델 정보 가져오기 예외:', error);
@@ -106,7 +163,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     } finally {
       setIsLoadingModels(false);
     }
-  }, [setCurrentModel]);
+  }, [setCurrentModel, testDirectFetch]);
 
   // 실제 Ollama 모델 상태 확인 - API 클라이언트 사용
   const checkSystemStatus = useCallback(async () => {
@@ -515,11 +572,32 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             </div>
             <div className="flex justify-between">
               <span>사용 가능한 모델:</span>
-              <span className={`font-medium ${
-                availableModels.length > 0 ? 'text-green-600' : 'text-gray-600'
-              }`}>
-                {availableModels.length}개
-              </span>
+              <div className="flex items-center space-x-2">
+                <span className={`font-medium ${
+                  availableModels.length > 0 ? 'text-green-600' : 'text-gray-600'
+                }`}>
+                  {availableModels.length}개
+                </span>
+                <button
+                  onClick={async () => {
+                    console.log('🔍 수동 모델 테스트 버튼 클릭');
+                    try {
+                      await fetchModelsWithApiClient();
+                      console.log('🎯 현재 상태:', {
+                        availableModels: availableModels.length,
+                        detailedModels: detailedModels.length,
+                        runningModels: runningModels.length
+                      });
+                    } catch (error) {
+                      console.error('❌ 수동 테스트 실패:', error);
+                    }
+                  }}
+                  className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded hover:bg-blue-200 transition-colors"
+                  title="모델 정보 수동 테스트"
+                >
+                  TEST
+                </button>
+              </div>
             </div>
             <div className="flex justify-between">
               <span>실행 중인 모델:</span>
