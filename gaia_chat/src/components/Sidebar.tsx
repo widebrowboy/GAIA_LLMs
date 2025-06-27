@@ -261,24 +261,60 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             href: window.location.href
           });
           
+          // 즉시 간단한 연결 테스트
+          console.log('🧪 간단한 연결 테스트 시작...');
+          try {
+            const testUrl = 'http://localhost:8000/health';
+            console.log('🌐 테스트 URL:', testUrl);
+            const testResponse = await fetch(testUrl);
+            console.log('✅ 간단 테스트 결과:', {
+              status: testResponse.status,
+              ok: testResponse.ok
+            });
+          } catch (testError) {
+            console.error('❌ 간단 테스트 실패:', testError);
+          }
+          
           // 서버 연결 상태 설정
           setServerConnected(true);
           
-          // 직접 API 호출로 모델 정보 가져오기 (CORS 우회)
-          console.log('📡 초기 모델 정보 로드 시도');
+          // 먼저 폴백 데이터로 즉시 UI 업데이트 (사용자 경험 개선)
+          console.log('🔄 즉시 폴백 데이터로 UI 업데이트');
+          const immediateModels = [
+            'gemma3-12b:latest',
+            'txgemma-chat:latest', 
+            'txgemma-predict:latest',
+            'Gemma3:27b-it-q4_K_M'
+          ];
+          setAvailableModels(immediateModels);
+          setDetailedModels(immediateModels.map(name => ({ name, parameter_size: '12B' })));
+          
+          // 백그라운드에서 실제 API 호출 시도
+          console.log('📡 백그라운드 API 호출로 실제 데이터 가져오기 시도');
           try {
             const url = getApiUrl('/api/system/models/detailed');
             console.log('🌐 초기 API URL:', url);
             
             console.log('📡 fetch 호출 시작...');
+            
+            // AbortController로 타임아웃 설정
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+              console.warn('⏰ fetch 타임아웃 (5초)');
+              controller.abort();
+            }, 5000);
+            
             const response = await fetch(url, {
               method: 'GET',
               headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
               },
-              cache: 'no-cache'
+              cache: 'no-cache',
+              signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
             
             console.log('📥 fetch 응답 수신:', {
               status: response.status,
@@ -301,8 +337,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               
               if (data.available && data.available.length > 0) {
                 const modelNames = data.available.map((m: any) => m.name);
-                console.log('🎯 모델 이름 추출:', modelNames);
+                console.log('🎯 실제 API에서 모델 이름 추출:', modelNames);
                 
+                // 실제 API 데이터로 업데이트 (폴백 데이터 덮어쓰기)
                 setAvailableModels(modelNames);
                 setDetailedModels(data.available);
                 setRunningModels(data.running || []);
@@ -312,40 +349,26 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                   setCurrentModel(data.current_model);
                 }
                 
-                console.log('🎯 초기 로드 완료 - 모델 수:', modelNames.length);
+                console.log('✅ 실제 API 데이터로 업데이트 완료 - 모델 수:', modelNames.length);
               } else {
-                console.warn('⚠️ 사용 가능한 모델이 없음');
+                console.warn('⚠️ API 응답에 사용 가능한 모델이 없음 - 폴백 데이터 유지');
               }
             } else {
-              console.warn('⚠️ 초기 API 응답 오류:', response.status);
+              console.warn('⚠️ API 응답 오류:', response.status, '- 폴백 데이터 유지');
               const errorText = await response.text().catch(() => 'Unknown error');
               console.error('❌ 오류 내용:', errorText);
-              
-              // 폴백으로 테스트 데이터 사용
-              console.log('🔄 폴백 데이터 사용');
-              const fallbackModels = [
-                'gemma3-12b:latest',
-                'txgemma-chat:latest',
-                'txgemma-predict:latest',
-                'Gemma3:27b-it-q4_K_M'
-              ];
-              setAvailableModels(fallbackModels);
-              setDetailedModels(fallbackModels.map(name => ({ name, parameter_size: '12B' })));
             }
           } catch (fetchError) {
-            console.error('❌ 초기 fetch 실패:', fetchError);
-            console.error('💥 에러 스택:', fetchError instanceof Error ? fetchError.stack : 'No stack');
+            console.error('❌ API 호출 실패:', fetchError);
+            console.error('💥 에러 타입:', fetchError instanceof Error ? fetchError.name : 'Unknown');
+            console.error('💥 에러 메시지:', fetchError instanceof Error ? fetchError.message : fetchError);
             
-            // 폴백으로 테스트 데이터 사용
-            console.log('🔄 폴백 데이터 사용 (catch)');
-            const fallbackModels = [
-              'gemma3-12b:latest',
-              'txgemma-chat:latest',
-              'txgemma-predict:latest',
-              'Gemma3:27b-it-q4_K_M'
-            ];
-            setAvailableModels(fallbackModels);
-            setDetailedModels(fallbackModels.map(name => ({ name, parameter_size: '12B' })));
+            // AbortError (타임아웃) 감지
+            if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+              console.warn('⏰ 타임아웃으로 인한 요청 취소 - 폴백 데이터 유지');
+            } else {
+              console.warn('🔄 네트워크 오류 - 폴백 데이터 유지');
+            }
           }
           
           setIsInitialized(true);
