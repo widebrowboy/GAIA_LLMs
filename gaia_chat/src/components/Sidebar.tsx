@@ -619,10 +619,19 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                         'Gemma3:27b-it-q4_K_M'
                       ];
                       console.log('📝 테스트 모델들:', testModels);
-                      setAvailableModels(testModels);
-                      setDetailedModels(testModels.map(name => ({ name, parameter_size: '12B' })));
+                      
+                      // 강제 리렌더링을 위해 빈 배열로 먼저 설정
+                      setAvailableModels([]);
+                      setDetailedModels([]);
                       setRunningModels([]);
-                      console.log('✅ 강제 업데이트 완료');
+                      
+                      // 약간의 지연 후 실제 데이터 설정
+                      setTimeout(() => {
+                        setAvailableModels(testModels);
+                        setDetailedModels(testModels.map(name => ({ name, parameter_size: '12B' })));
+                        setRunningModels([]);
+                        console.log('✅ 강제 업데이트 완료 - 현재 모델 수:', testModels.length);
+                      }, 100);
                     }}
                     className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded hover:bg-yellow-200 transition-colors"
                     title="강제 상태 업데이트 (테스트)"
@@ -705,8 +714,18 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                     onClick={() => {
                       console.log('🔍 XMLHttpRequest 테스트');
                       const xhr = new XMLHttpRequest();
-                      xhr.open('GET', 'http://localhost:8000/api/system/models/detailed', true);
-                      xhr.setRequestHeader('Content-Type', 'application/json');
+                      
+                      // 타임아웃 설정
+                      xhr.timeout = 5000; // 5초
+                      
+                      xhr.onload = function() {
+                        console.log('📥 XHR 로드 완료:', {
+                          status: xhr.status,
+                          statusText: xhr.statusText,
+                          responseText: xhr.responseText.substring(0, 200)
+                        });
+                      };
+                      
                       xhr.onreadystatechange = function() {
                         console.log('📊 XHR 상태 변경:', {
                           readyState: xhr.readyState,
@@ -721,9 +740,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                               if (data.available && data.available.length > 0) {
                                 console.log('🔄 XHR 데이터로 상태 업데이트');
                                 const modelNames = data.available.map((m: any) => m.name);
-                                setAvailableModels(modelNames);
-                                setDetailedModels(data.available);
-                                setRunningModels(data.running || []);
+                                // 강제 리렌더링
+                                setAvailableModels([]);
+                                setTimeout(() => {
+                                  setAvailableModels(modelNames);
+                                  setDetailedModels(data.available);
+                                  setRunningModels(data.running || []);
+                                  console.log('✅ XHR 상태 업데이트 완료');
+                                }, 50);
                               }
                             } catch (error) {
                               console.error('❌ XHR JSON 파싱 오류:', error);
@@ -733,10 +757,23 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                           }
                         }
                       };
+                      
                       xhr.onerror = function() {
                         console.error('💥 XHR 네트워크 오류');
                       };
-                      xhr.send();
+                      
+                      xhr.ontimeout = function() {
+                        console.error('⏰ XHR 타임아웃 (5초)');
+                      };
+                      
+                      try {
+                        xhr.open('GET', 'http://localhost:8000/api/system/models/detailed', true);
+                        xhr.setRequestHeader('Accept', 'application/json');
+                        console.log('🚀 XHR 요청 전송 중...');
+                        xhr.send();
+                      } catch (error) {
+                        console.error('💥 XHR 전송 오류:', error);
+                      }
                     }}
                     className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 transition-colors"
                     title="XMLHttpRequest 테스트"
