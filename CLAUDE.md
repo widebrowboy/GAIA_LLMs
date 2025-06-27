@@ -1,4 +1,4 @@
-# GAIA-BT v2.9 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.0 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
@@ -136,6 +136,14 @@ python run_api_server.py
 
 ## 🔍 문제 해결
 
+### ⚠️ 테스트 전 필수 절차 (중요!)
+```bash
+# WebUI나 API 서버 테스트 시작 전 반드시 수행
+./scripts/server_manager.sh restart-all    # 모든 서버 재시작
+./scripts/server_manager.sh status         # 상태 확인
+curl -s http://localhost:8000/health        # API 서버 헬스체크
+```
+
 ### 포트 충돌 해결
 ```bash
 ./scripts/server_manager.sh clean-ports    # 포트 강제 정리
@@ -270,7 +278,8 @@ git reset --hard [커밋해시]
 - **v2.7**: 바이오/화학 전문 서비스 디자인 적용 및 아이콘/이모지 통합
 - **v2.8**: 대화 페이지 완전 바이오 테마 적용 및 일관성 있는 디자인 완성
 - **v2.9**: Ollama API 응답 완전성 보장 및 보고서 스타일 마크다운 렌더링 구현
+- **v3.0**: 테스트 전 API 서버 재시작 필수 절차 지침 추가
 
 ---
 
-**GAIA-BT v2.9** - 신약개발 연구의 새로운 패러다임 🧬✨
+**GAIA-BT v3.0** - 신약개발 연구의 새로운 패러다임 🧬✨
