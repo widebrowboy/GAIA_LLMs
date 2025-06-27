@@ -329,6 +329,27 @@ async def system_startup(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@router.get("/startup-validation")
+async def get_startup_validation() -> Dict[str, Any]:
+    """API 서버 시작 시 Ollama 검증 결과 조회"""
+    from fastapi import Request
+    from app.api_server.main import app
+    
+    # 애플리케이션 상태에서 검증 결과 가져오기
+    validation_result = getattr(app.state, 'ollama_validation', None)
+    
+    if validation_result:
+        return {
+            "status": "success",
+            "validation_result": validation_result,
+            "message": "시작 시 Ollama 검증 정보 조회 성공"
+        }
+    else:
+        return {
+            "status": "not_available",
+            "message": "시작 시 검증 정보를 찾을 수 없습니다"
+        }
+
 @router.get("/startup-banner")
 async def get_startup_banner(
     service: ChatbotService = Depends(get_chatbot_service)

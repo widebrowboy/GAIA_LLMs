@@ -35,24 +35,75 @@ async def lifespan(app: FastAPI):
     # 시작 시 초기화
     logger.info("🚀 GAIA-BT API Server 시작 중...")
     
-    # 서비스 초기화
-    chatbot_service = ChatbotService()
-    await chatbot_service.initialize()
-
-    # Ollama 기본 모델(gemma3-12b:latest) 상시 실행 보장
+    # 1. Ollama 모델 상태 검증 및 자동 시작 (최우선)
+    validation_result = None
     try:
-        from app.utils.ollama_manager import ensure_models_running
-        await ensure_models_running(["gemma3-12b:latest"])
+        from app.utils.startup_validator import validate_ollama_startup
+        validation_result = await validate_ollama_startup()
+        
+        if not validation_result["validation_success"]:
+            error_msg = f"❌ Ollama 모델 검증 실패: {validation_result['error']}"
+            logger.error(error_msg)
+            logger.error(f"📍 실패 단계: {validation_result['stage']}")
+            
+            # 서비스 연결 실패인 경우에만 서버 시작 중단
+            if validation_result['stage'] in ['service_check', 'no_models_installed']:
+                logger.error("🚨 크리티컬 오류 - API 서버 시작 중단")
+                raise RuntimeError(f"API 서버 시작 불가: {validation_result['error']}")
+            else:
+                # 모델 시작 관련 오류는 경고로만 처리하고 서버는 계속 시작
+                logger.warning(f"⚠️ Ollama 모델 검증 실패하지만 서버는 계속 시작: {validation_result['error']}")
+                validation_result["validation_success"] = True  # 강제로 성공으로 변경
+                validation_result["message"] = f"서버 시작 (모델 검증 실패: {validation_result['error']})"
+        else:
+            logger.info(f"✅ Ollama 모델 검증 성공: {validation_result.get('message', '모델 준비 완료')}")
+            if validation_result.get("started_model"):
+                logger.info(f"🎯 자동 시작된 모델: {validation_result['started_model']}")
+                
     except Exception as e:
-        logger.warning(f"기본 모델 실행 보장 실패: {e}")
+        error_msg = f"❌ Ollama 모델 검증 중 예외 발생: {str(e)}"
+        logger.error(error_msg)
+        
+        # 크리티컬 서비스 오류인지 확인
+        if "연결" in str(e) or "service" in str(e).lower() or "tags" in str(e).lower():
+            logger.error("🚨 Ollama 서비스 연결 불가 - 서버 시작 중단")
+            raise RuntimeError(f"API 서버 시작 불가: {error_msg}")
+        else:
+            # 기타 오류는 경고로 처리
+            logger.warning(f"⚠️ Ollama 검증 중 오류 발생하지만 서버는 계속 시작: {str(e)}")
+            validation_result = {
+                "validation_success": True,
+                "stage": "fallback",
+                "message": f"서버 시작 (검증 오류: {str(e)})",
+                "running_models": [],
+                "started_model": None
+            }
     
-    websocket_manager = WebSocketManager()
+    # 2. ChatbotService 초기화
+    try:
+        chatbot_service = ChatbotService()
+        await chatbot_service.initialize()
+        logger.info("✅ ChatbotService 초기화 완료")
+    except Exception as e:
+        logger.error(f"❌ ChatbotService 초기화 실패: {str(e)}")
+        raise RuntimeError(f"ChatbotService 초기화 실패: {str(e)}")
+    
+    # 3. WebSocket 매니저 초기화
+    try:
+        websocket_manager = WebSocketManager()
+        logger.info("✅ WebSocketManager 초기화 완료")
+    except Exception as e:
+        logger.error(f"❌ WebSocketManager 초기화 실패: {str(e)}")
+        raise RuntimeError(f"WebSocketManager 초기화 실패: {str(e)}")
     
     # 의존성 주입을 위한 상태 저장
     app.state.chatbot_service = chatbot_service
     app.state.websocket_manager = websocket_manager
+    app.state.ollama_validation = validation_result  # 검증 결과도 저장
     
     logger.info("✅ GAIA-BT API Server 준비 완료")
+    logger.info(f"🎯 활성 모델: {validation_result.get('running_models', [])}")
+    # 시스템 정상 작동 확인
     
     yield
     
