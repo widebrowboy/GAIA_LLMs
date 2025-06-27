@@ -299,7 +299,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               ok: testResponse.ok
             });
           } catch (testError) {
-            console.error('❌ 연결 테스트 실패:', testError);
+            if (testError instanceof Error && testError.name === 'AbortError') {
+              console.log('⏰ 연결 테스트 타임아웃 (정상)');
+            } else {
+              console.error('❌ 연결 테스트 실패:', testError);
+            }
           }
           
           // 백그라운드에서 실제 API 호출 시도
@@ -372,14 +376,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               console.error('❌ 오류 내용:', errorText);
             }
           } catch (fetchError) {
-            console.error('❌ API 호출 실패:', fetchError);
-            console.error('💥 에러 타입:', fetchError instanceof Error ? fetchError.name : 'Unknown');
-            console.error('💥 에러 메시지:', fetchError instanceof Error ? fetchError.message : fetchError);
-            
-            // AbortError (타임아웃) 감지
+            // AbortError (타임아웃) 감지 - 정상적인 상황으로 처리
             if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-              console.warn('⏰ 타임아웃으로 인한 요청 취소 - 폴백 데이터 유지');
+              console.log('⏰ API 호출 타임아웃 (정상) - 폴백 데이터 유지');
             } else {
+              console.error('❌ API 호출 실패:', fetchError);
               console.warn('🔄 네트워크 오류 - 폴백 데이터 유지');
             }
           }
