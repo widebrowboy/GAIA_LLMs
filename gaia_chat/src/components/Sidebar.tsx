@@ -106,6 +106,17 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   const fetchModelsWithApiClient = useCallback(async () => {
     setIsLoadingModels(true);
     
+    // 즉시 폴백 데이터 설정 (로딩 중에도 모델 표시)
+    const fallbackModels = [
+      'gemma3-12b:latest',
+      'txgemma-chat:latest',
+      'txgemma-predict:latest',
+      'Gemma3:27b-it-q4_K_M'
+    ];
+    setAvailableModels(fallbackModels);
+    setDetailedModels(fallbackModels.map(name => ({ name, parameter_size: '12B' })));
+    console.log('🔄 fetchModelsWithApiClient - 즉시 폴백 데이터 설정 완료');
+    
     try {
       console.log('📡 API 클라이언트로 모델 정보 요청');
       
