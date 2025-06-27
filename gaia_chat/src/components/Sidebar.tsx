@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Plus, MessageCircle, Trash2, X, Brain, Shield, Zap, ChevronDown, ChevronUp, Monitor } from 'lucide-react';
+import { Plus, MessageCircle, Trash2, X, Brain, Shield, Zap, ChevronDown, ChevronUp, Monitor, RefreshCw } from 'lucide-react';
 import { useChatContext } from '@/contexts/SimpleChatContext';
 import { formatDate } from '../utils/helpers';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -39,7 +39,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     setCurrentModel,
     setCurrentMode,
     setMcpEnabled,
-    setCurrentPromptType
+    setCurrentPromptType,
+    refreshSystemStatus
   } = useChatContext();
   
   const { isDesktop } = useResponsive();
@@ -190,15 +191,44 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     const doInitialLoad = async () => {
       if (mounted) {
         await checkSystemStatus();
+        await fetchAvailableModels();
       }
     };
     
     doInitialLoad();
     
+    // 시스템 상태 업데이트 이벤트 리스너 추가
+    const handleSystemStatusUpdate = (event: CustomEvent) => {
+      if (mounted) {
+        const data = event.detail;
+        console.log('📡 Sidebar에서 시스템 상태 업데이트 수신:', data);
+        
+        // 상태 업데이트
+        if (data.available) {
+          const modelNames = data.available.map((model: any) => model.name) || [];
+          setAvailableModels(modelNames);
+          setDetailedModels(data.available);
+        }
+        
+        if (data.running) {
+          setRunningModels(data.running);
+        }
+        
+        if (data.current_model && setCurrentModel) {
+          setCurrentModel(data.current_model);
+        }
+        
+        setOllamaRunning(data.current_model_running || false);
+      }
+    };
+    
+    window.addEventListener('systemStatusUpdate', handleSystemStatusUpdate as EventListener);
+    
     return () => {
       mounted = false;
+      window.removeEventListener('systemStatusUpdate', handleSystemStatusUpdate as EventListener);
     };
-  }, [checkSystemStatus]);
+  }, [checkSystemStatus, fetchAvailableModels, setCurrentModel]);
 
   // 모델 다이얼로그 열릴 때 모델 목록 새로고침
   useEffect(() => {
@@ -362,16 +392,35 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
 
       {/* 시스템 상태 */}
       <div className="p-4 bg-gradient-to-r from-emerald-50/50 to-blue-50/50 border-t border-emerald-200">
-        <button
-          onClick={() => setShowSystemStatus(!showSystemStatus)}
-          className="w-full text-sm font-semibold text-emerald-700 mb-3 flex items-center justify-between hover:text-emerald-800 transition-colors bg-white/50 p-2 rounded-xl border border-emerald-200/50"
-        >
-          <div className="flex items-center space-x-2">
-            <span className="text-base">📊</span>
-            <span>시스템 상태</span>
-          </div>
-          {showSystemStatus ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setShowSystemStatus(!showSystemStatus)}
+            className="flex-1 text-sm font-semibold text-emerald-700 mb-3 flex items-center justify-between hover:text-emerald-800 transition-colors bg-white/50 p-2 rounded-xl border border-emerald-200/50"
+          >
+            <div className="flex items-center space-x-2">
+              <span className="text-base">📊</span>
+              <span>시스템 상태</span>
+            </div>
+            {showSystemStatus ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={async () => {
+              if (typeof refreshSystemStatus === 'function') {
+                try {
+                  await refreshSystemStatus();
+                  await checkSystemStatus();
+                  await fetchAvailableModels();
+                } catch (error) {
+                  console.warn('시스템 상태 새로고침 오류:', error);
+                }
+              }
+            }}
+            className="ml-2 p-2 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-100 rounded-lg transition-colors"
+            title="시스템 상태 새로고침"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
         
         {showSystemStatus && (
           <div className="space-y-2 text-xs">

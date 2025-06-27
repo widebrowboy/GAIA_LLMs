@@ -566,8 +566,35 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
           console.warn('시스템 초기화 실패:', result.error);
         }
       }
+      
+      // 초기화 후 모델 상태도 확인
+      await refreshSystemStatus();
     } catch (error) {
       console.warn('시스템 초기화 오류:', error);
+    }
+  };
+
+  // 시스템 상태 새로고침 함수
+  const refreshSystemStatus = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/system/models/detailed`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(' 시스템 상태 새로고침:', data);
+        
+        if (data.current_model) {
+          setCurrentModel(data.current_model);
+        }
+        
+        // 상태 업데이트를 위한 이벤트 발송
+        window.dispatchEvent(new CustomEvent('systemStatusUpdate', { detail: data }));
+      }
+    } catch (error) {
+      console.warn('시스템 상태 새로고침 오류:', error);
     }
   };
 
@@ -700,7 +727,10 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
     setCurrentModel,
     setCurrentMode,
     setMcpEnabled,
-    setCurrentPromptType
+    setCurrentPromptType,
+    
+    // 시스템 상태 새로고침 함수
+    refreshSystemStatus: refreshSystemStatus
   };
 
   return (

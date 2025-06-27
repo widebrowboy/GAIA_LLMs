@@ -74,4 +74,6 @@ export interface ChatContextType {
   setCurrentMode?: (mode: string) => void;
   setMcpEnabled?: (enabled: boolean) => void;
   setCurrentPromptType?: (promptType: string) => void;
+  // 시스템 상태 새로고침 함수 (선택적)
+  refreshSystemStatus?: () => Promise<void>;
 }
