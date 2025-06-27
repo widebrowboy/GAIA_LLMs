@@ -373,11 +373,13 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             }
           }
           
+          setIsLoadingModels(false);
           setIsInitialized(true);
           console.log('✅ Sidebar 초기화 완료');
         } catch (error) {
           console.error('❌ 초기 로드 중 오류:', error);
           setServerConnected(false);
+          setIsLoadingModels(false);
           setIsInitialized(true); // 오류가 있어도 초기화 완료로 설정
         }
       }
