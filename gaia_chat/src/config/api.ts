@@ -24,10 +24,13 @@ export const API_BASE_URL = (() => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-    return `http://localhost:${getApiPort()}`;
+  // CORS 우회를 위해 현재 호스트 사용
+  if (typeof window !== 'undefined') {
+    const currentHost = window.location.hostname;
+    const currentProtocol = window.location.protocol;
+    return `${currentProtocol}//${currentHost}:${getApiPort()}`;
   }
-  // 배포 환경 기본값
+  // 서버 사이드 렌더링 시
   return `http://localhost:8000`;
 })();
 
