@@ -251,8 +251,16 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     
     const doInitialLoad = async () => {
       if (mounted && !isInitialized) {
-        console.log('🚀 Sidebar 초기 로드 시작');
+        console.log('🚀 =============[ Sidebar 초기화 시작 ]=============');
         try {
+          // 브라우저 환경 정보 출력
+          console.log('🌍 브라우저 환경:', {
+            hostname: window.location.hostname,
+            port: window.location.port,
+            protocol: window.location.protocol,
+            href: window.location.href
+          });
+          
           // 서버 연결 상태 설정
           setServerConnected(true);
           
@@ -262,32 +270,59 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             const url = getApiUrl('/api/system/models/detailed');
             console.log('🌐 초기 API URL:', url);
             
+            console.log('📡 fetch 호출 시작...');
             const response = await fetch(url, {
               method: 'GET',
               headers: {
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
               },
               cache: 'no-cache'
             });
             
+            console.log('📥 fetch 응답 수신:', {
+              status: response.status,
+              ok: response.ok,
+              statusText: response.statusText,
+              url: response.url,
+              headers: Object.fromEntries(response.headers.entries())
+            });
+            
             if (response.ok) {
+              console.log('📄 JSON 파싱 시작...');
               const data = await response.json();
               console.log('✅ 초기 모델 데이터 로드 성공:', data);
+              console.log('🔍 데이터 세부 정보:', {
+                available_count: data.available?.length || 0,
+                running_count: data.running?.length || 0,
+                current_model: data.current_model,
+                current_model_running: data.current_model_running
+              });
               
               if (data.available && data.available.length > 0) {
                 const modelNames = data.available.map((m: any) => m.name);
+                console.log('🎯 모델 이름 추출:', modelNames);
+                
                 setAvailableModels(modelNames);
                 setDetailedModels(data.available);
                 setRunningModels(data.running || []);
                 setOllamaRunning(data.current_model_running || false);
+                
                 if (data.current_model && setCurrentModel) {
                   setCurrentModel(data.current_model);
                 }
+                
                 console.log('🎯 초기 로드 완료 - 모델 수:', modelNames.length);
+              } else {
+                console.warn('⚠️ 사용 가능한 모델이 없음');
               }
             } else {
               console.warn('⚠️ 초기 API 응답 오류:', response.status);
+              const errorText = await response.text().catch(() => 'Unknown error');
+              console.error('❌ 오류 내용:', errorText);
+              
               // 폴백으로 테스트 데이터 사용
+              console.log('🔄 폴백 데이터 사용');
               const fallbackModels = [
                 'gemma3-12b:latest',
                 'txgemma-chat:latest',
@@ -299,7 +334,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             }
           } catch (fetchError) {
             console.error('❌ 초기 fetch 실패:', fetchError);
+            console.error('💥 에러 스택:', fetchError instanceof Error ? fetchError.stack : 'No stack');
+            
             // 폴백으로 테스트 데이터 사용
+            console.log('🔄 폴백 데이터 사용 (catch)');
             const fallbackModels = [
               'gemma3-12b:latest',
               'txgemma-chat:latest',

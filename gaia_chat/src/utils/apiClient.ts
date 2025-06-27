@@ -2,11 +2,6 @@
 
 import { getApiUrl } from '@/config/api';
 
-// Next.js 환경에서 fetch API 타입 확실하게 지정
-declare global {
-  const fetch: typeof globalThis.fetch;
-}
-
 interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
