@@ -349,7 +349,6 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
             <span>{timestamp}</span>
           </div>
         )}
-            </div>
       </div>
     </div>
   );
