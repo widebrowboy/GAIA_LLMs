@@ -219,14 +219,14 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
       const startTime = Date.now();
       console.log('📡 API 호출 시작:', message.substring(0, 50) + '...');
       
-      // 타임아웃 설정 (600초로 증가 - 딥리서치 및 긴 응답용)
+      // 타임아웃 설정 (2분으로 복원)
       const timeoutId = setTimeout(() => {
         if (!controller.signal.aborted) {
-          console.warn('Warning: API 요청 타임아웃 발생 (600초 초과)');
+          console.warn('⚠️ API 요청 타임아웃 발생 (2분 초과)');
           console.warn(`경과 시간: ${(Date.now() - startTime) / 1000}초`);
           controller.abort(new DOMException('Request timeout', 'AbortError'));
         }
-      }, 600000); // 10분으로 연장
+      }, 120000); // 2분으로 복원
       
       console.log('🔄 스트리밍 요청 준비:', {
         url: `${API_BASE_URL}/api/chat/stream`,
@@ -234,14 +234,21 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
         sessionId
       });
 
+      console.log('⏰ fetch 요청 시작 - 타임스탬프:', new Date().toISOString());
+      console.log('🌐 요청 URL 검증:', `${API_BASE_URL}/api/chat/stream`);
+      console.log('🏗️ 요청 body:', JSON.stringify({
+        message: message,
+        session_id: sessionId,
+        complete_response: true,
+        stream: true
+      }));
+      
       const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-          'Referrer-Policy': 'same-origin'
+          'Accept': 'text/event-stream'
+          // preflight 문제 해결을 위해 불필요한 헤더 제거
         },
         signal: controller.signal,
         body: JSON.stringify({
@@ -258,6 +265,7 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
         })
       });
       
+      console.log('⏰ fetch 요청 완료 - 타임스탬프:', new Date().toISOString());
       console.log('📡 스트리밍 응답 수신:', {
         status: response.status,
         ok: response.ok,

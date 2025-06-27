@@ -2,8 +2,8 @@
 Chat Router - 채팅 관련 API 엔드포인트
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.responses import StreamingResponse, JSONResponse
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 
@@ -264,7 +264,25 @@ async def stream_message(
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "Connection": "keep-alive"
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Accept"
+        }
+    )
+
+@router.options("/stream", 
+                summary="CORS Preflight for streaming",
+                response_class=JSONResponse)
+async def stream_options():
+    """CORS preflight 요청 처리"""
+    return JSONResponse(
+        content={"message": "OK"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Accept",
+            "Access-Control-Max-Age": "3600"
         }
     )
 

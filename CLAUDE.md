@@ -1,4 +1,4 @@
-# GAIA-BT v3.20 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.21 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
