@@ -577,7 +577,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           <div className="flex items-center justify-center space-x-2 mb-1">
             <span className="text-sm">🧬</span>
             <p className="text-xs font-bold bg-gradient-to-r from-emerald-700 to-blue-700 bg-clip-text text-transparent">
-              GAIA-BT v3.5
+              GAIA-BT v3.6
             </p>
           </div>
           <p className="text-xs text-emerald-600 font-medium">
