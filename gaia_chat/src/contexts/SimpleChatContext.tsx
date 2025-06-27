@@ -137,9 +137,9 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
         abortControllerRef.current = null;
         // 정리 완료까지 짧은 대기
         await new Promise(resolve => setTimeout(resolve, 50));
-      } catch (err) {
+      } catch {
         // abort 과정에서 발생하는 에러는 무시
-        console.log('요청 정리 중 에러 (정상적인 동작):', err);
+        console.log('요청 정리 중 에러 (정상적인 동작):', error);
       }
     }
   };
@@ -268,6 +268,8 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
         let fullResponse = '';
         let isCompleted = false;
         let partialLine = ''; // 여러 청크에 걸친 라인을 처리하기 위한 변수
+        let responseChunks: string[] = []; // 모든 청크를 수집하여 완전성 보장
+        let lastUpdateTime = Date.now();
         
         try {
           while (true) {
@@ -277,6 +279,7 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
               // 스트림이 종료되었지만 [DONE] 마커가 없는 경우도 처리
               if (!isCompleted && fullResponse) {
                 isCompleted = true;
+                console.log('✓ 스트림 종료 감지 - 응답 완료');
               }
               break;
             }
@@ -295,30 +298,39 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
                 
                 if (data === '[DONE]') {
                   isCompleted = true;
+                  console.log('✓ [DONE] 마커 수신 - 응답 완료');
                   break;
                 }
                 
                 if (data && data !== '') {
+                  let contentToAdd = '';
                   try {
                     // JSON 데이터를 파싱하려고 시도
                     const jsonData = JSON.parse(data);
-                    if (jsonData.content) {
-                      fullResponse += jsonData.content;
-                    } else {
-                      // JSON 형식이지만 content가 없는 경우 원본 사용
-                      fullResponse += data;
-                    }
+                    contentToAdd = jsonData.content || jsonData.response || jsonData.text || data;
                   } catch {
                     // JSON이 아닌 일반 텍스트인 경우
-                    fullResponse += data;
+                    contentToAdd = data;
                   }
                   
-                  // 실시간 스트리밍 응답 업데이트
-                  setStreamingResponse(fullResponse);
+                  if (contentToAdd) {
+                    fullResponse += contentToAdd;
+                    responseChunks.push(contentToAdd);
+                    
+                    // 응답 품질 향상을 위한 적응적 업데이트
+                    const currentTime = Date.now();
+                    if (currentTime - lastUpdateTime > 50 || contentToAdd.includes('\n') || 
+                        /[.!?]\s*$/.test(contentToAdd) || responseChunks.length % 5 === 0) {
+                      setStreamingResponse(fullResponse);
+                      lastUpdateTime = currentTime;
+                    }
+                  }
                 }
               } else if (line.trim() !== '') {
                 // 'data:' 접두사가 없는 유효한 라인도 처리
-                fullResponse += line.trim();
+                const content = line.trim();
+                fullResponse += content;
+                responseChunks.push(content);
                 setStreamingResponse(fullResponse);
               }
             }
@@ -326,41 +338,73 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
             if (isCompleted) break;
           }
           
-          // 마지막 부분 라인 처리
+          // 마지막 부분 라인 처리 - 완전성 보장
           if (partialLine && partialLine.trim()) {
+            let finalContent = '';
             if (partialLine.startsWith('data: ')) {
               const data = partialLine.slice(6).trim();
               if (data && data !== '' && data !== '[DONE]') {
                 try {
                   const jsonData = JSON.parse(data);
-                  if (jsonData.content) {
-                    fullResponse += jsonData.content;
-                  } else {
-                    fullResponse += data;
-                  }
+                  finalContent = jsonData.content || jsonData.response || jsonData.text || data;
                 } catch {
-                  fullResponse += data;
+                  finalContent = data;
                 }
-                setStreamingResponse(fullResponse);
               }
             } else if (partialLine.trim() !== '') {
-              fullResponse += partialLine.trim();
+              finalContent = partialLine.trim();
+            }
+            
+            if (finalContent) {
+              fullResponse += finalContent;
+              responseChunks.push(finalContent);
               setStreamingResponse(fullResponse);
             }
           }
           
-          console.log(`✓ 스트리밍 응답 완료 (${fullResponse.length} 자)`)
+          // 최종 응답 완전성 검증
+          const finalResponseLength = fullResponse.length;
+          const chunksTotal = responseChunks.join('').length;
+          console.log(`📊 응답 완전성 검증: 최종응답=${finalResponseLength}자, 청크총합=${chunksTotal}자`);
           
-          // 스트리밍 완료 후에 최종 메시지를 대화에 추가
-          if (fullResponse) {
-            const finalMessage: Message = {
-              id: 'msg_' + Date.now() + '_ai',
-              content: fullResponse,
+          if (finalResponseLength !== chunksTotal && responseChunks.length > 0) {
+            // 불일치 시 청크 기반으로 재구성
+            fullResponse = responseChunks.join('');
+            setStreamingResponse(fullResponse);
+            console.log('🔧 응답 재구성 완료');
+          }
+          
+          console.log(`✓ 스트리밍 응답 완료 (${fullResponse.length}자, ${responseChunks.length}개 청크)`);
+          
+          // 스트리밍 완료 후 최종 마크다운 검증 및 정리
+          let finalContent = fullResponse.trim();
+          if (finalContent) {
+            // 마크다운 구조 개선을 위한 후처리
+            finalContent = finalContent
+              .replace(/\n{3,}/g, '\n\n') // 과도한 줄바꿈 정리
+              .replace(/([.!?])([A-Za-z가-힣])/g, '$1 $2') // 문장 간 공백 확보
+              .replace(/#{1,6}\s*([^\n]+)/g, (match, title) => {
+                // 마크다운 헤더 정리
+                const level = match.indexOf(' ');
+                return '#'.repeat(Math.min(level, 6)) + ' ' + title.trim();
+              });
+            
+            console.log('📝 마크다운 후처리 완료');
+          }
+          
+          // After streaming finished, add assistant message with userQuestion field
+          if (finalContent && !controller.signal.aborted) {
+            const assistantMessage: Message = {
+              id: 'assistant_' + Date.now(),
               role: 'assistant',
+              content: finalContent,
               timestamp: new Date(),
-              conversationId: conversation.id
+              conversationId: conversation.id,
+              userQuestion: message, // Save the user question for traceability
+              isComplete: true // 완전한 응답임을 표시
             };
-            addMessage(finalMessage);
+            addMessage(assistantMessage);
+            console.log('💾 완전한 응답 메시지 저장 완료');
           } else {
             throw new Error('응답을 받았지만 내용이 비어있습니다');
           }
@@ -547,19 +591,18 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
   // 컴포넌트 언마운트 시 정리
   useEffect(() => {
     return () => {
-      // cleanup 함수에서 현재 abortController 정리
       if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
         try {
-          console.log(' 컴포넌트 언마운트: 진행 중인 요청 정리');
-          abortControllerRef.current.abort(new DOMException('컴포넌트 언마운트', 'AbortError'));
-        } catch (err) {
-          // abort 과정에서 발생하는 에러는 무시
+          abortControllerRef.current.abort(new DOMException('Component unmount', 'AbortError'));
+        } catch {
+          // ignore abort errors
         }
         abortControllerRef.current = null;
       }
     };
   }, []);
 
+  
   // startNewConversation 별칭 함수 (기존 코드 호환성)
   const startNewConversation = () => {
     createConversation();

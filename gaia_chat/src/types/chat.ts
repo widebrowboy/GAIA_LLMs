@@ -1,9 +1,27 @@
 export interface Message {
   id: string;
   content: string;
+  /**
+   * Role of the message sender: 'user', 'assistant', or 'system'
+   */
   role: 'user' | 'assistant' | 'system';
+  /**
+   * Timestamp of the message (ISO string or Date)
+   */
   timestamp: Date;
+  /**
+   * Conversation ID this message belongs to
+   */
   conversationId: string;
+  /**
+   * (Optional) The original user question for assistant responses.
+   * Only set for messages where role === 'assistant'.
+   */
+  userQuestion?: string;
+  /**
+   * (Optional) Indicates if the message is a complete response (streaming finished)
+   */
+  isComplete?: boolean;
 }
 
 export interface Conversation {

@@ -4,6 +4,7 @@ import React, { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import Image from 'next/image';
 import { Message } from '@/types/chat';
 
 interface MessageItemProps {
@@ -11,8 +12,20 @@ interface MessageItemProps {
 }
 
 const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
-  const isUser = message.role === 'user';
-  const isSystem = message.role === 'system';
+  const isUserMessage = message.role === 'user';
+  const isAssistantMessage = message.role === 'assistant';
+  const isSystemMessage = message.role === 'system';
+  const isCompleteResponse = isAssistantMessage && message.isComplete;
+  const hasResearchKeywords = isAssistantMessage && (
+    message.content.toLowerCase().includes('연구') ||
+    message.content.toLowerCase().includes('임상') ||
+    message.content.toLowerCase().includes('신약') ||
+    message.content.toLowerCase().includes('화학') ||
+    message.content.toLowerCase().includes('research') ||
+    message.content.toLowerCase().includes('clinical') ||
+    message.content.toLowerCase().includes('drug')
+  );
+  
   const timestamp = new Date(message.timestamp).toLocaleTimeString('ko-KR', {
     hour: '2-digit',
     minute: '2-digit',
@@ -125,7 +138,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
   };
 
   // 시스템 메시지를 위한 별도 렌더링
-  if (isSystem) {
+  if (isSystemMessage) {
     return (
       <div className="flex justify-center mb-6">
         <div className="max-w-3xl w-full">
@@ -165,61 +178,178 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
   }
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-      <div className={`flex items-start space-x-3 max-w-2xl lg:max-w-4xl ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
-        {/* 아바타 */}
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg ${
-          isUser ? 'bg-gradient-to-br from-green-500 to-green-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'
-        }`}>
-          {isUser ? '👤' : '🧬'}
-        </div>
-        
-        {/* 메시지 버블 */}
-        <div className="flex flex-col">
-          <div className={`rounded-2xl px-4 py-3 shadow-sm ${
-            isUser 
-              ? 'bg-gradient-to-br from-green-500 to-green-600 text-white' 
-              : 'bg-white border border-gray-200 text-gray-800'
-          }`}>
-            {isUser ? (
-              // 사용자 메시지는 일반 텍스트로 표시
-              <p className="whitespace-pre-wrap break-words leading-relaxed">
-                {message.content}
-              </p>
-            ) : (
-              // AI 메시지는 마크다운으로 렌더링
-              <div className="prose prose-sm max-w-none break-words overflow-visible">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeHighlight]}
-                  components={markdownComponents as any}
-                  skipHtml={false}
-                  unwrapDisallowed={false}
-                >
-                  {message.content}
-                </ReactMarkdown>
+    <div className="flex items-start space-x-4 mb-6">
+      {/* 아바타 - 개선된 GAIA-BT 로고 적용 */}
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-xl border-2 flex-shrink-0 ${
+        isUserMessage
+          ? 'bg-gradient-to-br from-emerald-400 via-green-500 to-emerald-600 border-emerald-300/50'
+          : isSystemMessage
+          ? 'bg-gradient-to-br from-purple-400 via-indigo-500 to-purple-600 border-purple-300/50'
+          : isCompleteResponse
+          ? 'bg-gradient-to-br from-white via-emerald-50 to-blue-50 border-emerald-300/70 p-1'
+          : 'bg-gradient-to-br from-blue-400 via-cyan-500 to-blue-600 border-blue-300/50'
+      }`}>
+        {isUserMessage ? (
+          <span className="text-2xl">🔬</span>
+        ) : isSystemMessage ? (
+          <span className="text-2xl">⚙️</span>
+        ) : isCompleteResponse ? (
+          <Image
+            src="/GAIABT_Logo.png"
+            alt="GAIA-BT Logo"
+            width={40}
+            height={40}
+            className="w-10 h-10 object-contain"
+          />
+        ) : (
+          <span className="text-2xl">🧬</span>
+        )}
+      </div>
+      {/* 메시지 컨테이너 */}
+      <div className={`${
+        isUserMessage
+          ? 'bg-gradient-to-br from-emerald-50/90 to-blue-50/90 border-2 border-emerald-200/70'
+          : isCompleteResponse
+          ? 'bg-gradient-to-br from-white via-blue-50/30 to-emerald-50/50 border-2 border-blue-300/50 shadow-2xl'
+          : hasResearchKeywords
+          ? 'bg-gradient-to-br from-blue-50/90 via-cyan-50/90 to-emerald-50/90 border-2 border-cyan-200/70'
+          : 'bg-gradient-to-br from-gray-50/90 to-slate-50/90 border-2 border-gray-200/70'
+      } rounded-3xl px-6 py-4 shadow-xl flex-1 backdrop-blur-sm`}>
+        {/* 헤더 - 완전한 응답에 대해서만 표시 */}
+        {isCompleteResponse && (
+          <div className="mb-6 pb-4 border-b-2 border-gradient-to-r from-emerald-200 to-blue-200">
+            <div className="flex items-center space-x-3 mb-2">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-bold text-emerald-700">📝 연구 보고서</span>
+              </div>
+              <div className="flex-1 h-px bg-gradient-to-r from-emerald-300 via-blue-300 to-transparent"></div>
+              <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                완료됨 {timestamp}
+              </span>
+            </div>
+            {message.userQuestion && (
+              <div className="bg-gradient-to-r from-emerald-50 to-blue-50 p-3 rounded-xl border border-emerald-200/50 mb-4">
+                <div className="flex items-center space-x-2 mb-1">
+                  <span className="text-sm">🔍</span>
+                  <span className="text-xs font-semibold text-emerald-700">연구 주제</span>
+                </div>
+                <p className="text-sm text-gray-700 font-medium italic">"{message.userQuestion}"</p>
               </div>
             )}
           </div>
-          
-          {/* 시간 및 상태 */}
-          <div className={`flex items-center space-x-2 mt-1 px-2 ${
-            isUser ? 'justify-end' : 'justify-start'
+        )}
+        
+        {/* 메시지 내용 */}
+        {isUserMessage ? (
+          <div className="flex items-center space-x-3 mb-3">
+            <span className="text-sm">🔬</span>
+            <span className="text-xs font-bold text-emerald-700">연구자</span>
+          </div>
+        ) : isAssistantMessage && !isCompleteResponse && (
+          <div className="flex items-center space-x-3 mb-3">
+            <span className="text-sm">🧠</span>
+            <span className="text-xs font-bold text-blue-700">GAIA-BT 연구지원</span>
+            <div className="flex space-x-1">
+              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
+              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            </div>
+          </div>
+        )}
+
+        {/* 메시지 텍스트/마크다운 */}
+        {isUserMessage ? (
+          <div className="whitespace-pre-wrap break-words leading-relaxed text-gray-900">
+            {message.content}
+          </div>
+        ) : (
+          <div className={`prose prose-sm max-w-none overflow-wrap-anywhere break-words text-gray-900 ${
+            isCompleteResponse ? 'prose-lg' : ''
           }`}>
-            <span className="text-xs text-gray-500">
-              {timestamp}
-            </span>
-            {isUser && (
-              <span className="text-xs text-green-600">✓</span>
-            )}
-            {!isUser && (
-              <span className="text-xs text-blue-600 flex items-center">
-                <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-1"></span>
-                GAIA-BT
-              </span>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+              components={{
+                // 완전한 응답에 대한 헤더 스타일 개선
+                h1: ({ children, ...props }: any) => (
+                  <h1 className={`${
+                    isCompleteResponse 
+                      ? 'text-2xl font-bold bg-gradient-to-r from-emerald-700 to-blue-700 bg-clip-text text-transparent mb-6 pb-3 border-b-2 border-emerald-200' 
+                      : 'text-xl font-bold text-gray-800 mb-4'
+                  } mt-6`} {...props}>
+                    {isCompleteResponse && <span className="mr-2">📄</span>}{children}
+                  </h1>
+                ),
+                h2: ({ children, ...props }: any) => (
+                  <h2 className={`${
+                    isCompleteResponse 
+                      ? 'text-xl font-bold text-emerald-700 mb-4 mt-8 flex items-center'
+                      : 'text-lg font-bold text-gray-700 mb-3 mt-6'
+                  }`} {...props}>
+                    {isCompleteResponse && <span className="mr-2">📋</span>}{children}
+                  </h2>
+                ),
+                h3: ({ children, ...props }: any) => (
+                  <h3 className={`${
+                    isCompleteResponse 
+                      ? 'text-lg font-semibold text-blue-700 mb-3 mt-6 flex items-center'
+                      : 'text-base font-semibold text-gray-700 mb-2 mt-4'
+                  }`} {...props}>
+                    {isCompleteResponse && <span className="mr-2">🔹</span>}{children}
+                  </h3>
+                ),
+                ...markdownComponents,
+                // 완전한 응답에 대한 추가 스타일링
+                blockquote: ({ children, ...props }: any) => (
+                  <blockquote className={`border-l-4 border-emerald-400 pl-6 py-3 my-4 italic text-emerald-800 rounded-r-lg ${
+                    isCompleteResponse 
+                      ? 'bg-gradient-to-r from-emerald-50 to-blue-50/50 shadow-md'
+                      : 'bg-emerald-50/50'
+                  }`} {...props}>
+                    {isCompleteResponse && <span className="mr-2">💬</span>}{children}
+                  </blockquote>
+                ),
+                p: ({ children, ...props }: any) => (
+                  <p className={`${
+                    isCompleteResponse ? 'mb-4 leading-relaxed text-gray-800' : 'mb-3'
+                  }`} {...props}>
+                    {children}
+                  </p>
+                )
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+            
+            {/* 완전한 응답의 푸터 */}
+            {isCompleteResponse && (
+              <div className="mt-8 pt-4 border-t border-emerald-200">
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <div className="flex items-center space-x-2">
+                    <span>✓</span>
+                    <span>연구 보고서 완료</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span>📅</span>
+                    <span>{new Date(message.timestamp).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
-        </div>
+        )}
+        
+        {/* 타임스탬프 및 상태 표시 */}
+        {isAssistantMessage && !isCompleteResponse && (
+          <div className="flex items-center space-x-2 mt-3 text-xs text-gray-500">
+            <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+            <span>GAIA-BT 응답</span>
+            <span className="text-gray-400">•</span>
+            <span>{timestamp}</span>
+          </div>
+        )}
+            </div>
       </div>
     </div>
   );

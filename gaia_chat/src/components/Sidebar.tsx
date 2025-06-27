@@ -40,7 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   
   const { isDesktop } = useResponsive();
 
-  const [showSystemStatus, setShowSystemStatus] = useState(true);
+  const [showSystemStatus, setShowSystemStatus] = useState(false);
   const [showExpertPrompts, setShowExpertPrompts] = useState(false);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -234,7 +234,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   };
 
   return (
-    <div className="sidebar-container w-72 sm:w-80 md:w-80 bg-gray-50 border-r border-gray-200 shadow-lg md:shadow-none overflow-hidden flex flex-col h-[100vh] max-h-screen">
+    <div className={
+      `flex flex-col h-full bg-white` +
+      (isDesktop ? ' border-r shadow-lg' : ' fixed inset-y-0 left-0 w-full max-w-xs z-50')
+    }>
       {/* 모바일에서 사이드바 닫기 버튼 */}
       {!isDesktop && (
         <button 
@@ -247,10 +250,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       )}
 
       {/* 헤더 */}
-      <div className="p-3 sm:p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+      <div className="p-3 sm:p-4 border-b border-emerald-200 bg-gradient-to-r from-emerald-50 to-blue-50 sticky top-0 z-10">
         <div className="flex items-center justify-between">
           <h1 
-            className="text-xl font-bold text-gray-800 flex items-center cursor-pointer hover:text-blue-600 transition-colors duration-200"
+            className="text-xl font-bold bg-gradient-to-r from-emerald-700 to-blue-700 bg-clip-text text-transparent flex items-center cursor-pointer hover:from-emerald-600 hover:to-blue-600 transition-all duration-200"
             onClick={() => {
               // 환영 페이지로 이동(현재 대화 선택 해제)
               selectConversation('');
@@ -264,30 +267,26 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             }}
             title="홈으로 이동 - 환영 페이지로 돌아가기"
           >
-            <Image 
-              src="/gaia-mark.png" 
-              alt="GAIA-GPT" 
-              width={24} 
-              height={24} 
-              className="mr-2" 
-            />
-            GAIA-GPT
+            <span className="mr-2 text-2xl">🧬</span>
+            GAIA-BT
           </h1>
           <div className="flex items-center space-x-2">
-            <div className={`px-2 py-1 rounded text-xs font-medium ${
+            <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1 ${
               currentMode === 'deep_research' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-gray-100 text-gray-800'
+                ? 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 border border-emerald-200' 
+                : 'bg-gradient-to-r from-gray-100 to-slate-100 text-gray-700 border border-gray-200'
             }`}>
-              {currentMode === 'deep_research' ? '딥리서치' : '기본'}
+              <span>{currentMode === 'deep_research' ? '🧬' : '💬'}</span>
+              <span>{currentMode === 'deep_research' ? '딥리서치' : '기본'}</span>
             </div>
-            <div className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
-              {currentPromptType === 'default' ? '일반' :
+            <div className="px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 border border-blue-200 flex items-center space-x-1">
+              <span>⚙️</span>
+              <span>{currentPromptType === 'default' ? '일반' :
                currentPromptType === 'patent' ? '특허' :
                currentPromptType === 'clinical' ? '임상' :
                currentPromptType === 'research' ? '연구' :
                currentPromptType === 'chemistry' ? '화학' :
-               currentPromptType === 'regulatory' ? '규제' : currentPromptType}
+               currentPromptType === 'regulatory' ? '규제' : currentPromptType}</span>
             </div>
             {onClose && !isDesktop && (
               <button
@@ -302,41 +301,41 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         </div>
         
         {/* 새 대화 버튼 + 모드 전환 */}
-        <div className="flex space-x-2 mt-3">
+        <div className="flex space-x-2 mt-4">
           <button
             onClick={handleNewConversation}
             disabled={isLoading || !serverConnected}
-            className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 text-white px-4 py-3 rounded-2xl flex items-center justify-center space-x-2 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-lg disabled:shadow-none font-medium"
             title={!serverConnected ? '서버 연결 필요' : '새 대화 시작'}
           >
-            <Plus className="w-4 h-4" />
-            <span>새 대화</span>
+            <span className="text-lg">✨</span>
+            <span>새 연구</span>
           </button>
           
           <button
             onClick={handleModeToggle}
             disabled={isModeChanging || !serverConnected}
-            className={`px-4 py-2 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`px-4 py-3 rounded-2xl flex items-center justify-center transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg disabled:shadow-none font-medium ${
               currentMode === 'deep_research'
-                ? 'bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white focus:ring-green-500'
-                : 'bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white focus:ring-gray-500'
+                ? 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white focus:ring-emerald-500'
+                : 'bg-gradient-to-r from-gray-500 to-slate-600 hover:from-gray-600 hover:to-slate-700 text-white focus:ring-gray-500'
             }`}
             title={!serverConnected ? '서버 연결 필요' : isModeChanging ? '모드 변경 중...' : currentMode === 'deep_research' ? '기본 모드로 전환' : '딥리서치 모드로 전환'}
           >
-            {currentMode === 'deep_research' ? <Brain className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+            {currentMode === 'deep_research' ? <span className="text-lg">🧠</span> : <span className="text-lg">💬</span>}
           </button>
         </div>
       </div>
 
       {/* 시스템 상태 */}
-      <div className="p-4 bg-gray-50 border-t border-gray-200">
+      <div className="p-4 bg-gradient-to-r from-emerald-50/50 to-blue-50/50 border-t border-emerald-200">
         <button
           onClick={() => setShowSystemStatus(!showSystemStatus)}
-          className="w-full text-sm font-semibold text-gray-700 mb-2 flex items-center justify-between hover:text-gray-900 transition-colors"
+          className="w-full text-sm font-semibold text-emerald-700 mb-3 flex items-center justify-between hover:text-emerald-800 transition-colors bg-white/50 p-2 rounded-xl border border-emerald-200/50"
         >
-          <div className="flex items-center">
-            <Monitor className="w-4 h-4 mr-1" />
-            시스템 상태
+          <div className="flex items-center space-x-2">
+            <span className="text-base">📊</span>
+            <span>시스템 상태</span>
           </div>
           {showSystemStatus ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
@@ -388,14 +387,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       </div>
 
       {/* 전문 프롬프트 */}
-      <div className="p-4 bg-gray-50 border-t border-gray-200">
+      <div className="p-4 bg-gradient-to-r from-purple-50/50 to-pink-50/50 border-t border-purple-200">
         <button
           onClick={() => setShowExpertPrompts(!showExpertPrompts)}
-          className="w-full text-sm font-semibold text-gray-700 mb-2 flex items-center justify-between hover:text-gray-900 transition-colors"
+          className="w-full text-sm font-semibold text-purple-700 mb-3 flex items-center justify-between hover:text-purple-800 transition-colors bg-white/50 p-2 rounded-xl border border-purple-200/50"
         >
-          <div className="flex items-center">
-            <Zap className="w-4 h-4 mr-1" />
-            전문 프롬프트
+          <div className="flex items-center space-x-2">
+            <span className="text-base">⚖️</span>
+            <span>전문 프롬프트</span>
           </div>
           {showExpertPrompts ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
@@ -403,25 +402,28 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         {showExpertPrompts && (
           <div className="grid grid-cols-2 gap-2">
             {[
-              { key: 'default', label: '일반모드' },
-              { key: 'patent', label: '특허검색' },
-              { key: 'clinical', label: '임상시험' },
-              { key: 'research', label: '연구분석' },
-              { key: 'chemistry', label: '의약화학' },
-              { key: 'regulatory', label: '규제승인' }
-            ].map(({ key, label }) => (
+              { key: 'default', label: '일반모드', icon: '💬', colors: 'from-gray-50 to-slate-100 border-gray-200 text-gray-700' },
+              { key: 'patent', label: '특허검색', icon: '📋', colors: 'from-blue-50 to-blue-100 border-blue-200 text-blue-700' },
+              { key: 'clinical', label: '임상시험', icon: '🏥', colors: 'from-green-50 to-emerald-100 border-green-200 text-green-700' },
+              { key: 'research', label: '연구분석', icon: '📊', colors: 'from-purple-50 to-purple-100 border-purple-200 text-purple-700' },
+              { key: 'chemistry', label: '의약화학', icon: '⚗️', colors: 'from-orange-50 to-orange-100 border-orange-200 text-orange-700' },
+              { key: 'regulatory', label: '규제승인', icon: '⚖️', colors: 'from-red-50 to-red-100 border-red-200 text-red-700' }
+            ].map(({ key, label, icon, colors }) => (
               <button
                 key={key}
                 onClick={() => handlePromptChange(key)}
                 disabled={isPromptChanging || !serverConnected}
-                className={`px-2 py-1 rounded text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed border flex flex-col items-center space-y-1 hover:shadow-md ${
                   currentPromptType === key 
-                    ? 'bg-blue-200 text-blue-800 font-medium' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? `bg-gradient-to-br ${colors} shadow-md scale-105` 
+                    : `bg-gradient-to-br from-white to-gray-50 border-gray-200 text-gray-600 hover:${colors.split(' ')[0]} hover:${colors.split(' ')[1]}`
                 }`}
                 title={!serverConnected ? '서버 연결 필요' : isPromptChanging ? '프롬프트 변경 중...' : `${label} 모드로 변경`}
               >
-                {isPromptChanging && currentPromptType === key ? '변경 중...' : label}
+                <span className="text-sm">{icon}</span>
+                <span className="text-center leading-tight">
+                  {isPromptChanging && currentPromptType === key ? '변경 중...' : label}
+                </span>
               </button>
             ))}
           </div>
@@ -429,49 +431,62 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       </div>
 
       {/* 대화 목록 */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden border-t border-gray-200 thin-scrollbar max-h-[calc(100vh-16rem)]">
-        <div className="p-3 bg-white border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-1 flex items-center">
-            <MessageCircle className="w-4 h-4 mr-1" />
-            대화 기록
-            <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+      <div className="flex-1 overflow-y-auto border-t border-emerald-200 thin-scrollbar bg-gradient-to-b from-white to-emerald-50/30">
+        <div className="p-4 bg-gradient-to-r from-emerald-50 to-blue-50 border-b border-emerald-200/50">
+          <h3 className="text-sm font-bold text-emerald-700 mb-1 flex items-center">
+            <span className="text-base mr-2">📜</span>
+            연구 기록
+            <span className="ml-2 text-xs font-medium text-emerald-600 bg-gradient-to-r from-emerald-100 to-green-100 px-3 py-1 rounded-full border border-emerald-200">
               {conversations.length}
             </span>
           </h3>
         </div>
         
         {conversations.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center p-4">
-            <div className="text-center text-gray-500">
-              <MessageCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm font-medium mb-1">아직 대화가 없습니다</p>
-              <p className="text-xs text-gray-400">새 대화를 시작해보세요!</p>
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-blue-100 rounded-3xl flex items-center justify-center mx-auto mb-4 border-2 border-emerald-200/50">
+                <span className="text-2xl">🧬</span>
+              </div>
+              <p className="text-sm font-semibold text-emerald-700 mb-2">아직 연구가 없습니다</p>
+              <p className="text-xs text-emerald-600">새 연구를 시작해보세요!</p>
             </div>
           </div>
         ) : (
-          <div className="p-3 space-y-2">
+          <div className="p-3 space-y-3">
             {conversations.map((conversation) => (
               <div
                 key={conversation.id}
                 onClick={() => handleConversationSelect(conversation.id)}
-                className={`group p-3 rounded-lg cursor-pointer transition-all duration-200 border ${
+                className={`group p-4 rounded-2xl cursor-pointer transition-all duration-300 border-2 ${
                   currentConversation?.id === conversation.id
-                    ? 'bg-blue-50 border-blue-200 shadow-sm'
-                    : 'bg-white border-gray-100 hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm'
+                    ? 'bg-gradient-to-br from-emerald-50 to-blue-50 border-emerald-300/70 shadow-lg scale-[1.02]'
+                    : 'bg-gradient-to-br from-white to-gray-50/50 border-gray-200/50 hover:from-emerald-50/50 hover:to-blue-50/50 hover:border-emerald-300/50 hover:shadow-md hover:scale-[1.01]'
                 }`}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-medium text-gray-800 truncate flex-1 mr-2 text-sm">
-                    {conversation.title || '새 대화'}
-                  </h4>
+                  <div className="flex items-center space-x-2 flex-1 mr-2">
+                    <span className="text-sm flex-shrink-0">🧬</span>
+                    <h4 className={`font-semibold truncate flex-1 text-sm ${
+                      currentConversation?.id === conversation.id
+                        ? 'bg-gradient-to-r from-emerald-700 to-blue-700 bg-clip-text text-transparent'
+                        : 'text-gray-800'
+                    }`}>
+                      {conversation.title || '새 연구'}
+                    </h4>
+                  </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                    <span className={`text-xs whitespace-nowrap font-medium ${
+                      currentConversation?.id === conversation.id
+                        ? 'text-emerald-600'
+                        : 'text-gray-500'
+                    }`}>
                       {formatDate(conversation.updatedAt)}
                     </span>
                     {currentConversation?.id !== conversation.id && (
                       <button
                         onClick={(e) => handleDeleteConversation(conversation.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 transition-all duration-200"
+                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-xl hover:bg-red-100 transition-all duration-300 hover:scale-110"
                         title="대화 삭제"
                       >
                         <Trash2 className="w-3 h-3 text-red-500" />
@@ -481,21 +496,35 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                 </div>
                 
                 {conversation.messages && conversation.messages.length > 0 && (
-                  <p className="text-xs text-gray-500 mb-2 overflow-hidden" style={{
+                  <div className={`text-xs mb-3 overflow-hidden p-2 rounded-xl border ${
+                    currentConversation?.id === conversation.id
+                      ? 'bg-white/60 border-emerald-200/50 text-emerald-700'
+                      : 'bg-gray-50/80 border-gray-200/50 text-gray-600'
+                  }`} style={{
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical'
                   }}>
                     {conversation.messages[conversation.messages.length - 1].content}
-                  </p>
+                  </div>
                 )}
                 
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-400">
-                    {conversation.messages?.length || 0}개 메시지
-                  </span>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs">💬</span>
+                    <span className={`text-xs font-medium ${
+                      currentConversation?.id === conversation.id
+                        ? 'text-emerald-600'
+                        : 'text-gray-500'
+                    }`}>
+                      {conversation.messages?.length || 0}개 메시지
+                    </span>
+                  </div>
                   {currentConversation?.id === conversation.id && (
-                    <span className="text-xs text-blue-600 font-medium">활성</span>
+                    <div className="flex items-center space-x-1">
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                      <span className="text-xs text-emerald-600 font-bold">진행 중</span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -505,10 +534,18 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       </div>
       
       {/* 하단 정보 */}
-      <div className="p-4 border-t border-gray-200 bg-white flex-shrink-0">
-        <p className="text-xs text-gray-500 text-center">
-          GAIA-GPT v2.0 - GAIA-BT 통합
-        </p>
+      <div className="p-4 border-t border-emerald-200 bg-gradient-to-r from-emerald-50 to-blue-50 flex-shrink-0">
+        <div className="text-center">
+          <div className="flex items-center justify-center space-x-2 mb-1">
+            <span className="text-sm">🧬</span>
+            <p className="text-xs font-bold bg-gradient-to-r from-emerald-700 to-blue-700 bg-clip-text text-transparent">
+              GAIA-BT v2.7
+            </p>
+          </div>
+          <p className="text-xs text-emerald-600 font-medium">
+            신약개발 AI 연구 어시스턴트
+          </p>
+        </div>
       </div>
 
       {/* 모델 선택 다이얼로그 */}

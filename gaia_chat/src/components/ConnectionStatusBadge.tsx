@@ -104,7 +104,7 @@ export default function ConnectionStatusBadge({ onConnectionChange }: Connection
         }
       };
 
-      ws.onerror = (event) => {
+      ws.onerror = (_event) => {
         // WebSocket 에러는 보안상의 이유로 상세 정보를 제공하지 않음
         // 대신 일반적인 메시지와 연결 상태만 기록
         console.error('Status WebSocket 연결 오류 발생. 서버가 실행 중인지 확인하세요.');
