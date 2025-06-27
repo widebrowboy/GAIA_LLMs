@@ -473,6 +473,22 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                 {currentMode === 'deep_research' ? 'Deep Research' : '일반'}
               </span>
             </div>
+            <div className="flex justify-between">
+              <span>사용 가능한 모델:</span>
+              <span className={`font-medium ${
+                availableModels.length > 0 ? 'text-green-600' : 'text-gray-600'
+              }`}>
+                {availableModels.length}개
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>실행 중인 모델:</span>
+              <span className={`font-medium ${
+                runningModels.length > 0 ? 'text-green-600' : 'text-gray-600'
+              }`}>
+                {runningModels.length}개
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -691,6 +707,42 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                               {isModelChanging ? '변경 중...' : '선택됨'}
                             </span>
                           )}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                const action = isRunning ? 'stop' : 'start';
+                                const response = await fetch(getApiUrl(`/api/system/models/${model.name}/${action}`), {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' }
+                                });
+                                
+                                if (response.ok) {
+                                  const result = await response.json();
+                                  console.log(`모델 ${action} 결과:`, result);
+                                  
+                                  // 상태 새로고침
+                                  if (typeof refreshSystemStatus === 'function') {
+                                    await refreshSystemStatus();
+                                  }
+                                  await checkSystemStatus();
+                                  await fetchAvailableModels();
+                                } else {
+                                  console.error(`모델 ${action} 실패:`, response.status);
+                                }
+                              } catch (error) {
+                                console.error(`모델 ${action} 오류:`, error);
+                              }
+                            }}
+                            className={`text-xs px-2 py-1 rounded-md transition-colors ${
+                              isRunning 
+                                ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                                : 'bg-green-100 text-green-700 hover:bg-green-200'
+                            }`}
+                            title={isRunning ? '모델 중지' : '모델 시작'}
+                          >
+                            {isRunning ? '중지' : '시작'}
+                          </button>
                         </div>
                       </div>
                       <div className="text-xs text-gray-500 space-y-1">

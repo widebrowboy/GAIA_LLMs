@@ -401,3 +401,10 @@ class ChatbotService:
         if "default" in self.sessions:
             return self.sessions["default"].config.debug_mode
         return False
+    
+    def update_current_model(self, model_name: str) -> None:
+        """현재 모델 업데이트"""
+        if "default" in self.sessions:
+            # OllamaClient의 _model_name 속성을 직접 수정
+            self.sessions["default"].client._model_name = model_name
+            logger.info(f"현재 모델을 '{model_name}'로 업데이트했습니다.")

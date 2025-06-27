@@ -263,6 +263,81 @@ async def get_running_models() -> Dict[str, Any]:
         "status": "success"
     }
 
+@router.post("/models/{model_name}/start")
+async def start_model(
+    model_name: str,
+    service: ChatbotService = Depends(get_chatbot_service)
+) -> Dict[str, Any]:
+    """특정 모델 시작"""
+    try:
+        import httpx
+        
+        # Ollama API를 통해 모델 시작
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # 간단한 generate 요청으로 모델 시작
+            response = await client.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": model_name,
+                    "prompt": "Hello",
+                    "stream": False,
+                    "keep_alive": "5m"  # 5분간 메모리에 유지
+                }
+            )
+            
+            if response.status_code == 200:
+                # 현재 모델로 설정
+                if hasattr(service, 'update_current_model'):
+                    service.update_current_model(model_name)
+                
+                return {
+                    "success": True,
+                    "message": f"모델 '{model_name}' 시작 완료",
+                    "model": model_name
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"모델 시작 실패: HTTP {response.status_code}",
+                    "model": model_name
+                }
+                
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"모델 시작 중 오류: {str(e)}",
+            "model": model_name
+        }
+
+@router.post("/models/{model_name}/stop")
+async def stop_model(
+    model_name: str,
+    service: ChatbotService = Depends(get_chatbot_service)
+) -> Dict[str, Any]:
+    """특정 모델 중지"""
+    try:
+        import httpx
+        
+        # Ollama API를 통해 모델 중지
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.delete(
+                f"http://localhost:11434/api/generate",
+                json={"model": model_name}
+            )
+            
+            return {
+                "success": True,
+                "message": f"모델 '{model_name}' 중지 요청 완료",
+                "model": model_name
+            }
+                
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"모델 중지 중 오류: {str(e)}",
+            "model": model_name
+        }
+
 @router.get("/health")
 async def health_check(
     service: ChatbotService = Depends(get_chatbot_service)
