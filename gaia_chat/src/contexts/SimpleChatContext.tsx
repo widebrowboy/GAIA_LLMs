@@ -137,9 +137,9 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
         abortControllerRef.current = null;
         // 정리 완료까지 짧은 대기
         await new Promise(resolve => setTimeout(resolve, 50));
-      } catch {
+      } catch (cleanupError) {
         // abort 과정에서 발생하는 에러는 무시
-        console.log('요청 정리 중 에러 (정상적인 동작):', error);
+        console.log('요청 정리 중 에러 (정상적인 동작):', cleanupError);
       }
     }
   };
@@ -415,14 +415,45 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
           };
           addMessage(assistantMessage);
           console.log(' 완전한 응답 메시지 저장 완료');
+          
+          // 스트리밍 완료 후 즉시 상태 해제
+          setIsLoading(false);
+          setIsStreaming(false);
+          setIsConnecting(false);
+          setStreamingResponse('');
+          console.log(' 스트리밍 완료 - 상태 즉시 해제');
         }
       }
     } catch (error) {
       console.error('스트리밍 응답 처리 실패:', error);
+      
+      // 오류가 발생했을 때도 기본 응답 제공
+      if (!controller.signal.aborted) {
+        const errorMessage: Message = {
+          id: 'assistant_' + Date.now(),
+          role: 'assistant',
+          content: '죄송합니다. 응답 처리 중 문제가 발생했습니다. 다시 시도해 주세요.',
+          timestamp: new Date(),
+          conversationId: conversation.id,
+          userQuestion: message,
+          isComplete: true
+        };
+        addMessage(errorMessage);
+      }
+      
+      setError('응답 처리 중 오류가 발생했습니다.');
     } finally {
+      // 모든 로딩 상태 강제 해제
       setIsLoading(false);
       setIsStreaming(false);
       setIsConnecting(false);
+      setStreamingResponse(''); // 스트리밍 응답 클리어
+      
+      // 진행 상태도 초기화
+      setWaitingTimer(0);
+      setIsWaitingForResponse(false);
+      
+      console.log('✅ 모든 로딩 상태 해제 완료');
     }
   };
 
