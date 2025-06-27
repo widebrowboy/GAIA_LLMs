@@ -48,38 +48,42 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [serverConnected] = useState(true);
   const [ollamaRunning, setOllamaRunning] = useState(false);
+  const [detailedModels, setDetailedModels] = useState<any[]>([]);
+  const [runningModels, setRunningModels] = useState<any[]>([]);
 
-  // 실제 Ollama 모델 상태 확인
+  // 실제 Ollama 모델 상태 확인 - 새로운 API 사용
   const checkSystemStatus = useCallback(async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
     
     try {
-      // Ollama API에서 직접 실행 중인 모델 확인
-      const response = await fetch('http://localhost:11434/api/ps', {
+      // GAIA-BT API 서버를 통해 정확한 모델 상태 확인
+      const response = await fetch(getApiUrl('/api/system/models/detailed'), {
         method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
         signal: controller.signal
       });
       
       if (response.ok) {
         const data = await response.json();
-        if (data.models && data.models.length > 0) {
-          const runningModel = data.models[0].name;
-          setCurrentModel(runningModel);
-          setOllamaRunning(true);
-          return true;
-        } else {
-          setOllamaRunning(false);
+        
+        // 현재 선택된 모델 업데이트
+        if (data.current_model) {
+          setCurrentModel(data.current_model);
         }
+        
+        // 실행 상태 업데이트
+        setOllamaRunning(data.current_model_running || false);
+        
+        return true;
       } else {
         setOllamaRunning(false);
       }
       
-      // Fallback: 기본 모델 상태 유지
       return true;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return true;
-      console.warn('Ollama 상태 확인 실패:', error);
+      console.warn('모델 상태 확인 실패:', error);
       setOllamaRunning(false);
       return true;
     } finally {
@@ -87,22 +91,34 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     }
   }, []);
 
-  // 사용 가능한 모델 목록 가져오기
+  // 사용 가능한 모델 목록 가져오기 - 상세 정보 포함
   const fetchAvailableModels = useCallback(async () => {
     setIsLoadingModels(true);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
     
     try {
-      const response = await fetch(getApiUrl('/api/system/models'), {
+      const response = await fetch(getApiUrl('/api/system/models/detailed'), {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal
       });
       
       if (response.ok) {
-        const models = await response.json();
-        setAvailableModels(models.models || []);
+        const data = await response.json();
+        // 설치된 모델 목록만 추출
+        const modelNames = data.available?.map((model: any) => model.name) || [];
+        setAvailableModels(modelNames);
+        
+        // 상세 모델 정보 저장
+        setDetailedModels(data.available || []);
+        setRunningModels(data.running || []);
+        
+        // 실행 상태도 업데이트
+        setOllamaRunning(data.current_model_running || false);
+        if (data.current_model) {
+          setCurrentModel(data.current_model);
+        }
       } else {
         const fallbackModels = [
           'gemma3-12b:latest',
@@ -595,26 +611,42 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                   <div className="mb-2">모델 목록을 불러오는 중...</div>
                   <div className="text-xs">잠시만 기다려주세요</div>
                 </div>
-              ) : availableModels.length > 0 ? (
-                availableModels.map((model) => (
-                  <button
-                    key={model}
-                    onClick={() => handleModelChange(model)}
-                    disabled={isModelChanging}
-                    className={`w-full text-left p-3 rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                      currentModel === model
-                        ? 'bg-blue-50 border-blue-200 text-blue-800'
-                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    <div className="font-medium">{model}</div>
-                    {currentModel === model && (
-                      <div className="text-xs text-blue-600 mt-1">
-                        {isModelChanging ? '변경 중...' : '현재 선택됨'}
+              ) : detailedModels.length > 0 ? (
+                detailedModels.map((model) => {
+                  const isRunning = runningModels.some(running => running.name === model.name);
+                  const isCurrent = currentModel === model.name;
+                  
+                  return (
+                    <button
+                      key={model.name}
+                      onClick={() => handleModelChange(model.name)}
+                      disabled={isModelChanging}
+                      className={`w-full text-left p-3 rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isCurrent
+                          ? 'bg-blue-50 border-blue-200 text-blue-800'
+                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-medium text-sm">{model.name}</div>
+                        <div className="flex items-center space-x-2">
+                          {isRunning && (
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="실행 중"></div>
+                          )}
+                          {isCurrent && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                              {isModelChanging ? '변경 중...' : '선택됨'}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </button>
-                ))
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <div>크기: {model.parameter_size}</div>
+                        <div>상태: {isRunning ? '🟢 실행 중' : '⚪ 대기 중'}</div>
+                      </div>
+                    </button>
+                  );
+                })
               ) : (
                 <div className="text-center text-gray-500 py-4">
                   <div className="mb-2">모델을 불러오는 중...</div>

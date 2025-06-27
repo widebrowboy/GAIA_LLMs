@@ -28,6 +28,63 @@ async def _get_ollama_models() -> List[str]:
         # 기본 모델 목록으로 폴백
         return ["gemma3:latest", "llama3.2:latest", "mistral:latest"]
 
+async def _get_ollama_running_models() -> List[Dict[str, Any]]:
+    """현재 실행 중인 Ollama 모델 목록 조회"""
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            response = await client.get("http://localhost:11434/api/ps")
+            response.raise_for_status()
+            data = response.json()
+            return data.get("models", [])
+    except Exception:
+        return []
+
+async def _get_ollama_model_details() -> Dict[str, Any]:
+    """전체 Ollama 모델 정보 조회 (설치된 모델 + 실행 중인 모델)"""
+    try:
+        available_models = []
+        running_models = []
+        
+        # 설치된 모델 목록
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            # 설치된 모델
+            tags_response = await client.get("http://localhost:11434/api/tags")
+            if tags_response.status_code == 200:
+                tags_data = tags_response.json()
+                for model in tags_data.get("models", []):
+                    available_models.append({
+                        "name": model["name"],
+                        "size": model.get("size", 0),
+                        "modified_at": model.get("modified_at", ""),
+                        "digest": model.get("digest", "")[:12] + "...",
+                        "parameter_size": model.get("details", {}).get("parameter_size", "Unknown")
+                    })
+            
+            # 실행 중인 모델
+            ps_response = await client.get("http://localhost:11434/api/ps")
+            if ps_response.status_code == 200:
+                ps_data = ps_response.json()
+                for model in ps_data.get("models", []):
+                    running_models.append({
+                        "name": model["name"],
+                        "size_vram": model.get("size_vram", 0),
+                        "expires_at": model.get("expires_at", ""),
+                        "is_running": True
+                    })
+        
+        return {
+            "available": available_models,
+            "running": running_models,
+            "status": "success"
+        }
+    except Exception as e:
+        return {
+            "available": [],
+            "running": [],
+            "status": "error",
+            "error": str(e)
+        }
+
 class SystemInfo(BaseModel):
     """시스템 정보 모델"""
     version: str = "2.0.0"
@@ -77,23 +134,35 @@ async def change_model(
     request: ModelChangeRequest,
     service: ChatbotService = Depends(get_chatbot_service)
 ) -> Dict[str, Any]:
-    """AI 모델 변경"""
+    """AI 모델 변경 및 Ollama 실행 보장"""
     chatbot = service.get_session(request.session_id)
     if not chatbot:
         raise HTTPException(404, f"세션 {request.session_id}를 찾을 수 없습니다")
     
     try:
-        # 1) Chatbot 내부 모델 교체
-        result = await chatbot.change_model(request.model)
-        # 2) Ollama 프로세스 보장 – 요청한 모델만 실행되도록 관리
+        # 먼저 요청된 모델이 Ollama에 설치되어 있는지 확인
+        available_models = await _get_ollama_models()
+        if request.model not in available_models:
+            raise HTTPException(400, f"모델 '{request.model}'이 Ollama에 설치되어 있지 않습니다. 설치된 모델: {available_models}")
+        
+        # 1) Ollama에서 모델 실행 보장 (먼저 실행)
         try:
-            from app.utils.ollama_manager import ensure_models_running
-            await ensure_models_running(["gemma3-12b:latest", chatbot.client.model_name])
+            from app.utils.ollama_manager import ensure_single_model_running
+            await ensure_single_model_running(request.model)
         except Exception as proc_err:
-            raise HTTPException(500, f"모델 프로세스 관리 실패: {proc_err}")
+            raise HTTPException(500, f"Ollama 모델 실행 실패: {proc_err}")
+        
+        # 2) Chatbot 내부 모델 교체
+        result = await chatbot.change_model(request.model)
+        
+        # 3) 모델 실행 상태 재확인
+        running_models = await _get_ollama_running_models()
+        model_running = any(model["name"] == request.model for model in running_models)
+        
         return {
             "success": True,
             "model": chatbot.client.model_name,
+            "model_running": model_running,
             "message": result
         }
     except Exception as e:
@@ -160,6 +229,37 @@ async def get_available_models(
     return {
         "models": models,
         "default": service.current_model,
+        "status": "success"
+    }
+
+@router.get("/models/detailed")
+async def get_detailed_models(
+    service: ChatbotService = Depends(get_chatbot_service)
+) -> Dict[str, Any]:
+    """상세한 모델 정보 가져오기 (설치된 모델 + 실행 중인 모델)"""
+    model_details = await _get_ollama_model_details()
+    current_model = service.current_model
+    
+    # 현재 선택된 모델이 실행 중인지 확인
+    current_model_running = any(
+        model["name"] == current_model 
+        for model in model_details.get("running", [])
+    )
+    
+    return {
+        **model_details,
+        "current_model": current_model,
+        "current_model_running": current_model_running
+    }
+
+@router.get("/models/running")
+async def get_running_models() -> Dict[str, Any]:
+    """현재 실행 중인 모델 목록 가져오기"""
+    running_models = await _get_ollama_running_models()
+    
+    return {
+        "running_models": running_models,
+        "count": len(running_models),
         "status": "success"
     }
 
