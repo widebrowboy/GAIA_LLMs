@@ -250,7 +250,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     let mounted = true;
     
     const doInitialLoad = async () => {
-      if (mounted && !isInitialized) {
+      if (mounted) {
         console.log('🚀 =============[ Sidebar 초기화 시작 ]=============');
         try {
           // 브라우저 환경 정보 출력
@@ -261,25 +261,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             href: window.location.href
           });
           
-          // 즉시 간단한 연결 테스트
-          console.log('🧪 간단한 연결 테스트 시작...');
-          try {
-            const testUrl = 'http://localhost:8000/health';
-            console.log('🌐 테스트 URL:', testUrl);
-            const testResponse = await fetch(testUrl);
-            console.log('✅ 간단 테스트 결과:', {
-              status: testResponse.status,
-              ok: testResponse.ok
-            });
-          } catch (testError) {
-            console.error('❌ 간단 테스트 실패:', testError);
-          }
-          
-          // 서버 연결 상태 설정
-          setServerConnected(true);
-          
-          // 먼저 폴백 데이터로 즉시 UI 업데이트 (사용자 경험 개선)
+          // 먼저 폴백 데이터로 즉시 UI 업데이트 (사용자 경험 최우선)
           console.log('🔄 즉시 폴백 데이터로 UI 업데이트');
+          setServerConnected(true);
           const immediateModels = [
             'gemma3-12b:latest',
             'txgemma-chat:latest', 
@@ -288,6 +272,24 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           ];
           setAvailableModels(immediateModels);
           setDetailedModels(immediateModels.map(name => ({ name, parameter_size: '12B' })));
+          console.log('✅ 폴백 데이터 설정 완료 - 모델 수:', immediateModels.length);
+          
+          // 간단한 연결 테스트 (백그라운드)
+          console.log('🧪 백그라운드 연결 테스트 시작...');
+          try {
+            const testController = new AbortController();
+            setTimeout(() => testController.abort(), 2000); // 2초 타임아웃
+            
+            const testUrl = 'http://localhost:8000/health';
+            console.log('🌐 테스트 URL:', testUrl);
+            const testResponse = await fetch(testUrl, { signal: testController.signal });
+            console.log('✅ 연결 테스트 성공:', {
+              status: testResponse.status,
+              ok: testResponse.ok
+            });
+          } catch (testError) {
+            console.error('❌ 연결 테스트 실패:', testError);
+          }
           
           // 백그라운드에서 실제 API 호출 시도
           console.log('📡 백그라운드 API 호출로 실제 데이터 가져오기 시도');
