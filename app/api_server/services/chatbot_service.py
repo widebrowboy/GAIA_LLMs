@@ -313,7 +313,7 @@ class ChatbotService:
             "debug": chatbot.config.debug_mode,
             "mcp_output_visible": chatbot.config.show_mcp_output,
             "available_models": ["gemma3-12b:latest", "txgemma-chat:latest", "txgemma-predict:latest", "Gemma3:27b-it-q4_K_M"],
-            "available_prompts": list(self.prompt_manager.templates.keys())
+            "available_prompts": list(self.prompt_manager.templates.keys()) if hasattr(self.prompt_manager, 'templates') and self.prompt_manager.templates else []
         }
     
     def get_all_sessions(self) -> List[Dict[str, Any]]:

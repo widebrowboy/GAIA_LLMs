@@ -267,188 +267,133 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
 
         let fullResponse = '';
         let isCompleted = false;
-        let partialLine = ''; // 여러 청크에 걸친 라인을 처리하기 위한 변수
-        let responseChunks: string[] = []; // 모든 청크를 수집하여 완전성 보장
         let lastUpdateTime = Date.now();
-        
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            
-            if (done) {
-              // 스트림이 종료되었지만 [DONE] 마커가 없는 경우도 처리
-              if (!isCompleted && fullResponse) {
-                isCompleted = true;
-                console.log('✓ 스트림 종료 감지 - 응답 완료');
-              }
-              break;
-            }
-            
-            // 청크 디코딩 및 부분 라인과 합치기
-            const chunk = decoder.decode(value, { stream: true });
-            const chunkText = partialLine + chunk;
-            const lines = chunkText.split('\n');
-            
-            // 마지막 라인이 완전하지 않을 수 있으므로 저장
-            partialLine = lines.pop() || '';
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6).trim();
-                
-                if (data === '[DONE]') {
-                  isCompleted = true;
-                  console.log('✓ [DONE] 마커 수신 - 응답 완료');
-                  break;
-                }
-                
-                if (data && data !== '') {
-                  let contentToAdd = '';
-                  try {
-                    // JSON 데이터를 파싱하려고 시도
-                    const jsonData = JSON.parse(data);
-                    contentToAdd = jsonData.content || jsonData.response || jsonData.text || data;
-                  } catch {
-                    // JSON이 아닌 일반 텍스트인 경우
-                    contentToAdd = data;
-                  }
-                  
-                  if (contentToAdd) {
-                    fullResponse += contentToAdd;
-                    responseChunks.push(contentToAdd);
-                    
-                    // 응답 품질 향상을 위한 적응적 업데이트
-                    const currentTime = Date.now();
-                    if (currentTime - lastUpdateTime > 50 || contentToAdd.includes('\n') || 
-                        /[.!?]\s*$/.test(contentToAdd) || responseChunks.length % 5 === 0) {
-                      setStreamingResponse(fullResponse);
-                      lastUpdateTime = currentTime;
-                    }
-                  }
-                }
-              } else if (line.trim() !== '') {
-                // 'data:' 접두사가 없는 유효한 라인도 처리
-                const content = line.trim();
-                fullResponse += content;
-                responseChunks.push(content);
-                setStreamingResponse(fullResponse);
-              }
-            }
-            
-            if (isCompleted) break;
+        const responseChunks: string[] = [];
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            isCompleted = true;
+            break;
           }
-          
-          // 마지막 부분 라인 처리 - 완전성 보장
-          if (partialLine && partialLine.trim()) {
-            let finalContent = '';
-            if (partialLine.startsWith('data: ')) {
-              const data = partialLine.slice(6).trim();
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim();
               if (data && data !== '' && data !== '[DONE]') {
                 try {
                   const jsonData = JSON.parse(data);
-                  finalContent = jsonData.content || jsonData.response || jsonData.text || data;
+                  const content = jsonData.content || jsonData.response || jsonData.text || data;
+                  fullResponse += content;
+                  responseChunks.push(content);
+                  
+                  // 응답 품질 향상을 위한 적응적 업데이트
+                  const currentTime = Date.now();
+                  if (currentTime - lastUpdateTime > 50 || content.includes('\n') || 
+                      /[.!?]\s*$/.test(content) || responseChunks.length % 5 === 0) {
+                    setStreamingResponse(fullResponse);
+                    lastUpdateTime = currentTime;
+                  }
                 } catch {
-                  finalContent = data;
+                  // JSON이 아닌 일반 텍스트인 경우
+                  const content = data;
+                  fullResponse += content;
+                  responseChunks.push(content);
+                  setStreamingResponse(fullResponse);
                 }
               }
-            } else if (partialLine.trim() !== '') {
-              finalContent = partialLine.trim();
-            }
-            
-            if (finalContent) {
-              fullResponse += finalContent;
-              responseChunks.push(finalContent);
+            } else if (line.trim() !== '') {
+              // 'data:' 접두사가 없는 유효한 라인도 처리
+              const content = line.trim();
+              fullResponse += content;
+              responseChunks.push(content);
               setStreamingResponse(fullResponse);
             }
           }
-          
-          // 최종 응답 완전성 검증
-          const finalResponseLength = fullResponse.length;
-          const chunksTotal = responseChunks.join('').length;
-          console.log(`📊 응답 완전성 검증: 최종응답=${finalResponseLength}자, 청크총합=${chunksTotal}자`);
-          
-          if (finalResponseLength !== chunksTotal && responseChunks.length > 0) {
-            // 불일치 시 청크 기반으로 재구성
-            fullResponse = responseChunks.join('');
-            setStreamingResponse(fullResponse);
-            console.log('🔧 응답 재구성 완료');
-          }
-          
-          console.log(`✓ 스트리밍 응답 완료 (${fullResponse.length}자, ${responseChunks.length}개 청크)`);
-          
-          // 스트리밍 완료 후 최종 마크다운 검증 및 정리
-          let finalContent = fullResponse.trim();
-          if (finalContent) {
-            // 마크다운 구조 개선을 위한 후처리
-            finalContent = finalContent
-              .replace(/\n{3,}/g, '\n\n') // 과도한 줄바꿈 정리
-              .replace(/([.!?])([A-Za-z가-힣])/g, '$1 $2') // 문장 간 공백 확보
-              .replace(/#{1,6}\s*([^\n]+)/g, (match, title) => {
-                // 마크다운 헤더 정리
-                const level = match.indexOf(' ');
-                return '#'.repeat(Math.min(level, 6)) + ' ' + title.trim();
-              });
-            
-            console.log('📝 마크다운 후처리 완료');
-          }
-          
-          // After streaming finished, add assistant message with userQuestion field
-          if (finalContent && !controller.signal.aborted) {
-            const assistantMessage: Message = {
-              id: 'assistant_' + Date.now(),
-              role: 'assistant',
-              content: finalContent,
-              timestamp: new Date(),
-              conversationId: conversation.id,
-              userQuestion: message, // Save the user question for traceability
-              isComplete: true // 완전한 응답임을 표시
-            };
-            addMessage(assistantMessage);
-            console.log('💾 완전한 응답 메시지 저장 완료');
-          } else {
-            throw new Error('응답을 받았지만 내용이 비어있습니다');
-          }
-          
-        } finally {
-          reader.releaseLock();
         }
-
-        setIsConnected(true);
-      } else {
-        throw new Error(`API 오류: ${response.status} ${response.statusText}`);
+        
+        // 마지막 부분 라인 처리 - 완전성 보장
+        const partialLine = decoder.decode();
+        if (partialLine && partialLine.trim()) {
+          let finalContent = '';
+          if (partialLine.startsWith('data: ')) {
+            const data = partialLine.slice(6).trim();
+            if (data && data !== '' && data !== '[DONE]') {
+              try {
+                const jsonData = JSON.parse(data);
+                finalContent = jsonData.content || jsonData.response || jsonData.text || data;
+              } catch {
+                finalContent = data;
+              }
+            }
+          } else if (partialLine.trim() !== '') {
+            finalContent = partialLine.trim();
+          }
+          
+          if (finalContent) {
+            fullResponse += finalContent;
+            responseChunks.push(finalContent);
+            setStreamingResponse(fullResponse);
+          }
+        }
+        
+        // 최종 응답 완전성 검증
+        const finalResponseLength = fullResponse.length;
+        const chunksTotal = responseChunks.join('').length;
+        console.log(` 응답 완전성 검증: 최종응답=${finalResponseLength}자, 청크총합=${chunksTotal}자`);
+        
+        if (finalResponseLength !== chunksTotal && responseChunks.length > 0) {
+          // 불일치 시 청크 기반으로 재구성
+          fullResponse = responseChunks.join('');
+          setStreamingResponse(fullResponse);
+          console.log(' 응답 재구성 완료');
+        }
+        
+        console.log(` 스트리밍 응답 완료 (${fullResponse.length}자, ${responseChunks.length}개 청크)`);
+        
+        // 스트리밍 완료 후 최종 마크다운 검증 및 정리
+        let finalContent = fullResponse.trim();
+        if (finalContent) {
+          // 마크다운 구조 개선을 위한 후처리
+          finalContent = finalContent
+            .replace(/\n{3,}/g, '\n\n') // 과도한 줄바꿈 정리
+            .replace(/([.!?])([A-Za-z가-힣])/g, '$1 $2') // 문장 간 공백 확보
+            .replace(/#{1,6}\s*([^\n]+)/g, (match, title) => {
+              // 마크다운 헤더 정리
+              const level = match.indexOf(' ');
+              return '#'.repeat(Math.min(level, 6)) + ' ' + title.trim();
+            });
+          
+          console.log(' 마크다운 후처리 완료');
+        }
+        
+        // After streaming finished, add assistant message with userQuestion field
+        if (finalContent && !controller.signal.aborted) {
+          const assistantMessage: Message = {
+            id: 'assistant_' + Date.now(),
+            role: 'assistant',
+            content: finalContent,
+            timestamp: new Date(),
+            conversationId: conversation.id,
+            userQuestion: message, // Save the user question for traceability
+            isComplete: true // 완전한 응답임을 표시
+          };
+          addMessage(assistantMessage);
+          console.log(' 완전한 응답 메시지 저장 완료');
+        }
       }
-    } catch (err) {
-      console.error('메시지 전송 오류:', err);
-      
-      // AbortError 처리
-      if (err instanceof Error && err.name === 'AbortError') {
-        return;
-      }
-      
-      setError(`메시지 전송 실패: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
-      setIsConnected(false);
-
-      // 오류 메시지 추가
-      if (conversation) {
-        const errorMessage: Message = {
-          id: 'msg_' + Date.now() + '_error',
-          content: `죄송합니다. 메시지 전송 중 오류가 발생했습니다. (${err instanceof Error ? err.message : '알 수 없는 오류'})`,
-          role: 'assistant',
-          timestamp: new Date(),
-          conversationId: conversation.id
-        };
-        addMessage(errorMessage);
-      }
+    } catch (error) {
+      console.error('스트리밍 응답 처리 실패:', error);
     } finally {
       setIsLoading(false);
       setIsStreaming(false);
       setIsConnecting(false);
-      setStreamingResponse('');
-      abortControllerRef.current = null;
     }
   };
 
-  // 모드 토글 함수 - 간소화된 버전
   const toggleMode = async () => {
     if (isModeChanging) return;
 

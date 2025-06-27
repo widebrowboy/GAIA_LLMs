@@ -29,6 +29,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
     isStreaming,
     streamingResponse,
     isConnecting,
+    error,
     setCurrentConversation,
     setConversations
   } = ctx;
@@ -291,6 +292,31 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
             <div className="flex flex-col items-center justify-center h-full text-gray-400 select-none py-24">
               <span className="text-4xl mb-4">💬</span>
               <span className="text-lg">아직 메시지가 없습니다.</span>
+            </div>
+          )}
+
+          {/* 에러 메시지 표시 */}
+          {error && (
+            <div className="flex items-start space-x-4 mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-400 via-pink-500 to-red-600 flex items-center justify-center text-2xl shadow-xl border-2 border-red-300/50">
+                ⚠️
+              </div>
+              
+              <div className="bg-gradient-to-br from-red-50/90 via-pink-50/90 to-red-100/90 border-2 border-red-200/70 rounded-3xl px-6 py-4 shadow-xl flex-1 backdrop-blur-sm">
+                <div className="flex items-center space-x-2 mb-3">
+                  <span className="text-sm">❌</span>
+                  <span className="text-xs font-bold text-red-700">오류 발생</span>
+                </div>
+                <div className="text-red-800 text-sm">
+                  {error}
+                </div>
+                <button
+                  onClick={() => ctx.setError && ctx.setError(null)}
+                  className="mt-3 px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-xs transition-colors"
+                >
+                  닫기
+                </button>
+              </div>
             </div>
           )}
 

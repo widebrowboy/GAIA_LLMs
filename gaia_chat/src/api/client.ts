@@ -158,10 +158,12 @@ export function patch<T = any>(endpoint: string, data?: any, options: RequestOpt
  * 스트리밍 응답 처리 도우미
  * @param response 스트리밍 응답
  * @param onChunk 청크 데이터 처리 콜백
+ * @param timeout 타임아웃 (밀리초, 기본값: 30초)
  */
 export async function handleStreamingResponse(
   response: Response,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  timeout: number = 30000
 ): Promise<void> {
   const reader = response.body?.getReader();
   if (!reader) {
@@ -174,6 +176,11 @@ export async function handleStreamingResponse(
   let lastChunk = '';
   // 누적 텍스트 - 줄바꿈 또는 문장 경계가 확인될 때만 onChunk 호출
   let accumulated = '';
+  
+  // 타임아웃 설정
+  const timeoutId = setTimeout(() => {
+    reader.cancel('타임아웃');
+  }, timeout);
 
   try {
     while (!done) {
@@ -306,6 +313,11 @@ export async function handleStreamingResponse(
   } catch (error) {
     console.error('스트리밍 처리 중 오류:', error);
     throw error;
+  } finally {
+    // 타임아웃 정리
+    clearTimeout(timeoutId);
+    // Reader 정리
+    reader.releaseLock();
   }
 }
 

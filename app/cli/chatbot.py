@@ -958,10 +958,12 @@ class DrugDevelopmentChatbot:
                     
         except Exception as e:
             import traceback
-            error_msg = f"스트리밍 응답 생성 중 오류 발생: {e!s}"
-            if self.settings["debug_mode"]:
-                print(f"\n[오류 상세 정보]\n{traceback.format_exc()}")
+            error_msg = f"오류: 스트리밍 응답 생성 중 예외 발생: {e!s}"
+            if self.settings.get("debug_mode", False):
+                tb = traceback.format_exc()
+                yield f"오류: 상세 정보: {tb}"
             yield error_msg
+            return
 
     def _extract_references_from_context(self, deep_search_context: str) -> str:
         """Deep Search 결과에서 참고문헌 정보를 추출하여 구조화"""

@@ -65,7 +65,11 @@ async def get_system_info(
         "mcp_enabled": service.mcp_enabled,
         "debug": service.debug_mode,
         "available_models": available_models,
-        "available_prompts": list(prompt_manager.templates.keys())
+        # templates 프로퍼티 AttributeError 등 모든 예외 방지
+        "available_prompts": (lambda: (
+            list(prompt_manager.templates.keys()) if hasattr(prompt_manager, 'templates') and isinstance(prompt_manager.templates, dict)
+            else []
+        ))()
     }
 
 @router.post("/model")

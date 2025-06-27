@@ -100,15 +100,33 @@ app.add_middleware(UTF8EncodingMiddleware)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """전역 예외 처리 - JSON 응답 보장"""
-    logger.error(f"Unhandled exception: {str(exc)}")
-    logger.error(f"Traceback: {traceback.format_exc()}")
+    # 상세한 오류 정보 로깅
+    error_details = {
+        "error_type": type(exc).__name__,
+        "error_message": str(exc),
+        "request_url": str(request.url),
+        "request_method": request.method,
+        "request_headers": dict(request.headers),
+        "traceback": traceback.format_exc()
+    }
+    
+    logger.error(f"🚨 Internal Server Error occurred:")
+    logger.error(f"📍 URL: {request.method} {request.url}")
+    logger.error(f"🔍 Error Type: {type(exc).__name__}")
+    logger.error(f"💬 Error Message: {str(exc)}")
+    logger.error(f"📋 Full Traceback:\n{traceback.format_exc()}")
+    
+    # PromptManager 관련 오류 특별 처리
+    if "PromptManager" in str(exc) or "templates" in str(exc):
+        logger.error("🎯 PromptManager 관련 오류 감지 - templates property 접근 문제일 가능성")
     
     return JSONResponse(
         status_code=500,
         content={
             "error": "Internal Server Error",
             "message": str(exc),
-            "type": type(exc).__name__
+            "type": type(exc).__name__,
+            "timestamp": str(asyncio.get_event_loop().time()) if hasattr(asyncio, 'get_event_loop') else None
         }
     )
 

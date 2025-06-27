@@ -87,8 +87,14 @@ export const NewChatProvider = ({ children }: NewChatProviderProps) => {
       const apiUrl = getApiUrl('/api/chat/stream');
       console.log('🌐 API 요청 시작...', { url: apiUrl, sessionId, messageLength: content.length });
       
-      // Fetch API를 사용한 스트리밍 방식으로 변경
+      // Fetch API를 사용한 스트리밍 방식으로 변경 (타임아웃 및 취소 지원)
       let fullResponse = '';
+      
+      // AbortController로 요청 취소 지원
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        abortController.abort();
+      }, 120000); // 2분 타임아웃
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -98,7 +104,8 @@ export const NewChatProvider = ({ children }: NewChatProviderProps) => {
         body: JSON.stringify({
           message: content,
           session_id: sessionId,
-        })
+        }),
+        signal: abortController.signal
       });
 
       console.log('📡 Fetch 응답 수신:', response.status, response.statusText);
@@ -267,7 +274,25 @@ export const NewChatProvider = ({ children }: NewChatProviderProps) => {
       
     } catch (error: unknown) {
       console.error('❌ 스트리밍 오류:', error);
-      setError(error instanceof Error ? error.message : '알 수 없는 오류');
+      
+      // 타임아웃 정리
+      clearTimeout(timeoutId);
+      
+      // 에러 타입별 처리
+      let errorMessage = '알 수 없는 오류';
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = '요청이 타임아웃되었습니다. 잠시 후 다시 시도해주세요.';
+        } else if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+          errorMessage = '네트워크 연결에 문제가 있습니다. 인터넷 연결을 확인해주세요.';
+        } else if (error.message.includes('500')) {
+          errorMessage = '서버에 일시적인 문제가 있습니다. 잠시 후 다시 시도해주세요.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setError(errorMessage);
       setIsStreaming(false);
       setIsConnecting(false);
       setStreamingResponse('');
