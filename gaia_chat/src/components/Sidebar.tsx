@@ -47,32 +47,45 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   const [showModelDialog, setShowModelDialog] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [serverConnected] = useState(true);
+  const [ollamaRunning, setOllamaRunning] = useState(false);
 
-  // 시스템 상태 확인
+  // 실제 Ollama 모델 상태 확인
   const checkSystemStatus = useCallback(async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
     
     try {
-      const response = await fetch(getApiUrl('/health'), {
+      // Ollama API에서 직접 실행 중인 모델 확인
+      const response = await fetch('http://localhost:11434/api/ps', {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
         signal: controller.signal
       });
       
       if (response.ok) {
-        await response.json();
-        // 상태 업데이트 로직 제거 (현재는 컨텍스트에서 관리)
+        const data = await response.json();
+        if (data.models && data.models.length > 0) {
+          const runningModel = data.models[0].name;
+          setCurrentModel(runningModel);
+          setOllamaRunning(true);
+          return true;
+        } else {
+          setOllamaRunning(false);
+        }
       } else {
-        // 에러 상태 처리 (현재는 컨텍스트에서 관리)
+        setOllamaRunning(false);
       }
+      
+      // Fallback: 기본 모델 상태 유지
+      return true;
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') return;
-      // 오프라인 상태 처리 (현재는 컨텍스트에서 관리)
+      if (error instanceof Error && error.name === 'AbortError') return true;
+      console.warn('Ollama 상태 확인 실패:', error);
+      setOllamaRunning(false);
+      return true;
     } finally {
       clearTimeout(timeoutId);
     }
-  }, [currentModel, currentMode, mcpEnabled]);
+  }, []);
 
   // 사용 가능한 모델 목록 가져오기
   const fetchAvailableModels = useCallback(async () => {
@@ -357,14 +370,23 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             </div>
             <div className="flex justify-between items-center">
               <span>모델:</span>
-              <button
-                onClick={handleOpenModelDialog}
-                disabled={isModelChanging || !serverConnected}
-                className="font-medium text-blue-600 truncate max-w-32 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
-                title={!serverConnected ? '서버 연결 필요' : isModelChanging ? '모델 변경 중...' : `현재 모델: ${currentModel || 'N/A'} (클릭하여 변경)`}
-              >
-                {isModelChanging ? '변경 중...' : (currentModel || 'N/A')}
-              </button>
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  ollamaRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                }`}></div>
+                <button
+                  onClick={handleOpenModelDialog}
+                  disabled={isModelChanging || !serverConnected}
+                  className={`font-medium truncate max-w-28 disabled:cursor-not-allowed transition-colors ${
+                    ollamaRunning 
+                      ? 'text-green-600 hover:text-green-800' 
+                      : 'text-gray-600 hover:text-gray-800'
+                  } disabled:text-gray-400`}
+                  title={!serverConnected ? '서버 연결 필요' : isModelChanging ? '모델 변경 중...' : `현재 모델: ${currentModel || 'N/A'} ${ollamaRunning ? '(실행 중)' : '(중지됨)'} (클릭하여 변경)`}
+                >
+                  {isModelChanging ? '변경 중...' : (currentModel || 'N/A')}
+                </button>
+              </div>
             </div>
             <div className="flex justify-between">
               <span>MCP:</span>
@@ -539,7 +561,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           <div className="flex items-center justify-center space-x-2 mb-1">
             <span className="text-sm">🧬</span>
             <p className="text-xs font-bold bg-gradient-to-r from-emerald-700 to-blue-700 bg-clip-text text-transparent">
-              GAIA-BT v2.7
+              GAIA-BT v3.5
             </p>
           </div>
           <p className="text-xs text-emerald-600 font-medium">

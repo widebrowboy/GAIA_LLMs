@@ -6,9 +6,6 @@ import Image from 'next/image';
 import { useChatContext } from '@/contexts/SimpleChatContext';
 import { useResponsive } from '@/hooks/useResponsive';
 import MessageItem from './MessageItem';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
 
 interface ChatAreaProps {
   onToggleSidebar?: () => void;
@@ -336,13 +333,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                 </div>
-                <div className="prose prose-sm max-w-none overflow-wrap-anywhere break-words text-gray-900">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeHighlight]}
-                  >
-                    {streamingResponse}
-                  </ReactMarkdown>
+                <div className="whitespace-pre-wrap break-words leading-relaxed text-gray-900">
+                  {streamingResponse}
                   <span className="inline-block w-3 h-5 bg-gradient-to-r from-emerald-500 to-blue-500 animate-pulse ml-1 rounded"></span>
                 </div>
               </div>

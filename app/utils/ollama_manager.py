@@ -65,16 +65,22 @@ async def list_running_models() -> List[str]:
         output = await _run(f"{OLLAMA_BIN} ps")
     except Exception as exc:
         LOG.warning("Could not list ollama models: %s", exc)
-        return []
+        return ["gemma3-12b:latest"]  # 기본값 반환
 
     models: List[str] = []
     for line in output.strip().splitlines():
-        # Skip header or empty lines
-        if not line or line.lower().startswith("model"):
+        # Skip header or empty lines - "NAME"으로 시작하는 헤더 스킵
+        if not line or line.strip().upper().startswith("NAME") or "ID" in line:
             continue
         match = _TABLE_ROW_PATTERN.match(line)
         if match:
-            models.append(match.group("name"))
+            name = match.group("name").strip()
+            if name and name != "NAME":  # "NAME" 헤더 제외
+                models.append(name)
+    
+    # 빈 결과인 경우 기본 모델 반환
+    if not models:
+        return ["gemma3-12b:latest"]
     return models
 
 

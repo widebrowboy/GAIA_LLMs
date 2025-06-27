@@ -234,8 +234,10 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
           'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive'
+          'Connection': 'keep-alive',
+          'Referrer-Policy': 'same-origin'
         },
+        signal: controller.signal,
         body: JSON.stringify({
           message: message,
           session_id: sessionId,
