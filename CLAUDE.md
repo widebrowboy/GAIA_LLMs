@@ -1,4 +1,4 @@
-# GAIA-BT v3.6 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.7 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
@@ -286,8 +286,28 @@ git reset --hard [커밋해시]
 - **v2.9**: Ollama API 응답 완전성 보장 및 보고서 스타일 마크다운 렌더링 구현
 - **v3.0**: 테스트 전 API 서버 재시작 필수 절차 지침 추가
 - **v3.1**: Todo 관리 규칙 및 워크플로우 지침 추가
+- **v3.2**: API 서버 시작 시 Ollama 모델 자동 검증 및 시작 기능 구현
+- **v3.3**: WebUI와 API 서버 간 상태 동기화 문제 해결 시작
+- **v3.4**: Ollama 모델 상태 관리 및 자동 시작 로직 완성
+- **v3.5**: 실시간 응답, 프론트엔드 오류 안내, API 개선 완료
+- **v3.6**: WebUI Sidebar 시스템 상태 새로고침 버튼 추가
+- **v3.7**: WebUI 모델 관리 완전 구현 및 API 강화
 
-### 완료된 Todo 기록 (v3.1)
+### 완료된 Todo 기록 (v3.7)
+
+#### v3.2-3.7: Ollama 모델 관리 시스템 구현
+- ✅ API 서버 시작 시 Ollama 모델 상태 검증 기능 구현 (`startup_validator.py`)
+- ✅ 최소 1개 이상 모델 실행 보장 로직 추가
+- ✅ 우선순위 기반 모델 자동 시작 시스템 (gemma3-12b → txgemma-chat → Gemma3:27b → txgemma-predict)
+- ✅ WebUI 시스템 상태에서 모델 정보 표시 문제 해결
+- ✅ 사용 가능한 모델 개수가 0개로 표시되던 문제 수정
+- ✅ API에 모델 시작/중지 엔드포인트 추가 (`/api/system/models/{model_name}/start|stop`)
+- ✅ WebUI Sidebar에 시스템 상태 새로고침 버튼 구현
+- ✅ 모델 다이얼로그에 개별 모델 시작/중지 버튼 추가
+- ✅ ChatbotService에 `update_current_model` 메서드 추가
+- ✅ 실시간 모델 상태 동기화 개선
+
+#### v3.1 이전: 기본 기능
 - ✅ Ollama API 연결 상태 및 설정 확인
 - ✅ API 서버의 Ollama 통신 로직 분석  
 - ✅ WebUI에서 API 서버 통신 흐름 확인
@@ -297,6 +317,113 @@ git reset --hard [커밋해시]
 - ✅ CLAUDE.md에 API 서버 재시작 지침 추가
 - ✅ Todo 관리 규칙을 지침에 추가
 
+## 🚨 중요 문제 해결 및 향후 주의사항
+
+### v3.7에서 해결한 주요 문제
+
+#### 1. WebUI-Backend 모델 상태 동기화 문제
+**문제**: WebUI에서 모델 상태가 실제와 다르게 표시됨
+- 사용 가능한 모델: 0개로 표시 (실제 4개)
+- 실행 중인 모델: 표시되지 않음
+- 시스템 상태: 비활성화로 표시
+
+**원인 분석**:
+- `fetchAvailableModels` 함수의 API 응답 처리 불완전
+- 모델 상태 업데이트 이벤트 전파 누락
+- Backend에서 모델이 실행되어도 Frontend 상태 미반영
+
+**해결책**:
+1. **API 응답 구조 정확한 매핑**:
+   ```typescript
+   const modelNames = data.available?.map((model: any) => model.name) || [];
+   setAvailableModels(modelNames);
+   setDetailedModels(data.available || []);
+   setRunningModels(data.running || []);
+   ```
+
+2. **시스템 상태 새로고침 버튼 추가**:
+   - 수동 상태 업데이트 기능 제공
+   - `refreshSystemStatus` 함수와 연동
+
+3. **모델 시작/중지 API 엔드포인트 구현**:
+   ```python
+   @router.post("/models/{model_name}/start")
+   @router.post("/models/{model_name}/stop")
+   ```
+
+#### 2. 모델 실행 상태 관리 문제
+**문제**: Ollama 모델이 실행되지 않아도 시스템이 정상으로 인식
+
+**해결책**:
+1. **startup_validator.py 구현**:
+   - 서버 시작 시 자동 모델 검증
+   - 우선순위 기반 모델 자동 시작
+   - 타임아웃 및 에러 처리 강화
+
+2. **ChatbotService 모델 관리 강화**:
+   ```python
+   def update_current_model(self, model_name: str) -> None:
+       if "default" in self.sessions:
+           self.sessions["default"].client._model_name = model_name
+   ```
+
+### 향후 발생 가능한 문제 및 예방 조치
+
+#### 1. 메모리 관리 문제
+**위험**: 여러 대형 모델 동시 실행 시 시스템 리소스 부족
+**예방책**:
+- 모델별 메모리 사용량 모니터링 추가
+- 자동 모델 언로딩 정책 구현 (keep_alive 시간 관리)
+- 시스템 리소스 한계치 설정
+
+#### 2. 동시성 문제
+**위험**: 여러 사용자가 동시에 모델 변경 시 충돌
+**예방책**:
+- 모델 변경 시 락(lock) 메커니즘 구현
+- 모델 상태 변경 큐잉 시스템 도입
+- 사용자별 모델 인스턴스 격리
+
+#### 3. 네트워크 연결 문제
+**위험**: Ollama 서비스 다운 시 전체 시스템 마비
+**예방책**:
+- Ollama 서비스 자동 재시작 로직
+- 연결 실패 시 재시도 메커니즘 강화
+- 오프라인 모드 또는 대체 모델 지원
+
+#### 4. API 응답 지연 문제
+**위험**: 대형 모델 로딩 시 타임아웃으로 인한 서비스 중단
+**예방책**:
+- 적응적 타임아웃 설정 (모델 크기별)
+- 모델 로딩 진행률 표시
+- 백그라운드 모델 pre-loading
+
+#### 5. 상태 동기화 문제
+**위험**: WebUI와 Backend 상태 불일치 지속
+**예방책**:
+- WebSocket 기반 실시간 상태 업데이트
+- 주기적 상태 동기화 백그라운드 작업
+- 상태 불일치 감지 및 자동 복구
+
+### 개발 시 필수 체크리스트
+
+#### 모델 관리 관련
+- [ ] 새 모델 추가 시 우선순위 리스트 업데이트
+- [ ] 모델 변경 후 상태 동기화 함수 호출
+- [ ] 에러 처리 시 사용자 친화적 메시지 제공
+- [ ] 타임아웃 설정의 적절성 검토
+
+#### UI/UX 관련  
+- [ ] 로딩 상태 표시 구현
+- [ ] 에러 상황 시 복구 방법 안내
+- [ ] 모델 상태 변경 시 즉시 UI 반영
+- [ ] 접근성 고려 (키보드 네비게이션, 스크린 리더)
+
+#### 성능 관련
+- [ ] 불필요한 API 호출 방지
+- [ ] 상태 업데이트 디바운싱 적용
+- [ ] 메모리 누수 방지 (이벤트 리스너 정리)
+- [ ] 대용량 모델 처리 시 진행률 표시
+
 ---
 
-**GAIA-BT v3.1** - 신약개발 연구의 새로운 패러다임 🧬✨
+**GAIA-BT v3.7** - 신약개발 연구의 새로운 패러다임 🧬✨
