@@ -269,8 +269,17 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
       console.log('📡 스트리밍 응답 수신:', {
         status: response.status,
         ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
+        headers: Object.fromEntries(response.headers.entries()),
+        bodyUsed: response.bodyUsed,
+        type: response.type
       });
+      
+      // 응답 상태 상세 확인
+      if (response.status === 200 && response.ok) {
+        console.log('✅ HTTP 200 OK - 스트리밍 응답 시작');
+      } else {
+        console.error('❌ HTTP 오류:', response.status, response.statusText);
+      }
       
       clearTimeout(timeoutId);
       
@@ -288,9 +297,9 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
       }
 
       if (response.ok) {
-        // 스트리밍 응답 처리 개선
+        // 스트리밍 응답 처리 단순화
         const reader = response.body?.getReader();
-        const decoder = new TextDecoder('utf-8', { fatal: false });
+        const decoder = new TextDecoder('utf-8');
         
         if (!reader) {
           throw new Error('스트림 리더를 가져올 수 없습니다');
@@ -298,91 +307,50 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
 
         console.log('📖 스트림 리더 시작 - 응답 읽기 시작');
         let fullResponse = '';
-        let isCompleted = false;
-        let lastUpdateTime = Date.now();
-        const responseChunks: string[] = [];
         let chunkCount = 0;
 
-        while (true) {
-          const { done, value } = await reader.read();
-          chunkCount++;
-          
-          if (chunkCount <= 5 || chunkCount % 10 === 0) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            chunkCount++;
+            
             console.log(`📦 청크 ${chunkCount} 수신:`, { done, valueLength: value?.length });
-          }
-          
-          if (done) {
-            isCompleted = true;
-            console.log(`✅ 스트림 완료 - 총 ${chunkCount}개 청크 처리`);
-            break;
-          }
+            
+            if (done) {
+              console.log(`✅ 스트림 완료 - 총 ${chunkCount}개 청크 처리`);
+              break;
+            }
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-              if (data && data !== '' && data !== '[DONE]') {
-                try {
-                  const jsonData = JSON.parse(data);
-                  const content = jsonData.content || jsonData.response || jsonData.text || data;
+            // 바이트를 텍스트로 변환
+            const chunk = decoder.decode(value, { stream: true });
+            console.log(`📝 청크 ${chunkCount} 내용:`, chunk.substring(0, 100) + '...');
+            
+            // SSE 형식 파싱
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6).trim();
+                
+                if (data === '[DONE]') {
+                  console.log('🏁 [DONE] 신호 수신');
+                  break;
+                } else if (data && data !== '') {
+                  // 데이터를 fullResponse에 추가
+                  fullResponse += data;
                   
-                  // 오류 메시지 감지 및 처리
-                  if (content.includes('[연결 오류]') || content.includes('[모델 시작 오류]')) {
-                    console.error('Ollama 연결/모델 오류 감지:', content);
-                    setError(`Ollama 연결 문제가 발생했습니다: ${content}`);
-                    setIsStreaming(false);
-                    setIsConnecting(false);
-                    return;
-                  }
-                  
-                  fullResponse += content;
-                  responseChunks.push(content);
-                  
-                  // 응답 품질 향상을 위한 적응적 업데이트
-                  const currentTime = Date.now();
-                  if (currentTime - lastUpdateTime > 50 || content.includes('\n') || 
-                      /[.!?]\s*$/.test(content) || responseChunks.length % 5 === 0) {
-                    setStreamingResponse(fullResponse);
-                    lastUpdateTime = currentTime;
-                  }
-                } catch {
-                  // JSON이 아닌 일반 텍스트인 경우
-                  const content = data;
-                  
-                  // 오류 메시지 감지 및 처리 (일반 텍스트)
-                  if (content.includes('[연결 오류]') || content.includes('[모델 시작 오류]')) {
-                    console.error('Ollama 연결/모델 오류 감지:', content);
-                    setError(`Ollama 연결 문제가 발생했습니다: ${content}`);
-                    setIsStreaming(false);
-                    setIsConnecting(false);
-                    return;
-                  }
-                  
-                  fullResponse += content;
-                  responseChunks.push(content);
+                  // 실시간으로 UI 업데이트
                   setStreamingResponse(fullResponse);
+                  console.log(`💬 응답 누적 길이: ${fullResponse.length}자`);
                 }
               }
-            } else if (line.trim() !== '') {
-              // 'data:' 접두사가 없는 유효한 라인도 처리
-              const content = line.trim();
-              
-              // 오류 메시지 감지 및 처리 (일반 라인)
-              if (content.includes('[연결 오류]') || content.includes('[모델 시작 오류]')) {
-                console.error('Ollama 연결/모델 오류 감지:', content);
-                setError(`Ollama 연결 문제가 발생했습니다: ${content}`);
-                setIsStreaming(false);
-                setIsConnecting(false);
-                return;
-              }
-              
-              fullResponse += content;
-              responseChunks.push(content);
-              setStreamingResponse(fullResponse);
             }
           }
+        } catch (readerError) {
+          console.error('스트림 리더 오류:', readerError);
+          throw readerError;
+        } finally {
+          reader.releaseLock();
+          console.log('🔓 스트림 리더 잠금 해제');
         }
         
         // 마지막 부분 라인 처리 - 완전성 보장
