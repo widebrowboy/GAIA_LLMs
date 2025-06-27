@@ -609,33 +609,139 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                     TEST
                   </button>
                   <button
+                    onClick={() => {
+                      console.log('🔧 강제 상태 업데이트 (테스트용)');
+                      // 테스트용 데이터로 강제 업데이트
+                      const testModels = [
+                        'gemma3-12b:latest',
+                        'txgemma-chat:latest',
+                        'txgemma-predict:latest',
+                        'Gemma3:27b-it-q4_K_M'
+                      ];
+                      console.log('📝 테스트 모델들:', testModels);
+                      setAvailableModels(testModels);
+                      setDetailedModels(testModels.map(name => ({ name, parameter_size: '12B' })));
+                      setRunningModels([]);
+                      console.log('✅ 강제 업데이트 완료');
+                    }}
+                    className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded hover:bg-yellow-200 transition-colors"
+                    title="강제 상태 업데이트 (테스트)"
+                  >
+                    FORCE
+                  </button>
+                  <button
                     onClick={async () => {
                       console.log('🌐 직접 API 테스트');
                       try {
                         const url = 'http://localhost:8000/api/system/models/detailed';
                         console.log('📍 직접 URL:', url);
-                        const response = await fetch(url);
-                        console.log('📊 직접 응답:', response.status, response.ok);
+                        
+                        // 타임아웃을 위한 컨트롤러
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => {
+                          console.warn('⏰ 직접 테스트 타임아웃 (5초)');
+                          controller.abort();
+                        }, 5000);
+                        
+                        console.log('🚀 fetch 호출 시작...');
+                        const response = await fetch(url, {
+                          method: 'GET',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                          },
+                          signal: controller.signal,
+                          mode: 'cors',
+                          cache: 'no-cache'
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        console.log('📊 직접 응답 받음:', {
+                          status: response.status, 
+                          ok: response.ok,
+                          statusText: response.statusText,
+                          type: response.type,
+                          url: response.url
+                        });
+                        
                         if (response.ok) {
+                          console.log('📄 JSON 파싱 시작...');
                           const data = await response.json();
                           console.log('📋 직접 데이터:', data);
+                          console.log('🔢 available 배열 길이:', data.available?.length || 0);
+                          
                           // 즉시 상태 업데이트
                           if (data.available && data.available.length > 0) {
-                            console.log('🔄 즉시 상태 업데이트');
+                            console.log('🔄 즉시 상태 업데이트 시작');
                             const modelNames = data.available.map((m: any) => m.name);
+                            console.log('📝 모델 이름들:', modelNames);
                             setAvailableModels(modelNames);
                             setDetailedModels(data.available);
                             setRunningModels(data.running || []);
+                            console.log('✅ 상태 업데이트 완료');
+                          } else {
+                            console.warn('⚠️ available 데이터가 없거나 빈 배열');
                           }
+                        } else {
+                          console.error('❌ HTTP 오류:', response.status, response.statusText);
+                          const errorText = await response.text();
+                          console.error('❌ 오류 내용:', errorText);
                         }
                       } catch (error) {
                         console.error('💥 직접 테스트 실패:', error);
+                        if (error instanceof Error) {
+                          console.error('💥 에러 이름:', error.name);
+                          console.error('💥 에러 메시지:', error.message);
+                          console.error('💥 에러 스택:', error.stack);
+                        }
                       }
                     }}
                     className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 transition-colors"
                     title="직접 API 호출 테스트"
                   >
                     DIRECT
+                  </button>
+                  <button
+                    onClick={() => {
+                      console.log('🔍 XMLHttpRequest 테스트');
+                      const xhr = new XMLHttpRequest();
+                      xhr.open('GET', 'http://localhost:8000/api/system/models/detailed', true);
+                      xhr.setRequestHeader('Content-Type', 'application/json');
+                      xhr.onreadystatechange = function() {
+                        console.log('📊 XHR 상태 변경:', {
+                          readyState: xhr.readyState,
+                          status: xhr.status,
+                          statusText: xhr.statusText
+                        });
+                        if (xhr.readyState === 4) {
+                          if (xhr.status === 200) {
+                            try {
+                              const data = JSON.parse(xhr.responseText);
+                              console.log('✅ XHR 성공:', data);
+                              if (data.available && data.available.length > 0) {
+                                console.log('🔄 XHR 데이터로 상태 업데이트');
+                                const modelNames = data.available.map((m: any) => m.name);
+                                setAvailableModels(modelNames);
+                                setDetailedModels(data.available);
+                                setRunningModels(data.running || []);
+                              }
+                            } catch (error) {
+                              console.error('❌ XHR JSON 파싱 오류:', error);
+                            }
+                          } else {
+                            console.error('❌ XHR HTTP 오류:', xhr.status, xhr.statusText);
+                          }
+                        }
+                      };
+                      xhr.onerror = function() {
+                        console.error('💥 XHR 네트워크 오류');
+                      };
+                      xhr.send();
+                    }}
+                    className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 transition-colors"
+                    title="XMLHttpRequest 테스트"
+                  >
+                    XHR
                   </button>
                 </div>
               </div>
