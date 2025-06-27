@@ -228,6 +228,12 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
         }
       }, 600000); // 10분으로 연장
       
+      console.log('🔄 스트리밍 요청 준비:', {
+        url: `${API_BASE_URL}/api/chat/stream`,
+        message: message.substring(0, 50),
+        sessionId
+      });
+
       const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
         method: 'POST',
         headers: {
@@ -249,14 +255,29 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
             return value.normalize('NFC');
           }
           return value;
-        }),
-        signal: controller.signal
+        })
+      });
+      
+      console.log('📡 스트리밍 응답 수신:', {
+        status: response.status,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
       });
       
       clearTimeout(timeoutId);
       
       // 연결 완료
       setIsConnecting(false);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ 스트리밍 응답 오류:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText.substring(0, 200)
+        });
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
 
       if (response.ok) {
         // 스트리밍 응답 처리 개선
@@ -267,15 +288,24 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
           throw new Error('스트림 리더를 가져올 수 없습니다');
         }
 
+        console.log('📖 스트림 리더 시작 - 응답 읽기 시작');
         let fullResponse = '';
         let isCompleted = false;
         let lastUpdateTime = Date.now();
         const responseChunks: string[] = [];
+        let chunkCount = 0;
 
         while (true) {
           const { done, value } = await reader.read();
+          chunkCount++;
+          
+          if (chunkCount <= 5 || chunkCount % 10 === 0) {
+            console.log(`📦 청크 ${chunkCount} 수신:`, { done, valueLength: value?.length });
+          }
+          
           if (done) {
             isCompleted = true;
+            console.log(`✅ 스트림 완료 - 총 ${chunkCount}개 청크 처리`);
             break;
           }
 
@@ -427,7 +457,13 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
     } catch (error) {
       console.error('스트리밍 응답 처리 실패:', error);
       
-      // 오류가 발생했을 때도 기본 응답 제공
+      // AbortError는 정상적인 취소 상황
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('🛑 요청이 취소되었습니다 (컴포넌트 재마운트 또는 새 요청)');
+        return; // 에러 메시지 추가하지 않고 종료
+      }
+      
+      // 실제 오류인 경우에만 에러 메시지 제공
       if (!controller.signal.aborted) {
         const errorMessage: Message = {
           id: 'assistant_' + Date.now(),
@@ -439,9 +475,8 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
           isComplete: true
         };
         addMessage(errorMessage);
+        setError('응답 처리 중 오류가 발생했습니다.');
       }
-      
-      setError('응답 처리 중 오류가 발생했습니다.');
     } finally {
       // 모든 로딩 상태 강제 해제
       setIsLoading(false);
