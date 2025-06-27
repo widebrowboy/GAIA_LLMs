@@ -65,6 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       const url = getApiUrl('/api/system/models/detailed');
       console.log('🌐 테스트 URL:', url);
       
+      console.log('📡 fetch 요청 시작...');
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -73,21 +74,30 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         }
       });
       
-      console.log('📥 직접 fetch 응답:', {
+      console.log('📥 직접 fetch 응답 받음:', {
         status: response.status,
         ok: response.ok,
-        statusText: response.statusText
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
       });
       
       if (response.ok) {
-        const data = await response.json();
+        console.log('📄 응답 텍스트 파싱 중...');
+        const text = await response.text();
+        console.log('📋 원본 응답 텍스트:', text.substring(0, 500));
+        
+        const data = JSON.parse(text);
         console.log('✅ 직접 fetch 성공 데이터:', data);
+        console.log('🔢 사용 가능한 모델 수:', data.available?.length || 0);
         return data;
       } else {
-        console.error('❌ 직접 fetch HTTP 오류:', response.status);
+        console.error('❌ 직접 fetch HTTP 오류:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('❌ 오류 내용:', errorText);
       }
     } catch (error) {
       console.error('💥 직접 fetch 예외:', error);
+      console.error('💥 에러 스택:', error instanceof Error ? error.stack : 'No stack');
     }
     return null;
   }, []);
@@ -578,25 +588,56 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                 }`}>
                   {availableModels.length}개
                 </span>
-                <button
-                  onClick={async () => {
-                    console.log('🔍 수동 모델 테스트 버튼 클릭');
-                    try {
-                      await fetchModelsWithApiClient();
-                      console.log('🎯 현재 상태:', {
-                        availableModels: availableModels.length,
-                        detailedModels: detailedModels.length,
-                        runningModels: runningModels.length
-                      });
-                    } catch (error) {
-                      console.error('❌ 수동 테스트 실패:', error);
-                    }
-                  }}
-                  className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded hover:bg-blue-200 transition-colors"
-                  title="모델 정보 수동 테스트"
-                >
-                  TEST
-                </button>
+                <div className="flex space-x-1">
+                  <button
+                    onClick={async () => {
+                      console.log('🔍 수동 모델 테스트 버튼 클릭');
+                      try {
+                        await fetchModelsWithApiClient();
+                        console.log('🎯 현재 상태:', {
+                          availableModels: availableModels.length,
+                          detailedModels: detailedModels.length,
+                          runningModels: runningModels.length
+                        });
+                      } catch (error) {
+                        console.error('❌ 수동 테스트 실패:', error);
+                      }
+                    }}
+                    className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded hover:bg-blue-200 transition-colors"
+                    title="모델 정보 수동 테스트"
+                  >
+                    TEST
+                  </button>
+                  <button
+                    onClick={async () => {
+                      console.log('🌐 직접 API 테스트');
+                      try {
+                        const url = 'http://localhost:8000/api/system/models/detailed';
+                        console.log('📍 직접 URL:', url);
+                        const response = await fetch(url);
+                        console.log('📊 직접 응답:', response.status, response.ok);
+                        if (response.ok) {
+                          const data = await response.json();
+                          console.log('📋 직접 데이터:', data);
+                          // 즉시 상태 업데이트
+                          if (data.available && data.available.length > 0) {
+                            console.log('🔄 즉시 상태 업데이트');
+                            const modelNames = data.available.map((m: any) => m.name);
+                            setAvailableModels(modelNames);
+                            setDetailedModels(data.available);
+                            setRunningModels(data.running || []);
+                          }
+                        }
+                      } catch (error) {
+                        console.error('💥 직접 테스트 실패:', error);
+                      }
+                    }}
+                    className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 transition-colors"
+                    title="직접 API 호출 테스트"
+                  >
+                    DIRECT
+                  </button>
+                </div>
               </div>
             </div>
             <div className="flex justify-between">
