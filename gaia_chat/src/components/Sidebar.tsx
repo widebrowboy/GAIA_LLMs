@@ -104,9 +104,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
 
   // API 클라이언트를 사용한 모델 정보 가져오기
   const fetchModelsWithApiClient = useCallback(async () => {
-    setIsLoadingModels(true);
-    
-    // 즉시 폴백 데이터 설정 (로딩 중에도 모델 표시)
+    // 즉시 폴백 데이터 설정 (로딩 없이 바로 모델 표시)
     const fallbackModels = [
       'gemma3-12b:latest',
       'txgemma-chat:latest',
@@ -115,6 +113,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     ];
     setAvailableModels(fallbackModels);
     setDetailedModels(fallbackModels.map(name => ({ name, parameter_size: '12B' })));
+    setIsLoadingModels(false); // 로딩 상태 해제
     console.log('🔄 fetchModelsWithApiClient - 즉시 폴백 데이터 설정 완료');
     
     try {
@@ -439,14 +438,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   // 모델 다이얼로그 열릴 때 모델 목록 새로고침
   useEffect(() => {
     if (showModelDialog) {
-      console.log('📋 모델 다이얼로그 열림 - 모델 목록 새로고침');
-      // 기존 상태 초기화 후 새로고침
-      setIsLoadingModels(true);
-      setAvailableModels([]);
-      setDetailedModels([]);
-      setRunningModels([]);
+      console.log('📋 모델 다이얼로그 열림 - 기존 모델 데이터 유지하며 새로고침');
+      // 로딩 상태를 true로 설정하지 않고 기존 데이터 유지
+      // setIsLoadingModels(true); // 제거: 이미 폴백 데이터가 있으므로 로딩 상태 불필요
       
-      // 약간의 지연 후 실행
+      // 약간의 지연 후 실행 (기존 데이터는 유지)
       const timer = setTimeout(() => {
         fetchAvailableModels();
       }, 100);
@@ -1095,7 +1091,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             <div className="space-y-2 mb-4">
               <p className="text-sm text-gray-600">사용할 AI 모델을 선택하세요:</p>
               <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                <span>사용 가능한 모델: {availableModels.length}개 {isLoadingModels && '(로딩 중...)'}</span>
+                <span>사용 가능한 모델: {availableModels.length}개</span>
                 <button 
                   onClick={async () => {
                     console.log('🔄 모델 목록 수동 새로고침');
