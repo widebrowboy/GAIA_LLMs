@@ -287,40 +287,18 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           // 연결 테스트 제거 - 직접 API 호출로 진행
           console.log('🚀 연결 테스트 생략 - 직접 API 호출로 진행');
           
-          // 백그라운드에서 실제 API 호출 시도
-          console.log('📡 백그라운드 API 호출로 실제 데이터 가져오기 시도');
+          // 백그라운드에서 실제 API 호출 시도 - apiClient 사용
+          console.log('📡 apiClient로 백그라운드 API 호출 시도');
           try {
-            const url = getApiUrl('/api/system/models/detailed');
-            console.log('🌐 초기 API URL:', url);
+            console.log('🎯 apiClient.getModelsDetailed() 호출 시작');
             
-            console.log('📡 fetch 호출 시작...');
+            const result = await apiClient.getModelsDetailed();
             
-            // AbortController 설정 (컴포넌트 언마운트 시에만 취소)
-            const controller = new AbortController();
-            // 타임아웃 제거 - 자연스러운 네트워크 타임아웃에 의존
-            console.log('🐛 AbortController 설정 완료 (자동 취소 방지)');
+            console.log('📥 apiClient 응답 수신:', result);
             
-            const response = await fetch(url, {
-              method: 'GET',
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-              },
-              cache: 'no-cache',
-              signal: controller.signal
-            });
-            
-            console.log('📥 fetch 응답 수신:', {
-              status: response.status,
-              ok: response.ok,
-              statusText: response.statusText,
-              url: response.url,
-              headers: Object.fromEntries(response.headers.entries())
-            });
-            
-            if (response.ok) {
-              console.log('📄 JSON 파싱 시작...');
-              const data = await response.json();
+            if (result.success && result.data) {
+              console.log('📄 apiClient 응답 파싱 시작...');
+              const data = result.data;
               console.log('✅ 초기 모델 데이터 로드 성공:', data);
               console.log('🔍 데이터 세부 정보:', {
                 available_count: data.available?.length || 0,
@@ -348,18 +326,17 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                 console.warn('⚠️ API 응답에 사용 가능한 모델이 없음 - 폴백 데이터 유지');
               }
             } else {
-              console.warn('⚠️ API 응답 오류:', response.status, '- 폴백 데이터 유지');
-              const errorText = await response.text().catch(() => 'Unknown error');
-              console.error('❌ 오류 내용:', errorText);
+              console.warn('⚠️ apiClient 응답 오류:', result.error || 'Unknown error', '- 폴백 데이터 유지');
+              console.error('❌ apiClient 오류 내용:', result.error);
             }
-          } catch (fetchError) {
-            // AbortError 감지 - 컴포넌트 언마운트 또는 취소로 인한 정상적인 상황
-            if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-              console.log('🏃‍♂️ API 호출 취소됨 (컴포넌트 상태 변경) - 폴백 데이터 유지');
-            } else {
-              console.error('❌ API 호출 실패:', fetchError);
-              console.warn('🔄 네트워크 오류 - 폴백 데이터 유지');
-            }
+          } catch (apiError) {
+            console.error('❌ apiClient 호출 실패:', apiError);
+            console.error('🔍 에러 상세 정보:', {
+              name: apiError instanceof Error ? apiError.name : 'Unknown',
+              message: apiError instanceof Error ? apiError.message : String(apiError),
+              stack: apiError instanceof Error ? apiError.stack : undefined
+            });
+            console.warn('🔄 apiClient 오류 - 폴백 데이터 유지');
           }
           
           setIsLoadingModels(false);
@@ -367,6 +344,21 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           console.log('✅ Sidebar 초기화 완료');
         } catch (error) {
           console.error('❌ 초기 로드 중 오류:', error);
+          console.error('🔍 초기화 에러 상세:', {
+            name: error instanceof Error ? error.name : 'Unknown',
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+          });
+          
+          // 폴백 데이터로 최소한의 기능은 유지
+          const fallbackModels = [
+            'gemma3-12b:latest',
+            'txgemma-chat:latest', 
+            'txgemma-predict:latest',
+            'Gemma3:27b-it-q4_K_M'
+          ];
+          setAvailableModels(fallbackModels);
+          setDetailedModels(fallbackModels.map(name => ({ name, parameter_size: '12B' })));
           setServerConnected(false);
           setIsLoadingModels(false);
           setIsInitialized(true); // 오류가 있어도 초기화 완료로 설정

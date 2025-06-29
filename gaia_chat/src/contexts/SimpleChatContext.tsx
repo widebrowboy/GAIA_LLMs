@@ -265,21 +265,7 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
         })
       });
       
-      console.log('⏰ fetch 요청 완료 - 타임스탬프:', new Date().toISOString());
-      console.log('📡 스트리밍 응답 수신:', {
-        status: response.status,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries()),
-        bodyUsed: response.bodyUsed,
-        type: response.type
-      });
-      
-      // 응답 상태 상세 확인
-      if (response.status === 200 && response.ok) {
-        console.log('✅ HTTP 200 OK - 스트리밍 응답 시작');
-      } else {
-        console.error('❌ HTTP 오류:', response.status, response.statusText);
-      }
+      // 응답 상태 확인
       
       clearTimeout(timeoutId);
       
@@ -288,11 +274,7 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ 스트리밍 응답 오류:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorText: errorText.substring(0, 200)
-        });
+        console.error('스트리밍 응답 오류:', response.status, response.statusText, errorText);
         throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
@@ -305,49 +287,64 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
           throw new Error('스트림 리더를 가져올 수 없습니다');
         }
 
-        console.log('📖 스트림 리더 시작 - 응답 읽기 시작');
         let fullResponse = '';
-        let chunkCount = 0;
+        let buffer = ''; // SSE 이벤트가 청크 경계에서 잘릴 수 있으므로 버퍼 사용
 
         try {
           while (true) {
             const { done, value } = await reader.read();
-            chunkCount++;
-            
-            console.log(`📦 청크 ${chunkCount} 수신:`, { done, valueLength: value?.length });
             
             if (done) {
-              console.log(`✅ 스트림 완료 - 총 ${chunkCount}개 청크 처리`);
               break;
             }
 
             // 바이트를 텍스트로 변환
             const chunk = decoder.decode(value, { stream: true });
-            console.log(`📝 청크 ${chunkCount} 내용:`, chunk.substring(0, 100) + '...');
+            console.log(`📦 청크 ${done ? '완료' : '수신'}:`, chunk.substring(0, 100));
+            buffer += chunk;
             
-            // SSE 형식 파싱 - 더 단순하게
-            const lines = chunk.split('\n');
+            // 줄 단위로 처리
+            const lines = buffer.split('\n');
+            console.log(`📋 분할된 라인 수: ${lines.length}`);
+            
+            // 마지막 줄은 불완전할 수 있으므로 버퍼에 보관
+            buffer = lines.pop() || '';
+            
             for (const line of lines) {
               const trimmedLine = line.trim();
-              console.log(`🔍 처리 중인 라인: "${trimmedLine}"`);
+              console.log('🔍 처리 중인 라인:', trimmedLine);
               
               if (trimmedLine.startsWith('data: ')) {
                 const data = trimmedLine.slice(6);
-                console.log(`📤 data 내용: "${data}"`);
+                console.log('📤 data 내용:', data);
                 
                 if (data === '[DONE]') {
-                  console.log('🏁 [DONE] 신호 수신');
+                  console.log('🏁 스트리밍 완료 신호 수신');
                   break;
                 }
                 
                 if (data) {
                   // 데이터를 fullResponse에 추가
                   fullResponse += data;
+                  console.log('💬 응답 누적 길이:', fullResponse.length);
                   
                   // 실시간으로 UI 업데이트
                   setStreamingResponse(fullResponse);
-                  console.log(`💬 응답 누적 길이: ${fullResponse.length}자, 내용: "${fullResponse.substring(fullResponse.length - 20)}..."`);
                 }
+              }
+            }
+          }
+          // 버퍼에 남은 마지막 부분 처리
+          if (buffer.trim()) {
+            const trimmedLine = buffer.trim();
+            console.log('🔍 버퍼 처리 중인 라인:', trimmedLine);
+            if (trimmedLine.startsWith('data: ')) {
+              const data = trimmedLine.slice(6);
+              console.log('📤 버퍼 data 내용:', data);
+              if (data && data !== '[DONE]') {
+                fullResponse += data;
+                console.log('💬 최종 응답 누적 길이:', fullResponse.length);
+                setStreamingResponse(fullResponse);
               }
             }
           }
@@ -356,31 +353,10 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
           throw readerError;
         } finally {
           reader.releaseLock();
-          console.log('🔓 스트림 리더 잠금 해제');
         }
-        
-        // 마지막 부분 라인 처리
-        const partialLine = decoder.decode();
-        console.log(`🔚 마지막 부분 라인 처리: "${partialLine}"`);
-        
-        if (partialLine && partialLine.trim()) {
-          const trimmed = partialLine.trim();
-          if (trimmed.startsWith('data: ')) {
-            const data = trimmed.slice(6);
-            if (data && data !== '[DONE]') {
-              fullResponse += data;
-              setStreamingResponse(fullResponse);
-              console.log(`💬 마지막 데이터 추가 - 최종 길이: ${fullResponse.length}자`);
-            }
-          }
-        }
-        
-        // 최종 응답 정리
-        console.log(`✅ 스트리밍 응답 완료 - 총 길이: ${fullResponse.length}자`);
-        console.log(`📄 최종 응답 내용 (첫 100자): "${fullResponse.substring(0, 100)}..."`);
         
         // 스트리밍 완료 후 최종 정리
-        let finalContent = fullResponse.trim();
+        const finalContent = fullResponse.trim();
         
         // After streaming finished, add assistant message with userQuestion field
         if (finalContent && !controller.signal.aborted) {
@@ -409,7 +385,6 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
       
       // AbortError는 정상적인 취소 상황
       if (error instanceof Error && error.name === 'AbortError') {
-        console.log('🛑 요청이 취소되었습니다 (컴포넌트 재마운트 또는 새 요청)');
         return; // 에러 메시지 추가하지 않고 종료
       }
       
@@ -438,7 +413,7 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
       setWaitingTimer(0);
       setIsWaitingForResponse(false);
       
-      console.log('✅ 모든 로딩 상태 해제 완료');
+      // 모든 로딩 상태 해제 완료
     }
   };
 

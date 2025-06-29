@@ -1,4 +1,4 @@
-# GAIA-BT v3.23 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.26 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
@@ -149,6 +149,18 @@ curl -s http://localhost:8000/health        # API 서버 헬스체크
 ./scripts/server_manager.sh clean-ports    # 포트 강제 정리
 ./scripts/server_manager.sh restart        # 서버 재시작
 ```
+
+### 🔒 SSH 서비스 보호 규칙 (필수)
+포트 충돌 해결 시 SSH 관련 프로세스는 절대 종료하지 않음:
+- **보호 대상**: `sshd`, `ssh-agent`, `ssh`, `sftp`, `scp`
+- **포트 22**: SSH 데몬 절대 종료 금지
+- **포트 정리 시**: SSH 관련 프로세스 자동 제외
+- **안전장치**: 시스템 원격 접속 유지 보장
+
+#### 포트 정리 안전 규칙
+- 포트 강제 정리 시 SSH 프로세스 자동 필터링
+- 원격 서버 운영 시 SSH 연결 끊김 방지
+- 개발 환경과 SSH 서비스 간 격리 유지
 
 ### 로그 확인
 ```bash
@@ -308,6 +320,9 @@ git reset --hard [커밋해시]
 - **v3.21**: CORS preflight 문제 해결 및 스트리밍 연결 수정
 - **v3.22**: 스트리밍 응답 처리 단순화 및 디버깅 강화
 - **v3.23**: SSE 파싱 로직 단순화 및 상세 디버깅 로그 추가
+- **v3.24**: 스트리밍 응답 파싱 로직 디버깅 강화 및 청크별 상세 로그 추가
+- **v3.25**: SSH 서비스보호 규칙 및 포트 정리 안전장치 추가
+- **v3.26**: Sidebar.tsx doInitialLoad 함수 fetch TypeError 해결 - apiClient 미들웨어 완전 적용
 
 ### 완료된 Todo 기록 (v3.7)
 
@@ -538,4 +553,4 @@ await fetchModelsWithApiClient();
 
 ---
 
-**GAIA-BT v3.23** - 신약개발 연구의 새로운 패러다임 🧬✨
+**GAIA-BT v3.26** - 신약개발 연구의 새로운 패러다임 🧬✨
