@@ -325,22 +325,28 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
             const chunk = decoder.decode(value, { stream: true });
             console.log(`📝 청크 ${chunkCount} 내용:`, chunk.substring(0, 100) + '...');
             
-            // SSE 형식 파싱
+            // SSE 형식 파싱 - 더 단순하게
             const lines = chunk.split('\n');
             for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6).trim();
+              const trimmedLine = line.trim();
+              console.log(`🔍 처리 중인 라인: "${trimmedLine}"`);
+              
+              if (trimmedLine.startsWith('data: ')) {
+                const data = trimmedLine.slice(6);
+                console.log(`📤 data 내용: "${data}"`);
                 
                 if (data === '[DONE]') {
                   console.log('🏁 [DONE] 신호 수신');
                   break;
-                } else if (data && data !== '') {
+                }
+                
+                if (data) {
                   // 데이터를 fullResponse에 추가
                   fullResponse += data;
                   
                   // 실시간으로 UI 업데이트
                   setStreamingResponse(fullResponse);
-                  console.log(`💬 응답 누적 길이: ${fullResponse.length}자`);
+                  console.log(`💬 응답 누적 길이: ${fullResponse.length}자, 내용: "${fullResponse.substring(fullResponse.length - 20)}..."`);
                 }
               }
             }
@@ -353,60 +359,28 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
           console.log('🔓 스트림 리더 잠금 해제');
         }
         
-        // 마지막 부분 라인 처리 - 완전성 보장
+        // 마지막 부분 라인 처리
         const partialLine = decoder.decode();
+        console.log(`🔚 마지막 부분 라인 처리: "${partialLine}"`);
+        
         if (partialLine && partialLine.trim()) {
-          let finalContent = '';
-          if (partialLine.startsWith('data: ')) {
-            const data = partialLine.slice(6).trim();
-            if (data && data !== '' && data !== '[DONE]') {
-              try {
-                const jsonData = JSON.parse(data);
-                finalContent = jsonData.content || jsonData.response || jsonData.text || data;
-              } catch {
-                finalContent = data;
-              }
+          const trimmed = partialLine.trim();
+          if (trimmed.startsWith('data: ')) {
+            const data = trimmed.slice(6);
+            if (data && data !== '[DONE]') {
+              fullResponse += data;
+              setStreamingResponse(fullResponse);
+              console.log(`💬 마지막 데이터 추가 - 최종 길이: ${fullResponse.length}자`);
             }
-          } else if (partialLine.trim() !== '') {
-            finalContent = partialLine.trim();
-          }
-          
-          if (finalContent) {
-            fullResponse += finalContent;
-            responseChunks.push(finalContent);
-            setStreamingResponse(fullResponse);
           }
         }
         
-        // 최종 응답 완전성 검증
-        const finalResponseLength = fullResponse.length;
-        const chunksTotal = responseChunks.join('').length;
-        console.log(` 응답 완전성 검증: 최종응답=${finalResponseLength}자, 청크총합=${chunksTotal}자`);
+        // 최종 응답 정리
+        console.log(`✅ 스트리밍 응답 완료 - 총 길이: ${fullResponse.length}자`);
+        console.log(`📄 최종 응답 내용 (첫 100자): "${fullResponse.substring(0, 100)}..."`);
         
-        if (finalResponseLength !== chunksTotal && responseChunks.length > 0) {
-          // 불일치 시 청크 기반으로 재구성
-          fullResponse = responseChunks.join('');
-          setStreamingResponse(fullResponse);
-          console.log(' 응답 재구성 완료');
-        }
-        
-        console.log(` 스트리밍 응답 완료 (${fullResponse.length}자, ${responseChunks.length}개 청크)`);
-        
-        // 스트리밍 완료 후 최종 마크다운 검증 및 정리
+        // 스트리밍 완료 후 최종 정리
         let finalContent = fullResponse.trim();
-        if (finalContent) {
-          // 마크다운 구조 개선을 위한 후처리
-          finalContent = finalContent
-            .replace(/\n{3,}/g, '\n\n') // 과도한 줄바꿈 정리
-            .replace(/([.!?])([A-Za-z가-힣])/g, '$1 $2') // 문장 간 공백 확보
-            .replace(/#{1,6}\s*([^\n]+)/g, (match, title) => {
-              // 마크다운 헤더 정리
-              const level = match.indexOf(' ');
-              return '#'.repeat(Math.min(level, 6)) + ' ' + title.trim();
-            });
-          
-          console.log(' 마크다운 후처리 완료');
-        }
         
         // After streaming finished, add assistant message with userQuestion field
         if (finalContent && !controller.signal.aborted) {
