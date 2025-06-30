@@ -1008,10 +1008,34 @@ body {
   text-rendering: optimizeSpeed;
 }
 
-/* 스트리밍 응답 라인별 스타일 */
+/* 스트리밍 응답 라인별 스타일 - 소제목 포함 */
 .streaming-line {
   display: block;
   margin: 0.2rem 0;
+}
+
+.subheading-line {
+  margin: 1rem 0 0.5rem 0;
+  padding: 0.3rem 0;
+  font-weight: 600;
+  color: #1e40af;
+  position: relative;
+}
+
+.subheading-line::before {
+  content: "";
+  display: block;
+  height: 0.8rem;
+  width: 100%;
+  margin-bottom: 0.3rem;
+}
+
+.subheading-line::after {
+  content: "";
+  display: block;
+  height: 0.5rem;
+  width: 100%;
+  margin-top: 0.2rem;
 }
 
 .list-item-line {

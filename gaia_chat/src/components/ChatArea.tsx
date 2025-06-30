@@ -336,12 +336,22 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
                 </div>
                 <div className="streaming-text korean-text text-gray-900">
                   {streamingResponse.split('\n').map((line, index) => {
-                    // * 패턴 기반 줄바꿈 처리
+                    // 패턴 기반 줄바꿈 처리 - 소제목, 리스트, * 패턴 인식
+                    const isSubHeading = /^\s*#{2,}\s+/.test(line);
                     const isListItem = /^\s*[*\-+]\s+/.test(line);
                     const hasAsterisk = line.includes('*');
                     
+                    let lineClass = 'regular-line';
+                    if (isSubHeading) {
+                      lineClass = 'subheading-line';
+                    } else if (isListItem) {
+                      lineClass = 'list-item-line';
+                    } else if (hasAsterisk) {
+                      lineClass = 'asterisk-line';
+                    }
+                    
                     return (
-                      <div key={index} className={`streaming-line ${isListItem ? 'list-item-line' : hasAsterisk ? 'asterisk-line' : 'regular-line'}`}>
+                      <div key={index} className={`streaming-line ${lineClass}`}>
                         {line}
                         {index < streamingResponse.split('\n').length - 1 && <br />}
                       </div>

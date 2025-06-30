@@ -27,6 +27,11 @@ export const advancedMarkdownProcessor = (text: string): string => {
       inListContext = false;
     }
     
+    // 소제목 패턴 처리 (##, ###, #### 등)
+    if (trimmedLine.match(/^#{2,}\s+/)) {
+      return handleSubHeadingWithLineBreaks(line, prevLine, nextLine);
+    }
+    
     // * 패턴 기반 강화된 줄바꿈 처리
     if (trimmedLine.includes('*')) {
       // 리스트 아이템인 경우 - 항상 앞뒤 줄바꿈 보장
@@ -83,6 +88,23 @@ export const handleListItem = (line: string, nextLine: string): string => {
   if (line.length > 80) return line + '  ';
   
   return line;
+};
+
+// 소제목 줄바꿈 처리 함수 (##, ###, #### 등)
+export const handleSubHeadingWithLineBreaks = (line: string, prevLine: string, nextLine: string): string => {
+  let result = line;
+  
+  // 소제목 앞에 빈 줄 추가 (이전 줄이 비어있지 않은 경우)
+  if (prevLine && prevLine.trim() !== '') {
+    result = '\n\n' + result;
+  }
+  
+  // 소제목 뒤에 빈 줄 추가 (다음 줄이 비어있지 않은 경우)
+  if (nextLine && nextLine.trim() !== '') {
+    result = result + '\n';
+  }
+  
+  return result;
 };
 
 // 텍스트 앞뒤 줄바꿈 보장 함수
