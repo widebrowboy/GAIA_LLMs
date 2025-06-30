@@ -335,7 +335,18 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
                   </div>
                 </div>
                 <div className="streaming-text korean-text text-gray-900">
-                  {streamingResponse}
+                  {streamingResponse.split('\n').map((line, index) => {
+                    // * 패턴 기반 줄바꿈 처리
+                    const isListItem = /^\s*[*\-+]\s+/.test(line);
+                    const hasAsterisk = line.includes('*');
+                    
+                    return (
+                      <div key={index} className={`streaming-line ${isListItem ? 'list-item-line' : hasAsterisk ? 'asterisk-line' : 'regular-line'}`}>
+                        {line}
+                        {index < streamingResponse.split('\n').length - 1 && <br />}
+                      </div>
+                    );
+                  })}
                   <span className="inline-block w-3 h-5 bg-gradient-to-r from-emerald-500 to-blue-500 animate-pulse ml-1 rounded"></span>
                 </div>
               </div>
