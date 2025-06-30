@@ -171,7 +171,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                       </div>
                     </div>
                   ),
-                  // 의료 리스트 스타일 - 구분 강화
+                  // 의료 리스트 스타일 - 구분 강화 (순서없는 목록)
                   ul: ({children}) => (
                     <div className="list-wrapper">
                       <div className="list-break-before"></div>
@@ -181,21 +181,39 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                       <div className="list-break-after"></div>
                     </div>
                   ),
+                  // 의료 리스트 스타일 - 구분 강화 (순서있는 목록)
                   ol: ({children}) => (
                     <div className="list-wrapper">
                       <div className="list-break-before"></div>
-                      <ol className="medical-list list-none p-0 my-4 space-y-2">
+                      <ol className="medical-numbered-list list-none p-0 my-4 space-y-3">
                         {children}
                       </ol>
                       <div className="list-break-after"></div>
                     </div>
                   ),
-                  li: ({children}) => (
-                    <li className="medical-list-item flex items-start gap-3 p-3 bg-white border-l-4 border-green-500 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 hover:translate-x-1">
-                      <span className="list-marker text-lg flex-shrink-0">💊</span>
-                      <span className="list-content flex-1">{children}</span>
-                    </li>
-                  ),
+                  // 의료 리스트 아이템 - 순서없는 목록
+                  li: ({children, ...props}) => {
+                    // 부모가 ol인지 ul인지 확인하여 다른 스타일 적용
+                    const isOrderedList = props.node?.parent?.tagName === 'ol';
+                    
+                    if (isOrderedList) {
+                      return (
+                        <li className="medical-numbered-item flex items-start gap-3 p-3 bg-gradient-to-r from-emerald-50 to-blue-50 border-l-4 border-emerald-500 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 hover:translate-x-1">
+                          <span className="numbered-marker text-lg flex-shrink-0 w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                            {/* 번호는 CSS counter로 자동 생성됨 */}
+                          </span>
+                          <span className="numbered-content flex-1">{children}</span>
+                        </li>
+                      );
+                    }
+                    
+                    return (
+                      <li className="medical-list-item flex items-start gap-3 p-3 bg-white border-l-4 border-green-500 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 hover:translate-x-1">
+                        <span className="list-marker text-lg flex-shrink-0">💊</span>
+                        <span className="list-content flex-1">{children}</span>
+                      </li>
+                    );
+                  },
                   // 전문적인 강조 스타일링
                   strong: ({children}) => (
                     <strong className="medical-emphasis font-semibold text-blue-800 bg-gradient-to-r from-blue-50 to-blue-100 px-2 py-1 rounded">{children}</strong>

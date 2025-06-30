@@ -32,6 +32,11 @@ export const advancedMarkdownProcessor = (text: string): string => {
       return handleSubHeadingWithLineBreaks(line, prevLine, nextLine);
     }
     
+    // 항목/소주제 패턴 처리 강화 (숫자, 알파벳, 번호 등)
+    if (trimmedLine.match(/^(\d+\.|\d+\)|\w\.|[가-힣]\.|[A-Z]\.|[a-z]\.|[ⅰ-ⅹ]\.|[①-⑳])/)) {
+      return handleItemWithLineBreaks(line, prevLine, nextLine);
+    }
+    
     // * 패턴 기반 강화된 줄바꿈 처리
     if (trimmedLine.includes('*')) {
       // 리스트 아이템인 경우 - 항상 앞뒤 줄바꿈 보장
@@ -53,6 +58,11 @@ export const advancedMarkdownProcessor = (text: string): string => {
       if (trimmedLine.match(/^\s*\*+\s*$/)) {
         return '\n' + line + '\n';
       }
+    }
+    
+    // 특수 키워드 기반 소주제 패턴 (개요, 결론, 요약 등)
+    if (trimmedLine.match(/^(개요|결론|요약|분석|평가|제안|권고|배경|목적|방법|결과|논의|한계|향후|참고|부록)[:：]/)) {
+      return handleKeywordSectionWithLineBreaks(line, prevLine, nextLine);
     }
     
     return handleRegularText(line, nextLine, inListContext);
@@ -100,6 +110,35 @@ export const handleSubHeadingWithLineBreaks = (line: string, prevLine: string, n
   }
   
   // 소제목 뒤에 빈 줄 추가 (다음 줄이 비어있지 않은 경우)
+  if (nextLine && nextLine.trim() !== '') {
+    result = result + '\n';
+  }
+  
+  return result;
+};
+
+// 항목/번호 패턴 줄바꿈 처리 함수 (1., a., 가., ①, etc.)
+export const handleItemWithLineBreaks = (line: string, prevLine: string, nextLine: string): string => {
+  let result = line;
+  
+  // 항목 앞에 줄바꿈 추가 (이전 줄이 다른 항목이 아닌 경우)
+  if (prevLine && prevLine.trim() !== '' && !prevLine.match(/^(\d+\.|\d+\)|\w\.|[가-힣]\.|[A-Z]\.|[a-z]\.|[ⅰ-ⅹ]\.|[①-⑳])/)) {
+    result = '\n' + result;
+  }
+  
+  return result;
+};
+
+// 키워드 기반 섹션 줄바꿈 처리 함수
+export const handleKeywordSectionWithLineBreaks = (line: string, prevLine: string, nextLine: string): string => {
+  let result = line;
+  
+  // 키워드 섹션 앞에 빈 줄 추가 (이전 줄이 비어있지 않은 경우)
+  if (prevLine && prevLine.trim() !== '') {
+    result = '\n\n' + result;
+  }
+  
+  // 키워드 섹션 뒤에 줄바꿈 추가 (다음 줄이 비어있지 않은 경우)
   if (nextLine && nextLine.trim() !== '') {
     result = result + '\n';
   }

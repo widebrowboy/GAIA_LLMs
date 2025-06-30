@@ -336,14 +336,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
                 </div>
                 <div className="streaming-text korean-text text-gray-900">
                   {streamingResponse.split('\n').map((line, index) => {
-                    // 패턴 기반 줄바꿈 처리 - 소제목, 리스트, * 패턴 인식
+                    // 확장된 패턴 기반 줄바꿈 처리
+                    const trimmedLine = line.trim();
                     const isSubHeading = /^\s*#{2,}\s+/.test(line);
+                    const isNumberedItem = /^(\d+\.|\d+\)|\w\.|[가-힣]\.|[A-Z]\.|[a-z]\.|[ⅰ-ⅹ]\.|[①-⑳])/.test(trimmedLine);
+                    const isKeywordSection = /^(개요|결론|요약|분석|평가|제안|권고|배경|목적|방법|결과|논의|한계|향후|참고|부록)[:：]/.test(trimmedLine);
                     const isListItem = /^\s*[*\-+]\s+/.test(line);
                     const hasAsterisk = line.includes('*');
                     
                     let lineClass = 'regular-line';
                     if (isSubHeading) {
                       lineClass = 'subheading-line';
+                    } else if (isNumberedItem) {
+                      lineClass = 'numbered-item-line';
+                    } else if (isKeywordSection) {
+                      lineClass = 'keyword-section-line';
                     } else if (isListItem) {
                       lineClass = 'list-item-line';
                     } else if (hasAsterisk) {
