@@ -1,4 +1,4 @@
-# GAIA-BT v3.32 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.33 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
@@ -155,9 +155,10 @@ curl -s http://localhost:8000/health        # API 서버 헬스체크
 
 #### 보호 대상 프로세스
 - **SSH 관련**: `sshd`, `ssh-agent`, `ssh`, `sftp`, `scp`, `remote-ssh`
-- **IDE 포트포워딩**: `code`, `windsurf`, `code-tunnel`, `code-server`
+- **IDE 포트포워딩**: `code`, `windsurf`, `cursor`, `code-tunnel`, `code-server`
+- **JetBrains IDEs**: `webstorm`, `intellij`, `phpstorm`, `pycharm`, `goland`, `clion`, `datagrip`, `rider`, `rubymine`, `appcode`, `mps`, `gateway`
 - **포트 22**: SSH 데몬 절대 종료 금지
-- **IDE 포트**: VS Code/Windsurf 포트포워딩 연결 유지
+- **IDE 포트**: VS Code/Windsurf/Cursor/JetBrains 포트포워딩 연결 유지
 
 #### 보호 규칙
 - **자동 필터링**: 서버 재시작 시 보호된 프로세스 자동 제외
@@ -338,6 +339,7 @@ git reset --hard [커밋해시]
 - **v3.30**: 딥리서치 모드 스트리밍 완성 및 안전한 서버 재시작 시스템 구현
 - **v3.31**: 마크다운 렌더링 최적화 - 스트리밍 완료 후 자연스러운 렌더링 구현
 - **v3.32**: 포트 포워딩 보호 강화 - VS Code/Windsurf IDE 연결 안정성 보장
+- **v3.33**: IDE 포트포워딩 보호 확장 및 WebUI 응답 텍스트 줄바꿈 개선
 
 ### 완료된 Todo 기록 (v3.31)
 
