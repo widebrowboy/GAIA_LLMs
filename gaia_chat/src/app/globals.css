@@ -441,3 +441,63 @@ body {
 .markdown-content > ol + * {
   margin-top: 1.5rem !important;
 }
+
+/* 가이드 기반 마크다운 전용 CSS 스타일 */
+.markdown-container {
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.markdown-list-item {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.markdown-list-item p {
+  margin: 0;
+  display: inline;
+}
+
+.markdown-emphasis {
+  font-style: italic;
+  line-height: inherit;
+}
+
+.markdown-strong {
+  font-weight: bold;
+  line-height: inherit;
+}
+
+/* 리스트 내 줄바꿈 자연스럽게 처리 */
+.markdown-container ul li,
+.markdown-container ol li {
+  white-space: pre-line;
+}
+
+/* 강조 텍스트 내 줄바꿈 처리 */
+.markdown-container em,
+.markdown-container strong {
+  white-space: pre-line;
+}
+
+/* 마크다운 리스트 스타일 개선 */
+.markdown-list {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+
+.markdown-list .markdown-list-item {
+  margin-bottom: 0.25rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* 코드 블록과 인라인 코드 보호 */
+.markdown-container pre,
+.markdown-container code {
+  white-space: pre;
+}
+
+.markdown-container pre code {
+  white-space: pre;
+}
