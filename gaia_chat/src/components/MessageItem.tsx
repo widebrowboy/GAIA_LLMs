@@ -16,6 +16,53 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
   const isSystemMessage = message.role === 'system';
   const isCompleteResponse = isAssistantMessage && message.isComplete;
   const isStreamingMessage = isAssistantMessage && !message.isComplete;
+
+  // * 패턴 감지 및 줄바꿈 처리 함수
+  const processLineBreaks = (text: string): string => {
+    // * 시작 패턴 감지
+    const startsWithAsterisk = /^\s*\*\s+/;
+    
+    // * 강조 패턴 감지  
+    const emphasisPattern = /\*([^*]+)\*/g;
+    
+    // 볼드 패턴 감지
+    const boldPattern = /\*\*([^*]+)\*\*/g;
+    
+    return text.split('\n').map((line, index, lines) => {
+      const isListItem = /^\s*[*\-+]\s+/.test(line);
+      const prevIsListItem = index > 0 && /^\s*[*\-+]\s+/.test(lines[index - 1]);
+      const nextIsListItem = index < lines.length - 1 && /^\s*[*\-+]\s+/.test(lines[index + 1]);
+      
+      // * 시작 패턴 감지하여 앞에 줄바꿈 추가
+      const startsWithAsteriskItem = startsWithAsterisk.test(line);
+      const prevLine = index > 0 ? lines[index - 1] : '';
+      const shouldAddLineBreakBefore = startsWithAsteriskItem && prevLine.trim() && !prevIsListItem;
+      
+      // * 끝 패턴 감지하여 뒤에 줄바꿈 추가
+      const currentIsLastListItem = isListItem && !nextIsListItem;
+      const shouldAddLineBreakAfter = currentIsLastListItem && index < lines.length - 1 && lines[index + 1].trim();
+      
+      // 리스트 컨텍스트에서는 자연스러운 줄바꿈 유지
+      if (isListItem || prevIsListItem) {
+        let processedLine = line;
+        
+        // 앞에 줄바꿈 추가 (리스트 시작)
+        if (shouldAddLineBreakBefore) {
+          processedLine = '\n' + processedLine;
+        }
+        
+        // 뒤에 줄바꿈 추가 (리스트 끝)
+        if (shouldAddLineBreakAfter) {
+          processedLine = processedLine + '\n';
+        }
+        
+        return processedLine;
+      }
+      
+      // 일반 텍스트는 강제 줄바꿈 추가
+      return line.trim() ? line + '  ' : line;
+    }).join('\n');
+  };
   
   const timestamp = new Date(message.timestamp).toLocaleTimeString('ko-KR', {
     hour: '2-digit',
@@ -100,7 +147,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
         {/* 메시지 텍스트 - 완료된 응답만 마크다운 렌더링 적용 */}
         <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full">
           {isCompleteResponse ? (
-            // 완료된 응답: 최적화된 마크다운 렌더링 적용
+            // 완료된 응답: 전처리된 마크다운 렌더링 적용
             <div className="markdown-content prose prose-slate max-w-none overflow-hidden">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
@@ -187,18 +234,18 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                   ),
                 }}
               >
-                {message.content}
+                {processLineBreaks(message.content)}
               </ReactMarkdown>
             </div>
           ) : isStreamingMessage ? (
-            // 스트리밍 중: 원본 텍스트만 표시 (마크다운 렌더링 없음)
-            <div className="streaming-text text-gray-700">
-              {message.content}
+            // 스트리밍 중: * 패턴 인식 및 줄바꿈 처리된 텍스트 표시
+            <div className="streaming-text text-gray-700" style={{ whiteSpace: 'pre-wrap' }}>
+              {processLineBreaks(message.content)}
             </div>
           ) : (
-            // 사용자 메시지: 원본 텍스트 표시
-            <div className="user-text">
-              {message.content}
+            // 사용자 메시지: * 패턴 인식 및 줄바꿈 처리된 텍스트 표시
+            <div className="user-text" style={{ whiteSpace: 'pre-wrap' }}>
+              {processLineBreaks(message.content)}
             </div>
           )}
         </div>
