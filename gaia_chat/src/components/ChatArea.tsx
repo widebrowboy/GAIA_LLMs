@@ -5,7 +5,6 @@ import { Send, Plus, Menu, Edit2, Check } from 'lucide-react';
 import Image from 'next/image';
 import { useChatContext } from '@/contexts/SimpleChatContext';
 import { useResponsive } from '@/hooks/useResponsive';
-import { processMarkdownText } from '@/utils/markdownProcessor';
 import MessageItem from './MessageItem';
 
 interface ChatAreaProps {
@@ -334,36 +333,16 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                 </div>
-                <div className="streaming-text korean-text text-gray-900">
-                  {streamingResponse.split('\n').map((line, index) => {
-                    // 확장된 패턴 기반 줄바꿈 처리
-                    const trimmedLine = line.trim();
-                    const isSubHeading = /^\s*#{2,}\s+/.test(line);
-                    const isNumberedItem = /^(\d+\.|\d+\)|\w\.|[가-힣]\.|[A-Z]\.|[a-z]\.|[ⅰ-ⅹ]\.|[①-⑳])/.test(trimmedLine);
-                    const isKeywordSection = /^(개요|결론|요약|분석|평가|제안|권고|배경|목적|방법|결과|논의|한계|향후|참고|부록)[:：]/.test(trimmedLine);
-                    const isListItem = /^\s*[*\-+]\s+/.test(line);
-                    const hasAsterisk = line.includes('*');
-                    
-                    let lineClass = 'regular-line';
-                    if (isSubHeading) {
-                      lineClass = 'subheading-line';
-                    } else if (isNumberedItem) {
-                      lineClass = 'numbered-item-line';
-                    } else if (isKeywordSection) {
-                      lineClass = 'keyword-section-line';
-                    } else if (isListItem) {
-                      lineClass = 'list-item-line';
-                    } else if (hasAsterisk) {
-                      lineClass = 'asterisk-line';
-                    }
-                    
-                    return (
-                      <div key={index} className={`streaming-line ${lineClass}`}>
-                        {line}
-                        {index < streamingResponse.split('\n').length - 1 && <br />}
-                      </div>
-                    );
-                  })}
+                <div 
+                  className="streaming-text korean-text text-gray-900"
+                  style={{ 
+                    whiteSpace: 'pre-line', 
+                    lineHeight: '1.6',
+                    color: '#374151',
+                    fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif'
+                  }}
+                >
+                  {streamingResponse}
                   <span className="inline-block w-3 h-5 bg-gradient-to-r from-emerald-500 to-blue-500 animate-pulse ml-1 rounded"></span>
                 </div>
               </div>

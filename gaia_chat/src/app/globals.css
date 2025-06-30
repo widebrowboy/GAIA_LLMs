@@ -148,6 +148,407 @@ body {
   background: #a8a8a8;
 }
 
+/* 의료 문서 스타일 - 한국어 최적화 */
+.medical-document {
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', sans-serif;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  text-rendering: optimizeLegibility;
+  line-height: 1.7;
+}
+
+/* 한국어 텍스트 최적화 */
+.korean-text {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.7;
+  letter-spacing: -0.01em;
+}
+
+/* 마크다운 제목 스타일 강화 */
+.medical-document h1 {
+  margin-top: 2rem !important;
+  margin-bottom: 1rem !important;
+  font-size: 1.75rem !important;
+  font-weight: 700 !important;
+  color: #065f46 !important;
+  border-bottom: 3px solid #10b981 !important;
+  padding-bottom: 0.5rem !important;
+}
+
+.medical-document h2 {
+  margin-top: 1.5rem !important;
+  margin-bottom: 0.75rem !important;
+  font-size: 1.375rem !important;
+  font-weight: 600 !important;
+  color: #1e40af !important;
+  border-bottom: 2px solid #3b82f6 !important;
+  padding-bottom: 0.25rem !important;
+}
+
+.medical-document h3 {
+  margin-top: 1.25rem !important;
+  margin-bottom: 0.5rem !important;
+  font-size: 1.125rem !important;
+  font-weight: 600 !important;
+  color: #7c3aed !important;
+}
+
+.medical-document h4 {
+  margin-top: 1rem !important;
+  margin-bottom: 0.5rem !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  color: #0891b2 !important;
+}
+
+/* 마크다운 리스트 스타일 강화 */
+.medical-document ul {
+  margin: 1rem 0 !important;
+  padding-left: 1.5rem !important;
+}
+
+.medical-document ol {
+  margin: 1rem 0 !important;
+  padding-left: 1.5rem !important;
+}
+
+.medical-document li {
+  margin: 0.25rem 0 !important;
+  line-height: 1.6 !important;
+  color: #374151 !important;
+}
+
+/* 중첩 리스트 간격 조정 */
+.medical-document ul ul,
+.medical-document ol ol,
+.medical-document ul ol,
+.medical-document ol ul {
+  margin: 0.5rem 0 !important;
+  padding-left: 1.25rem !important;
+}
+
+/* 강조 텍스트 스타일 */
+.medical-document strong {
+  font-weight: 700 !important;
+  color: #065f46 !important;
+  background-color: #ecfdf5 !important;
+  padding: 0.125rem 0.25rem !important;
+  border-radius: 0.25rem !important;
+}
+
+.medical-document em {
+  font-style: italic !important;
+  color: #1e40af !important;
+  background-color: #eff6ff !important;
+  padding: 0.125rem 0.25rem !important;
+  border-radius: 0.25rem !important;
+}
+
+/* 문단 간격 및 스타일 */
+.medical-document p {
+  margin: 0.75rem 0 !important;
+  line-height: 1.7 !important;
+  color: #374151 !important;
+  text-align: justify !important;
+}
+
+/* 코드 블록 스타일 */
+.medical-document pre {
+  background-color: #1f2937 !important;
+  color: #e5e7eb !important;
+  padding: 1rem !important;
+  border-radius: 0.5rem !important;
+  margin: 1rem 0 !important;
+  overflow-x: auto !important;
+}
+
+.medical-document code {
+  background-color: #f3f4f6 !important;
+  color: #374151 !important;
+  padding: 0.125rem 0.375rem !important;
+  border-radius: 0.25rem !important;
+  font-size: 0.875rem !important;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace !important;
+}
+
+/* 인용구 스타일 */
+.medical-document blockquote {
+  border-left: 4px solid #10b981 !important;
+  background-color: #ecfdf5 !important;
+  margin: 1rem 0 !important;
+  padding: 0.75rem 1rem !important;
+  color: #065f46 !important;
+  font-style: italic !important;
+  border-radius: 0 0.375rem 0.375rem 0 !important;
+}
+
+/* GitHub 스타일 마크다운 */
+.github-markdown {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  font-size: 16px;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+/* GitHub 스타일 제목들 */
+.github-markdown h1,
+.github-markdown h2,
+.github-markdown h3,
+.github-markdown h4,
+.github-markdown h5,
+.github-markdown h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.github-markdown h1 {
+  font-size: 2em;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.github-markdown h2 {
+  font-size: 1.5em;
+}
+
+.github-markdown h3 {
+  font-size: 1.25em;
+}
+
+.github-markdown h4 {
+  font-size: 1em;
+}
+
+.github-markdown h5 {
+  font-size: 0.875em;
+}
+
+.github-markdown h6 {
+  font-size: 0.85em;
+  color: #656d76;
+}
+
+/* GitHub 스타일 문단 */
+.github-markdown p {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+/* GitHub 스타일 리스트 */
+.github-markdown ul,
+.github-markdown ol {
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding-left: 2em;
+}
+
+.github-markdown li {
+  word-wrap: break-word;
+}
+
+.github-markdown li > p {
+  margin-top: 16px;
+}
+
+.github-markdown li + li {
+  margin-top: 0.25em;
+}
+
+/* GitHub 스타일 중첩 리스트 */
+.github-markdown ul ul,
+.github-markdown ul ol,
+.github-markdown ol ol,
+.github-markdown ol ul {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* GitHub 스타일 인라인 코드 */
+.github-markdown code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(175, 184, 193, 0.2);
+  border-radius: 6px;
+}
+
+/* GitHub 스타일 코드 블록 */
+.github-markdown pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: #f6f8fa;
+  border-radius: 6px;
+}
+
+.github-markdown pre code {
+  display: inline;
+  max-width: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  line-height: inherit;
+  word-wrap: normal;
+  background-color: transparent;
+  border: 0;
+}
+
+/* GitHub 스타일 테이블 */
+.github-markdown table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.github-markdown table th {
+  font-weight: 600;
+}
+
+.github-markdown table th,
+.github-markdown table td {
+  padding: 6px 13px;
+  border: 1px solid #d0d7de;
+}
+
+.github-markdown table tr {
+  background-color: #ffffff;
+  border-top: 1px solid #c6cbd1;
+}
+
+.github-markdown table tr:nth-child(2n) {
+  background-color: #f6f8fa;
+}
+
+.github-markdown table th[align="center"],
+.github-markdown table td[align="center"] {
+  text-align: center;
+}
+
+.github-markdown table th[align="right"],
+.github-markdown table td[align="right"] {
+  text-align: right;
+}
+
+/* GitHub 스타일 인용구 */
+.github-markdown blockquote {
+  padding: 0 1em;
+  color: #656d76;
+  border-left: 0.25em solid #d0d7de;
+  margin: 0 0 16px 0;
+}
+
+.github-markdown blockquote > :first-child {
+  margin-top: 0;
+}
+
+.github-markdown blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* GitHub 스타일 가로선 */
+.github-markdown hr {
+  height: 0.25em;
+  padding: 0;
+  margin: 24px 0;
+  background-color: #d0d7de;
+  border: 0;
+}
+
+/* GitHub 스타일 링크 */
+.github-markdown a {
+  color: #0969da;
+  text-decoration: none;
+}
+
+.github-markdown a:hover {
+  text-decoration: underline;
+}
+
+/* GitHub 스타일 강조 */
+.github-markdown strong {
+  font-weight: 600;
+}
+
+.github-markdown em {
+  font-style: italic;
+}
+
+/* GitHub 스타일 체크박스 리스트 */
+.github-markdown .task-list-item {
+  list-style-type: none;
+}
+
+.github-markdown .task-list-item-checkbox {
+  margin: 0 0.2em 0.25em -1.6em;
+  vertical-align: middle;
+}
+
+/* GitHub 스타일 이미지 */
+.github-markdown img {
+  max-width: 100%;
+  box-sizing: content-box;
+  background-color: #ffffff;
+}
+
+/* 반응형 테이블 래퍼 */
+.github-markdown .table-wrapper {
+  overflow-x: auto;
+  margin: 16px 0;
+}
+
+/* 한국어 텍스트 최적화 (GitHub 스타일) */
+.github-markdown.korean-text {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.7;
+  letter-spacing: -0.01em;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', sans-serif;
+}
+
+/* 한국어 + 영어 혼합 텍스트 최적화 */
+.github-markdown.korean-text p,
+.github-markdown.korean-text li,
+.github-markdown.korean-text td,
+.github-markdown.korean-text th {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 영어 단어 기본 줄바꿈 허용 */
+.github-markdown.korean-text code,
+.github-markdown.korean-text pre {
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+/* 한국어 문장 부호 최적화 */
+.github-markdown.korean-text {
+  hanging-punctuation: allow-end;
+}
+
+/* 스트리밍 텍스트에도 같은 최적화 적용 */
+.raw-text.korean-text {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', sans-serif;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+  letter-spacing: -0.01em;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* 전문가 수준 보고서 스타일링 */
 .professional-report {
   font-family: 'Georgia', 'Times New Roman', serif;

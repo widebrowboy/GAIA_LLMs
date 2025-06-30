@@ -32,7 +32,14 @@ Ollama LLM과 MCP(Model Context Protocol)를 활용한 **프로덕션 레디** �
 - **포트 충돌 방지**: 자동 프로세스 관리 시스템
 
 ### 🔬 고성능 연구 플랫폼
-- **통합 MCP 서버**: DrugBank, OpenTargets, ChEMBL, PubMed, ClinicalTrials.gov, BioMCP, BioRxiv/medRxiv, Sequential Thinking, Playwright
+- **완전 구성된 MCP 서버 (v3.34)**: 
+  - **BioMCP**: 통합 생명과학 연구 도구 (PubMed, ClinicalTrials, MyVariant)
+  - **OpenTargets**: 타겟 검증 및 질환-타겟 연관성 분석
+  - **DrugBank**: 약물 정보 데이터베이스 및 상호작용 분석
+  - **ChEMBL**: 화학 생물활성 데이터베이스
+  - **PubMed**: 생명과학 문헌 검색
+  - **ClinicalTrials**: 임상시험 레지스트리
+- **Claude Code 호환성**: MCP 구성 파일 자동 생성 (claude_code_config.json)
 - **스마트 Deep Search**: 질문 키워드 분석 기반 적응형 다중 데이터베이스 검색
 - **실시간 분석**: 최신 논문, 임상시험, 약물-타겟 상호작용 데이터 실시간 조회
 - **AI 통합 분석**: Sequential Thinking + 다중 데이터소스 조합으로 포괄적 연구 수행
@@ -279,17 +286,42 @@ ws.send(JSON.stringify({
 }));
 ```
 
-## 🔬 MCP 통합 기능
+## 🔬 MCP 통합 기능 (v3.34 완전 구성)
 
-### 지원되는 데이터베이스
-- **DrugBank**: 약물 정보 및 상호작용
-- **ChEMBL**: 화학 구조 및 생물활성 데이터
-- **OpenTargets**: 타겟-질병 연관성 분석
-- **PubMed**: 의학 논문 검색 (BioMCP)
-- **ClinicalTrials.gov**: 임상시험 데이터
-- **BioRxiv/medRxiv**: 최신 프리프린트 논문
-- **Sequential Thinking**: AI 기반 단계별 추론
-- **Playwright**: 웹 자동화 및 데이터 수집
+### 설치된 MCP 서버
+1. **BioMCP** (`/mcp/biomcp/`) - 통합 생명과학 연구 도구
+   - PubTator3/PubMed 문헌 검색
+   - ClinicalTrials.gov 임상시험 데이터
+   - MyVariant.info 유전자 변이 정보
+   - 도구: `article_searcher`, `article_details`, `trial_searcher`, `variant_searcher`
+
+2. **OpenTargets** (`/mcp/opentargets/`) - 타겟 검증 플랫폼
+   - 타겟-질환 연관성 분석
+   - 유전적 증거 및 신뢰도 점수
+   - 약물 개발 가능성 평가
+
+3. **DrugBank** (`/mcp/drugbank/`) - 약물 정보 데이터베이스
+   - 승인된 약물 정보 및 상호작용
+   - 약물동력학 및 약물동태학 데이터
+   - 도구: `search_drugs`, `get_drug_details`, `find_drugs_by_indication`
+
+4. **ChEMBL** (`/mcp/chembl/`) - 화학 생물활성 데이터베이스
+   - 분자 구조 및 생물활성 데이터
+   - SAR (구조-활성 관계) 분석
+   - 도구: `search_molecule`, `search_target`, `canonicalize_smiles`
+
+5. **PubMed** (`/mcp/pubmed/`) - 생명과학 문헌 검색
+   - MEDLINE 데이터베이스 직접 접근
+   - 저자별, 주제별 논문 검색
+
+6. **ClinicalTrials** (`/mcp/clinicaltrials/`) - 임상시험 레지스트리
+   - ClinicalTrials.gov 데이터 접근
+   - 임상시험 프로토콜 및 결과 분석
+
+### Claude Code MCP 구성 파일
+- **위치**: `/home/gaia-bt/.config/claude-code/claude_code_config.json`
+- **내용**: 모든 MCP 서버 구성 정보 포함
+- **사용법**: Claude Code에서 즉시 사용 가능
 
 ### Deep Search 사용법
 ```bash
