@@ -1,0 +1,158 @@
+
+# Pharmaceutical Competitive Landscape Analysis Guide
+
+## Overview
+
+This guide provides comprehensive instructions for conducting competitive landscape analyses in pharmaceutical and biotechnology sectors, focusing on specific targets, mechanisms of action (MoA), or therapeutic indications.
+
+## Section 1: Analysis for Specific Target or MoA
+
+### 1. Literature Review Search Strategy
+
+**Search Parameters:**
+
+- Primary search: "[Target Name]" AND "Review"
+- Time frame: Last 3-5 years only
+- Focus: Review articles exclusively (exclude primary research papers)
+
+**Exclusion Criteria:**
+
+- Reviews authored by researchers from Iranian or Indian academic institutions or medical centers
+- Primary research papers (due to potential retraction risks at this stage)
+
+### 2. Competitive Landscape Development
+
+**Essential Data Points:**
+
+- **INN** (International Nonproprietary Name)
+- **Brand names/Development codes** (multiple possible due to licensing - search all variants)
+- **Developer(s)/Company(ies)**
+- **Target specificity** (verify detailed subtypes)
+- **Indications** (approved and in development)
+- **Combination therapies** (specify combination drugs by indication)
+- **Industry collaborators** (by indication)
+- **Dosing and regimen**
+- **Latest development stage** (by indication)
+- **Patent information**
+
+**Class-Specific Factors for Differentiation Analysis:**
+
+- Efficacy parameters
+- Safety profile and toxicity data
+- Production specifications (host systems, manufacturing processes)
+- Formulation details
+- Dosing and administration regimen
+
+### 3. Reference Sources
+
+**Approved Drugs:**
+
+- FDA Database: [https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm](https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm)
+- EMA Database: [https://www.ema.europa.eu/en/medicines](https://www.ema.europa.eu/en/medicines)
+
+**Clinical Development:**
+
+- ClinicalTrials.gov
+- WHO International Clinical Trials Registry: trialsearch.who.int
+
+**Patent Research:**
+
+- KIPRIS (Korea): [https://www.kipris.or.kr/khome/main.do](https://www.kipris.or.kr/khome/main.do)
+    - Search parameters:
+        - Applicant: Development companies
+        - Inventors: Executive team, Scientific Advisory Board (SAB), Technical/Science executives
+        - University Technology Transfer Offices (TTOs) associated with SAB members
+        - Claims analysis
+
+**Additional Sources:**
+
+- Company websites
+- Google search (beyond news articles)
+- Maximum 20 pages of Google results (extend to 40 pages if initial results are limited)
+
+## Section 2: Analysis for Specific Therapeutic Indication
+
+### 1. Initial Literature Review
+
+(Follow same search strategy as Section 1.1)
+
+### 2. Approved Therapeutics Competitive Landscape
+
+**Priority Focus:** Begin with FDA/EMA approved drugs and therapies
+
+**Data Collection:** (Follow same essential data points and class-specific factors as Section 1.2)
+
+### 3. Pipeline Therapeutics Competitive Landscape
+
+**Development Stage Analysis:**
+
+- Include all clinical development stages
+- Track both monotherapy and combination approaches
+- Monitor licensing and collaboration changes
+
+**Special Considerations for Combination Therapies:**
+
+- When combination includes approved drugs: Cross-reference with FDA/EMA databases
+- Verify all partner drug information
+- Document indication-specific combinations
+
+### 4. Comprehensive Source Verification
+
+(Use all reference sources listed in Section 1.3)
+
+## Report Structure Guidelines
+
+### Executive Summary Format
+
+1. Target/MoA or Indication overview
+2. Market landscape summary
+3. Key competitive advantages/challenges
+4. Development pipeline highlights
+
+### Detailed Analysis Sections
+
+1. **Approved Therapeutics**
+    - Comprehensive profiles by product
+    - Market performance data
+    - Patent expiration timelines
+2. **Clinical Pipeline**
+    - Phase III candidates (nearest to market)
+    - Phase II programs (mid-stage)
+    - Phase I/Preclinical (early stage)
+3. **Differentiation Analysis**
+    - Efficacy comparisons
+    - Safety profile distinctions
+    - Manufacturing/formulation advantages
+    - Dosing convenience factors
+4. **Strategic Insights**
+    - Partnership opportunities
+    - Market gaps identification
+    - Development risks assessment
+
+## Quality Control Checklist
+
+- [ ]  All reviews from last 3-5 years reviewed
+- [ ]  Excluded papers from restricted sources
+- [ ]  All brand names/development codes searched
+- [ ]  Patent landscape comprehensive
+- [ ]  Clinical trial databases fully searched
+- [ ]  Cross-verification completed across sources
+- [ ]  Differentiation factors analyzed
+- [ ]  All indications covered
+- [ ]  Collaboration details verified
+
+## Usage Instructions
+
+This guide can be used as:
+
+1. A systematic prompt for AI-assisted research
+2. A checklist for manual competitive intelligence gathering
+3. A template for standardizing competitive landscape reports
+4. Training material for new analysts in pharmaceutical competitive intelligence
+
+When using as a prompt, specify:
+
+- The specific target/MoA or indication
+- Any additional company or geographic focus
+- Desired output format (table, narrative, presentation)
+- Priority ranking criteria (e.g., development stage, company size, efficacy)

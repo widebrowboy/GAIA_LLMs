@@ -112,38 +112,54 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                 ]}
                 rehypePlugins={[rehypeRaw]}
                 components={{
-                  // 메인 타이틀 - 의료 문서 스타일 (앞뒤 줄바꿈 강화)
+                  // 메인 타이틀 - 의료 문서 스타일 (강제 줄바꿈 추가)
                   h1: ({children}) => (
-                    <h1 className="document-main-title text-2xl font-bold text-slate-900 mb-8 mt-8 pb-3 border-b-3 border-blue-600 leading-tight tracking-tight flex items-center gap-3">
-                      <span className="text-2xl">🏥</span>
-                      {children}
-                    </h1>
+                    <div className="heading-wrapper">
+                      <div className="heading-break-before"></div>
+                      <h1 className="document-main-title text-2xl font-bold text-slate-900 mb-8 mt-8 pb-3 border-b-3 border-blue-600 leading-tight tracking-tight flex items-center gap-3">
+                        <span className="text-2xl">🏥</span>
+                        {children}
+                      </h1>
+                      <div className="heading-break-after"></div>
+                    </div>
                   ),
-                  // 섹션 타이틀 - 의료 문서 스타일 (앞뒤 줄바꿈 강화)
+                  // 섹션 타이틀 - 의료 문서 스타일 (강제 줄바꿈 추가)
                   h2: ({children}) => (
-                    <h2 className="section-title text-xl font-semibold text-slate-800 mb-6 mt-8 pb-2 px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 border-l-4 border-blue-500 rounded-r-lg leading-tight flex items-center gap-2">
-                      <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                        {(() => {
-                          const text = children?.toString() || '';
-                          const match = text.match(/^(\d+)\./);
-                          return match ? match[1] : '•';
-                        })()}
-                      </span>
-                      {children}
-                    </h2>
+                    <div className="heading-wrapper">
+                      <div className="heading-break-before"></div>
+                      <h2 className="section-title text-xl font-semibold text-slate-800 mb-6 mt-8 pb-2 px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 border-l-4 border-blue-500 rounded-r-lg leading-tight flex items-center gap-2">
+                        <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                          {(() => {
+                            const text = children?.toString() || '';
+                            const match = text.match(/^(\d+)\./);
+                            return match ? match[1] : '•';
+                          })()}
+                        </span>
+                        {children}
+                      </h2>
+                      <div className="heading-break-after"></div>
+                    </div>
                   ),
-                  // 서브섹션 타이틀 (앞뒤 줄바꿈 강화)
+                  // 서브섹션 타이틀 (강제 줄바꿈 추가)
                   h3: ({children}) => (
-                    <h3 className="subsection-title text-lg font-medium text-slate-700 mb-4 mt-6 leading-tight flex items-center gap-2">
-                      <span className="text-base">📋</span>
-                      {children}
-                    </h3>
+                    <div className="heading-wrapper">
+                      <div className="heading-break-before"></div>
+                      <h3 className="subsection-title text-lg font-medium text-slate-700 mb-4 mt-6 leading-tight flex items-center gap-2">
+                        <span className="text-base">📋</span>
+                        {children}
+                      </h3>
+                      <div className="heading-break-after"></div>
+                    </div>
                   ),
                   h4: ({children}) => (
-                    <h4 className="text-md font-medium text-slate-700 mb-3 mt-5 leading-tight flex items-center gap-2">
-                      <span className="text-sm">🔹</span>
-                      {children}
-                    </h4>
+                    <div className="heading-wrapper">
+                      <div className="heading-break-before"></div>
+                      <h4 className="text-md font-medium text-slate-700 mb-3 mt-5 leading-tight flex items-center gap-2">
+                        <span className="text-sm">🔹</span>
+                        {children}
+                      </h4>
+                      <div className="heading-break-after"></div>
+                    </div>
                   ),
                   // 의료 경고 박스 (blockquote)
                   blockquote: ({children}) => (
@@ -155,16 +171,24 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                       </div>
                     </div>
                   ),
-                  // 의료 리스트 스타일
+                  // 의료 리스트 스타일 - 구분 강화
                   ul: ({children}) => (
-                    <ul className="medical-list list-none p-0 my-4 space-y-2">
-                      {children}
-                    </ul>
+                    <div className="list-wrapper">
+                      <div className="list-break-before"></div>
+                      <ul className="medical-list list-none p-0 my-4 space-y-2">
+                        {children}
+                      </ul>
+                      <div className="list-break-after"></div>
+                    </div>
                   ),
                   ol: ({children}) => (
-                    <ol className="medical-list list-none p-0 my-4 space-y-2">
-                      {children}
-                    </ol>
+                    <div className="list-wrapper">
+                      <div className="list-break-before"></div>
+                      <ol className="medical-list list-none p-0 my-4 space-y-2">
+                        {children}
+                      </ol>
+                      <div className="list-break-after"></div>
+                    </div>
                   ),
                   li: ({children}) => (
                     <li className="medical-list-item flex items-start gap-3 p-3 bg-white border-l-4 border-green-500 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 hover:translate-x-1">
@@ -181,7 +205,9 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                   ),
                   // 의료 문서 단락 스타일 - 제목과 문단 앞뒤 줄바꿈 강화
                   p: ({children}) => (
-                    <p className="medical-paragraph mb-6 mt-4 leading-7 text-slate-700 text-justify">{children}</p>
+                    <div className="paragraph-wrapper">
+                      <p className="medical-paragraph mb-6 mt-4 leading-7 text-slate-700 text-justify">{children}</p>
+                    </div>
                   ),
                   // 의료 전문 표 스타일링
                   table: ({children}) => (

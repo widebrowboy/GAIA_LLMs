@@ -841,6 +841,108 @@ body {
   }
 }
 
+/* 제목 앞뒤 강제 줄바꿈 구현 */
+.heading-wrapper {
+  display: block;
+  width: 100%;
+}
+
+.heading-break-before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 1.5rem;
+  clear: both;
+  margin: 0;
+  padding: 0;
+}
+
+.heading-break-after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 1rem;
+  clear: both;
+  margin: 0;
+  padding: 0;
+}
+
+/* 제목과 텍스트 간 명확한 구분을 위한 추가 스타일 */
+.heading-wrapper + * {
+  margin-top: 1.5rem !important;
+}
+
+* + .heading-wrapper {
+  margin-top: 2rem !important;
+}
+
+/* 문단 래퍼 스타일 - 명확한 구분을 위한 간격 */
+.paragraph-wrapper {
+  display: block;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.paragraph-wrapper + .heading-wrapper {
+  margin-top: 2.5rem !important;
+}
+
+.heading-wrapper + .paragraph-wrapper {
+  margin-top: 1.5rem !important;
+}
+
+.paragraph-wrapper + .paragraph-wrapper {
+  margin-top: 0.8rem !important;
+}
+
+/* 리스트 래퍼 스타일 - 리스트 앞뒤 구분 강화 */
+.list-wrapper {
+  display: block;
+  width: 100%;
+  margin: 1.5rem 0;
+}
+
+.list-break-before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 1rem;
+  clear: both;
+  margin: 0;
+  padding: 0;
+}
+
+.list-break-after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 0.8rem;
+  clear: both;
+  margin: 0;
+  padding: 0;
+}
+
+/* 리스트와 다른 요소 간 간격 조정 */
+.paragraph-wrapper + .list-wrapper {
+  margin-top: 1.5rem !important;
+}
+
+.list-wrapper + .paragraph-wrapper {
+  margin-top: 1.5rem !important;
+}
+
+.heading-wrapper + .list-wrapper {
+  margin-top: 1.5rem !important;
+}
+
+.list-wrapper + .heading-wrapper {
+  margin-top: 2.5rem !important;
+}
+
+.list-wrapper + .list-wrapper {
+  margin-top: 1rem !important;
+}
+
 /* 한국어 유니코드 처리 최적화 */
 .korean-text {
   font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', 'Apple Gothic', 'Apple SD Gothic Neo', sans-serif;
