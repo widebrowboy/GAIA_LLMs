@@ -138,11 +138,12 @@ check_port_safely() {
     if [ ! -z "$pids" ]; then
         echo -e "${YELLOW}⚠️ 포트 $port가 이미 사용 중입니다 (PID: $pids)${NC}"
         
-        # SSH 관련 프로세스인지 확인
-        local ssh_processes=$(echo "$pids" | xargs -I {} ps -p {} -o comm= 2>/dev/null | grep -E "sshd|ssh-agent|ssh|sftp|scp" || true)
+        # SSH 및 포트 포워딩 관련 프로세스인지 확인
+        local protected_processes=$(echo "$pids" | xargs -I {} ps -p {} -o comm= 2>/dev/null | grep -E "sshd|ssh-agent|ssh|sftp|scp|code|windsurf|code-tunnel|code-server|remote-ssh" || true)
         
-        if [ ! -z "$ssh_processes" ]; then
-            echo -e "${RED}🚨 SSH 관련 프로세스가 포트 $port를 사용 중입니다. 보안상 종료하지 않습니다.${NC}"
+        if [ ! -z "$protected_processes" ]; then
+            echo -e "${RED}🚨 보호된 프로세스(SSH/포트포워딩/IDE)가 포트 $port를 사용 중입니다. 보안상 종료하지 않습니다.${NC}"
+            echo -e "${YELLOW}💡 보호된 프로세스: SSH, VS Code, Windsurf 등${NC}"
             echo -e "${YELLOW}💡 해결 방법: 다른 포트를 사용하거나 수동으로 확인하세요.${NC}"
             return 1
         fi
