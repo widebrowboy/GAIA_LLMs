@@ -98,10 +98,10 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
         )}
 
         {/* 메시지 텍스트 - 완료된 응답만 마크다운 렌더링 적용 */}
-        <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word">
+        <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full">
           {isCompleteResponse ? (
-            // 완료된 응답: 마크다운 렌더링 적용
-            <div className="prose prose-slate max-w-none">
+            // 완료된 응답: 최적화된 마크다운 렌더링 적용
+            <div className="markdown-content prose prose-slate max-w-none overflow-hidden">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -131,15 +131,15 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                   em: ({children}) => (
                     <em className="italic text-gray-700">{children}</em>
                   ),
-                  // 리스트 스타일링 - 자연스러운 들여쓰기
-                  ul: ({children}) => (
-                    <ul className="list-disc list-outside space-y-1 my-3 ml-6 pl-2">{children}</ul>
+                  // 리스트 스타일링 - 줄바꿈 보장
+                  ul: ({children, ...props}) => (
+                    <ul className="list-block" {...props}>{children}</ul>
                   ),
-                  ol: ({children}) => (
-                    <ol className="list-decimal list-outside space-y-1 my-3 ml-6 pl-2">{children}</ol>
+                  ol: ({children, ...props}) => (
+                    <ol className="list-block" {...props}>{children}</ol>
                   ),
-                  li: ({children}) => (
-                    <li className="text-gray-800 leading-relaxed mb-1">{children}</li>
+                  li: ({children, ...props}) => (
+                    <li className="list-item-block" {...props}>{children}</li>
                   ),
                   // 표 스타일링
                   table: ({children}) => (
@@ -175,7 +175,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                   },
                   // 단락 스타일링 - 자연스러운 간격과 줄바꿈 처리
                   p: ({children}) => (
-                    <p className="mb-4 leading-relaxed text-gray-800 break-words overflow-wrap-anywhere">{children}</p>
+                    <p className="mb-3 leading-relaxed text-gray-800">{children}</p>
                   ),
                   // 수평선 스타일링
                   hr: () => (
@@ -192,12 +192,12 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
             </div>
           ) : isStreamingMessage ? (
             // 스트리밍 중: 원본 텍스트만 표시 (마크다운 렌더링 없음)
-            <div className="whitespace-pre-wrap font-mono text-gray-700 leading-relaxed break-words overflow-wrap-anywhere">
+            <div className="streaming-text text-gray-700">
               {message.content}
             </div>
           ) : (
             // 사용자 메시지: 원본 텍스트 표시
-            <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere">
+            <div className="user-text">
               {message.content}
             </div>
           )}

@@ -333,7 +333,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                 </div>
-                <div className="whitespace-pre-wrap break-words leading-relaxed text-gray-900">
+                <div className="streaming-text text-gray-900">
                   {streamingResponse}
                   <span className="inline-block w-3 h-5 bg-gradient-to-r from-emerald-500 to-blue-500 animate-pulse ml-1 rounded"></span>
                 </div>

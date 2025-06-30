@@ -28,19 +28,55 @@ body {
 /* 마크다운 추가 스타일링 */
 .prose {
   max-width: none;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .prose p {
   margin-bottom: 0.5rem;
   line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .prose ul, .prose ol {
   margin-bottom: 0.5rem;
 }
 
+/* 중첩된 리스트 스타일링 */
+.prose ul ul, .prose ol ol, .prose ul ol, .prose ol ul {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+  padding-left: 1.5rem;
+}
+
 .prose li {
   margin-bottom: 0.25rem;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 중첩된 리스트 아이템 들여쓰기 */
+.prose li li {
+  margin-bottom: 0.125rem;
+  padding-left: 0.5rem;
+}
+
+/* 리스트 마커 스타일 개선 */
+.prose ul {
+  list-style-type: disc;
+}
+
+.prose ul ul {
+  list-style-type: circle;
+}
+
+.prose ul ul ul {
+  list-style-type: square;
 }
 
 .prose blockquote {
@@ -198,8 +234,9 @@ body {
 }
 
 /* 포커스 스타일 개선 */
-.focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #3b82f6, 0 0 0 4px rgba(59, 130, 246, 0.3);
 }
 
 /* 그라디언트 애니메이션 */
@@ -231,4 +268,176 @@ body {
 @keyframes overlayFadeOut {
   from { opacity: 1; }
   to { opacity: 0; }
+}
+
+/* 텍스트 줄바꿈 및 띄어쓰기 개선 */
+.text-responsive {
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  max-width: 100%;
+}
+
+/* 스트리밍 응답용 텍스트 스타일 */
+.streaming-text {
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  max-width: 100%;
+}
+
+/* 사용자 메시지용 텍스트 스타일 */
+.user-text {
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  max-width: 100%;
+}
+
+/* 인라인 코드가 길 때도 자연스럽게 줄바꿈 */
+.prose code {
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 마크다운 콘텐츠 기본 스타일 */
+.markdown-content {
+  line-height: 1.7;
+  color: #374151;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+/* 간단하고 효과적인 리스트 스타일 - 줄바꿈 강화 */
+.markdown-content ul {
+  list-style-type: disc;
+  margin: 1.25rem 0; /* 위아래 간격 증가 */
+  padding-left: 2rem;
+  display: block; /* 블록 요소로 명시 */
+}
+
+.markdown-content ol {
+  list-style-type: decimal;
+  margin: 1.25rem 0; /* 위아래 간격 증가 */
+  padding-left: 2rem;
+  display: block; /* 블록 요소로 명시 */
+}
+
+/* 리스트가 단락 바로 뒤에 올 때 간격 보장 */
+.markdown-content p + ul,
+.markdown-content p + ol {
+  margin-top: 1.5rem;
+}
+
+/* 리스트 바로 뒤에 단락이 올 때 간격 보장 */
+.markdown-content ul + p,
+.markdown-content ol + p {
+  margin-top: 1.5rem;
+}
+
+/* 리스트끼리 연속으로 올 때 간격 */
+.markdown-content ul + ul,
+.markdown-content ol + ol,
+.markdown-content ul + ol,
+.markdown-content ol + ul {
+  margin-top: 0.75rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  display: list-item; /* 리스트 아이템 형태 명시 */
+  position: relative;
+}
+
+/* 리스트 아이템 앞뒤 공백 개선 */
+.markdown-content li::before {
+  content: "";
+  display: block;
+  height: 0;
+  margin: 0;
+}
+
+.markdown-content li:first-child {
+  margin-top: 0;
+}
+
+.markdown-content li:last-child {
+  margin-bottom: 0.25rem; /* 마지막 아이템 여백 조정 */
+}
+
+/* 중첩 리스트 */
+.markdown-content ul ul {
+  list-style-type: circle;
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+.markdown-content ul ul ul {
+  list-style-type: square;
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+.markdown-content ol ol {
+  list-style-type: lower-alpha;
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+.markdown-content ol ol ol {
+  list-style-type: lower-roman;
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+/* 리스트 아이템 내 단락 처리 */
+.markdown-content li p {
+  margin: 0.25rem 0;
+  display: block;
+}
+
+.markdown-content li p:first-child {
+  margin-top: 0;
+}
+
+.markdown-content li p:last-child {
+  margin-bottom: 0;
+}
+
+/* 추가 리스트 블록 스타일 */
+.list-block {
+  display: block !important;
+  margin: 1.25rem 0 !important;
+  clear: both;
+}
+
+.list-item-block {
+  display: list-item !important;
+  margin-bottom: 0.5rem !important;
+  clear: both;
+}
+
+/* 텍스트와 리스트 사이 강제 줄바꿈 */
+.markdown-content > * + ul,
+.markdown-content > * + ol {
+  margin-top: 1.5rem !important;
+}
+
+.markdown-content > ul + *,
+.markdown-content > ol + * {
+  margin-top: 1.5rem !important;
 }

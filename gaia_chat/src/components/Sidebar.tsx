@@ -725,6 +725,40 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                   </button>
                   <button
                     onClick={async () => {
+                      console.log('🧪 개선된 XHR 테스트');
+                      try {
+                        console.log('🔧 XHR Health 체크 시작');
+                        const healthResult = await apiClient.xhrFetch('/health');
+                        console.log('💊 Health 결과:', healthResult);
+                        
+                        if (healthResult.success) {
+                          console.log('🔧 XHR 모델 상세 정보 요청');
+                          const modelsResult = await apiClient.xhrFetch('/api/system/models/detailed');
+                          console.log('📋 모델 결과:', modelsResult);
+                          
+                          if (modelsResult.success) {
+                            console.log('✅ XHR 테스트 완전 성공!');
+                            alert(`XHR 테스트 성공!\nHealth: OK\n모델 수: ${modelsResult.data.available?.length || 0}개`);
+                          } else {
+                            console.warn('⚠️ 모델 정보 실패:', modelsResult.error);
+                            alert(`XHR 부분 성공\nHealth: OK\n모델 정보: 실패 - ${modelsResult.error}`);
+                          }
+                        } else {
+                          console.error('❌ Health 체크 실패:', healthResult.error);
+                          alert(`XHR 테스트 실패\nHealth: 실패 - ${healthResult.error}`);
+                        }
+                      } catch (error) {
+                        console.error('💥 XHR 테스트 예외:', error);
+                        alert(`XHR 테스트 예외: ${error}`);
+                      }
+                    }}
+                    className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded hover:bg-emerald-200 transition-colors"
+                    title="개선된 XHR 방식으로 API 테스트"
+                  >
+                    XHR
+                  </button>
+                  <button
+                    onClick={async () => {
                       console.log('🌐 직접 API 테스트');
                       try {
                         const url = 'http://localhost:8000/api/system/models/detailed';

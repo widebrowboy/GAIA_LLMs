@@ -132,29 +132,46 @@ export class ApiClient {
   }
 
   // XMLHttpRequest 기반 fetch 대체 (fetch 문제 해결용)
-  async xhrFetch(endpoint: string, method: string = 'GET'): Promise<any> {
+  async xhrFetch(endpoint: string, method: string = 'GET', data?: any): Promise<any> {
     return new Promise((resolve) => {
       try {
         const url = getApiUrl(endpoint);
-        console.log(`🔧 XHR Fetch 사용: ${method} ${url}`);
+        console.log(`🔧 XHR Fetch 사용: ${method} ${url}`, data ? { data } : {});
         
         const xhr = new XMLHttpRequest();
         xhr.open(method, url, true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
+        
+        // CORS 헤더 설정
+        xhr.setRequestHeader('Content-Type', 'application/json; charset=utf-8');
         xhr.setRequestHeader('Accept', 'application/json');
+        xhr.setRequestHeader('Cache-Control', 'no-cache');
+        
+        // CORS credentials 설정
+        xhr.withCredentials = false;
         
         xhr.onreadystatechange = function() {
           if (xhr.readyState === 4) {
             console.log(`📋 XHR 응답: ${xhr.status} ${xhr.statusText}`);
+            console.log(`📋 XHR 응답 헤더:`, xhr.getAllResponseHeaders());
             
             if (xhr.status >= 200 && xhr.status < 300) {
               try {
-                const data = JSON.parse(xhr.responseText);
+                const responseText = xhr.responseText;
+                console.log(`📄 XHR 응답 텍스트 (처음 200자):`, responseText.substring(0, 200));
+                
+                if (!responseText.trim()) {
+                  console.warn('⚠️ 빈 응답 텍스트');
+                  resolve({ success: false, error: '서버에서 빈 응답을 받았습니다' });
+                  return;
+                }
+                
+                const data = JSON.parse(responseText);
                 console.log('✅ XHR 성공:', data);
                 resolve({ success: true, data });
               } catch (parseError) {
                 console.error('❌ XHR JSON 파싱 오류:', parseError);
-                resolve({ success: false, error: 'JSON 파싱 실패' });
+                console.error('❌ 원본 응답:', xhr.responseText);
+                resolve({ success: false, error: `JSON 파싱 실패: ${parseError}` });
               }
             } else {
               console.error(`❌ XHR HTTP 오류: ${xhr.status}`, xhr.responseText);
@@ -165,18 +182,21 @@ export class ApiClient {
         
         xhr.onerror = function() {
           console.error('💥 XHR 네트워크 오류');
-          resolve({ success: false, error: 'XHR 네트워크 오류' });
+          resolve({ success: false, error: 'XHR 네트워크 오류 - 서버에 연결할 수 없습니다' });
         };
         
         xhr.ontimeout = function() {
           console.error('⏰ XHR 타임아웃');
-          resolve({ success: false, error: 'XHR 타임아웃' });
+          resolve({ success: false, error: 'XHR 타임아웃 - 서버 응답이 너무 늦습니다' });
         };
         
-        xhr.timeout = 15000; // 15초 타임아웃
+        xhr.timeout = 10000; // 10초 타임아웃으로 단축
         
-        if (method === 'POST') {
-          xhr.send(JSON.stringify({}));
+        // 요청 전송
+        if (method === 'POST' || method === 'PUT') {
+          const payload = data ? JSON.stringify(data) : JSON.stringify({});
+          console.log(`📤 XHR 요청 데이터:`, payload);
+          xhr.send(payload);
         } else {
           xhr.send();
         }
@@ -263,12 +283,17 @@ export class ApiClient {
     
     // XHR 우선 시도
     try {
-      const xhrResult = await this.xhrFetch(`/api/system/models/${encodedName}/start`, 'POST');
-      if (xhrResult.success) return xhrResult;
+      const xhrResult = await this.xhrFetch(`/api/system/models/${encodedName}/start`, 'POST', {});
+      if (xhrResult.success) {
+        console.log('✅ XHR 모델 시작 성공');
+        return xhrResult;
+      }
+      console.warn('⚠️ XHR 모델 시작 실패:', xhrResult.error);
     } catch (error) {
-      console.warn('⚠️ XHR 방식 실패, simpleFetch로 폴백:', error);
+      console.warn('⚠️ XHR 방식 예외, simpleFetch로 폴백:', error);
     }
     
+    console.log('🔄 simpleFetch로 모델 시작 재시도');
     return this.simpleFetch(`/api/system/models/${encodedName}/start`, 'POST');
   }
 
@@ -279,12 +304,17 @@ export class ApiClient {
     
     // XHR 우선 시도
     try {
-      const xhrResult = await this.xhrFetch(`/api/system/models/${encodedName}/stop`, 'POST');
-      if (xhrResult.success) return xhrResult;
+      const xhrResult = await this.xhrFetch(`/api/system/models/${encodedName}/stop`, 'POST', {});
+      if (xhrResult.success) {
+        console.log('✅ XHR 모델 중지 성공');
+        return xhrResult;
+      }
+      console.warn('⚠️ XHR 모델 중지 실패:', xhrResult.error);
     } catch (error) {
-      console.warn('⚠️ XHR 방식 실패, simpleFetch로 폴백:', error);
+      console.warn('⚠️ XHR 방식 예외, simpleFetch로 폴백:', error);
     }
     
+    console.log('🔄 simpleFetch로 모델 중지 재시도');
     return this.simpleFetch(`/api/system/models/${encodedName}/stop`, 'POST');
   }
 
@@ -295,12 +325,52 @@ export class ApiClient {
     // XHR 우선 시도
     try {
       const xhrResult = await this.xhrFetch('/health');
-      if (xhrResult.success) return xhrResult;
+      if (xhrResult.success) {
+        console.log('✅ XHR Health 체크 성공');
+        return xhrResult;
+      }
+      console.warn('⚠️ XHR Health 체크 실패:', xhrResult.error);
     } catch (error) {
-      console.warn('⚠️ XHR 방식 실패, simpleFetch로 폴백:', error);
+      console.warn('⚠️ XHR 방식 예외, simpleFetch로 폴백:', error);
     }
     
+    console.log('🔄 simpleFetch로 Health 체크 재시도');
     return this.simpleFetch('/health');
+  }
+
+  // 완전 독립적인 안전한 API 호출 (마지막 fallback)
+  async safeApiCall(endpoint: string): Promise<any> {
+    console.log(`🛡️ 안전한 API 호출: ${endpoint}`);
+    
+    try {
+      const url = getApiUrl(endpoint);
+      console.log(`🌐 안전한 API URL: ${url}`);
+      
+      // Image나 XMLHttpRequest를 이용한 가장 기본적인 방법
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          console.log('✅ 서버 연결 확인됨 (이미지 로딩 성공)');
+          resolve({ success: true, data: { status: 'reachable' } });
+        };
+        img.onerror = () => {
+          console.log('❌ 서버 연결 실패 (이미지 로딩 실패)');
+          resolve({ success: false, error: '서버 연결 실패' });
+        };
+        // 실제 API 엔드포인트가 아닌 favicon을 테스트
+        img.src = getApiUrl('/favicon.ico');
+        
+        // 5초 후 타임아웃
+        setTimeout(() => {
+          console.log('⏰ 안전한 API 호출 타임아웃');
+          resolve({ success: false, error: '연결 타임아웃' });
+        }, 5000);
+      });
+      
+    } catch (error) {
+      console.error('💥 안전한 API 호출 예외:', error);
+      return { success: false, error: error instanceof Error ? error.message : '알 수 없는 오류' };
+    }
   }
 }
 
