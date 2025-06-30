@@ -561,14 +561,14 @@ class OllamaClient:
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n사용자: {prompt}\n\n어시스턴트:"
         
-        # 단순한 payload 구성
+        # 단순한 payload 구성 - 딥리서치 모드를 위한 긴 응답 지원
         payload = {
             "model": self.model,
             "prompt": full_prompt,
             "stream": True,
             "options": {
                 "temperature": temp,
-                "num_predict": 500,
+                "num_predict": -1,  # 무제한 토큰 생성으로 변경
                 "keep_alive": "5m"
             }
         }
@@ -591,16 +591,22 @@ class OllamaClient:
                         try:
                             chunk = json.loads(line)
                             
-                            if "response" in chunk and chunk["response"]:
+                            # 스트림 완료 확인을 먼저 처리
+                            if chunk.get("done", False):
+                                # done=True인 청크에도 마지막 응답이 있을 수 있으므로 먼저 처리
+                                if "response" in chunk and chunk["response"]:
+                                    chunk_count += 1
+                                    print(f"📝 마지막 청크 {chunk_count} 수신")
+                                    yield chunk["response"]
+                                print(f"✅ 스트리밍 완료 (총 {chunk_count}개 청크)")
+                                break  # return 대신 break 사용하여 정상 완료
+                            
+                            # 일반 응답 처리
+                            elif "response" in chunk and chunk["response"]:
                                 chunk_count += 1
                                 if chunk_count % 20 == 0:  # 20개 청크마다 로그
                                     print(f"📝 청크 {chunk_count} 수신")
                                 yield chunk["response"]
-                            
-                            # 스트림 완료 확인
-                            if chunk.get("done", False):
-                                print(f"✅ 스트리밍 완료 (총 {chunk_count}개 청크)")
-                                return
                                 
                         except json.JSONDecodeError:
                             continue

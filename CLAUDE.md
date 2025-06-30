@@ -1,4 +1,4 @@
-# GAIA-BT v3.29 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.30 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
@@ -326,6 +326,7 @@ git reset --hard [커밋해시]
 - **v3.27**: XMLHttpRequest 기반 fetch 대체 방안 구현 - "Failed to fetch" 오류 완전 해결
 - **v3.28**: 현재 상태 정리 및 향후 로드맵 수립 - 안정성 확보 완료
 - **v3.29**: 스트리밍 응답 토큰 누락 문제 완전 해결 - [DONE] 신호 처리 강화
+- **v3.30**: 딥리서치 모드 스트리밍 완성 및 안전한 서버 재시작 시스템 구현
 
 ### 완료된 Todo 기록 (v3.27)
 

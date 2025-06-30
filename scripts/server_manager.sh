@@ -126,8 +126,8 @@ open_browser() {
     fi
 }
 
-# 포트 사용 프로세스 종료
-kill_port_processes() {
+# 포트 사용 프로세스 확인 및 안전한 처리
+check_port_safely() {
     local port=$1
     local service_name=$2
     
@@ -136,19 +136,42 @@ kill_port_processes() {
     local pids=$(check_port $port)
     
     if [ ! -z "$pids" ]; then
-        echo -e "${RED}⚠️ 포트 $port가 이미 사용 중입니다 (PID: $pids)${NC}"
-        echo -e "${YELLOW}🔪 $service_name 관련 프로세스를 종료합니다...${NC}"
+        echo -e "${YELLOW}⚠️ 포트 $port가 이미 사용 중입니다 (PID: $pids)${NC}"
         
-        # 먼저 graceful shutdown 시도
-        echo "$pids" | xargs -r kill -TERM 2>/dev/null
-        sleep 2
+        # SSH 관련 프로세스인지 확인
+        local ssh_processes=$(echo "$pids" | xargs -I {} ps -p {} -o comm= 2>/dev/null | grep -E "sshd|ssh-agent|ssh|sftp|scp" || true)
         
-        # 여전히 실행 중이면 강제 종료
-        local remaining_pids=$(check_port $port)
-        if [ ! -z "$remaining_pids" ]; then
-            echo -e "${RED}💥 강제 종료 중...${NC}"
-            echo "$remaining_pids" | xargs -r kill -KILL 2>/dev/null
-            sleep 1
+        if [ ! -z "$ssh_processes" ]; then
+            echo -e "${RED}🚨 SSH 관련 프로세스가 포트 $port를 사용 중입니다. 보안상 종료하지 않습니다.${NC}"
+            echo -e "${YELLOW}💡 해결 방법: 다른 포트를 사용하거나 수동으로 확인하세요.${NC}"
+            return 1
+        fi
+        
+        # GAIA-BT 관련 프로세스만 안전하게 종료
+        local gaia_processes=$(echo "$pids" | xargs -I {} ps -p {} -o cmd= 2>/dev/null | grep -E "gaia|api_server|webui|uvicorn.*app|node.*next" || true)
+        
+        if [ ! -z "$gaia_processes" ]; then
+            echo -e "${YELLOW}🔄 $service_name 관련 프로세스만 안전하게 재시작합니다...${NC}"
+            
+            # GAIA-BT 관련 프로세스의 PID만 추출
+            local gaia_pids=$(echo "$pids" | xargs -I {} bash -c 'ps -p {} -o cmd= 2>/dev/null | grep -E "gaia|api_server|webui|uvicorn.*app|node.*next" >/dev/null && echo {}' || true)
+            
+            if [ ! -z "$gaia_pids" ]; then
+                echo -e "${YELLOW}🔪 GAIA-BT 프로세스 종료 중... (PID: $gaia_pids)${NC}"
+                echo "$gaia_pids" | xargs -r kill -TERM 2>/dev/null
+                sleep 3
+                
+                # 여전히 실행 중이면 강제 종료
+                local remaining_gaia_pids=$(echo "$gaia_pids" | xargs -I {} bash -c 'kill -0 {} 2>/dev/null && echo {}' || true)
+                if [ ! -z "$remaining_gaia_pids" ]; then
+                    echo -e "${RED}💥 GAIA-BT 프로세스 강제 종료 중...${NC}"
+                    echo "$remaining_gaia_pids" | xargs -r kill -KILL 2>/dev/null
+                    sleep 1
+                fi
+            fi
+        else
+            echo -e "${YELLOW}⚠️ 포트 $port를 사용하는 프로세스가 GAIA-BT와 관련이 없습니다.${NC}"
+            echo -e "${YELLOW}💡 서버 재시작을 계속 진행하지만, 포트 충돌이 발생할 수 있습니다.${NC}"
         fi
         
         # 최종 확인
@@ -156,14 +179,19 @@ kill_port_processes() {
         if [ -z "$final_pids" ]; then
             echo -e "${GREEN}✅ 포트 $port 정리 완료${NC}"
         else
-            echo -e "${RED}❌ 포트 $port 정리 실패${NC}"
-            return 1
+            echo -e "${YELLOW}⚠️ 포트 $port에 여전히 다른 프로세스가 실행 중입니다${NC}"
+            echo -e "${YELLOW}💡 해당 프로세스: $(echo "$final_pids" | xargs -I {} ps -p {} -o cmd= 2>/dev/null | head -1)${NC}"
         fi
     else
         echo -e "${GREEN}✅ 포트 $port 사용 가능${NC}"
     fi
     
     return 0
+}
+
+# 기존 함수명 호환성을 위한 별칭
+kill_port_processes() {
+    check_port_safely "$@"
 }
 
 # 모든 GAIA-BT 관련 프로세스 종료
