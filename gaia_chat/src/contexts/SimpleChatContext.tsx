@@ -236,12 +236,17 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
 
       console.log('⏰ fetch 요청 시작 - 타임스탬프:', new Date().toISOString());
       console.log('🌐 요청 URL 검증:', `${API_BASE_URL}/api/chat/stream`);
-      console.log('🏗️ 요청 body:', JSON.stringify({
+      const requestBody = {
         message: message,
         session_id: sessionId,
         complete_response: true,
-        stream: true
-      }));
+        stream: true,
+        mode: currentMode, // 현재 모드 정보 추가
+        mcp_enabled: mcpEnabled // MCP 활성화 상태 추가
+      };
+      
+      console.log('🏗️ 요청 body:', JSON.stringify(requestBody));
+      console.log('🎭 현재 모드:', currentMode, 'MCP 활성화:', mcpEnabled);
       
       const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
         method: 'POST',
@@ -251,12 +256,7 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
           // preflight 문제 해결을 위해 불필요한 헤더 제거
         },
         signal: controller.signal,
-        body: JSON.stringify({
-          message: message,
-          session_id: sessionId,
-          complete_response: true, // 전체 응답 수신을 명시적으로 요청
-          stream: true // 스트림 명시적으로 활성화
-        }, (_, value) => {
+        body: JSON.stringify(requestBody, (_, value) => {
           // 문자열 값에 대해 UTF-8 인코딩 문제 방지
           if (typeof value === 'string') {
             return value.normalize('NFC');
@@ -297,6 +297,22 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
             
             if (done) {
               console.log('📖 스트림 리더 완료 (done=true)');
+              // 스트림 완료 시에도 버퍼에 남은 데이터 처리
+              if (buffer.trim()) {
+                console.log('🔍 스트림 완료 후 버퍼 처리:', buffer.trim());
+                const lines = buffer.split('\n');
+                for (const line of lines) {
+                  const trimmedLine = line.trim();
+                  if (trimmedLine.startsWith('data: ')) {
+                    const data = trimmedLine.slice(6);
+                    if (data && data !== '[DONE]' && data.trim()) {
+                      fullResponse += data;
+                      console.log('💬 스트림 완료 후 응답 추가:', data);
+                      setStreamingResponse(fullResponse);
+                    }
+                  }
+                }
+              }
               break;
             }
 
@@ -342,21 +358,6 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
             if (streamCompleted) {
               console.log('✅ [DONE] 신호로 인한 스트리밍 종료');
               break;
-            }
-          }
-          
-          // 버퍼에 남은 마지막 부분 처리 (스트림이 완료되지 않은 경우에만)
-          if (!streamCompleted && buffer.trim()) {
-            const trimmedLine = buffer.trim();
-            console.log('🔍 버퍼 마지막 라인 처리:', trimmedLine);
-            if (trimmedLine.startsWith('data: ')) {
-              const data = trimmedLine.slice(6);
-              console.log('📤 버퍼 data 내용:', data);
-              if (data && data !== '[DONE]' && data.trim()) {
-                fullResponse += data;
-                console.log('💬 최종 버퍼 응답 누적 길이:', fullResponse.length);
-                setStreamingResponse(fullResponse);
-              }
             }
           }
           

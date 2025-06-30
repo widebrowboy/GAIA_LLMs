@@ -2,6 +2,8 @@
 
 import React, { memo } from 'react';
 import Image from 'next/image';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Message } from '@/types/chat';
 
 interface MessageItemProps {
@@ -13,6 +15,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
   const isAssistantMessage = message.role === 'assistant';
   const isSystemMessage = message.role === 'system';
   const isCompleteResponse = isAssistantMessage && message.isComplete;
+  const isStreamingMessage = isAssistantMessage && !message.isComplete;
   
   const timestamp = new Date(message.timestamp).toLocaleTimeString('ko-KR', {
     hour: '2-digit',
@@ -94,9 +97,110 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
           </div>
         )}
 
-        {/* 메시지 텍스트 - 마크다운 비활성화 */}
-        <div className="whitespace-pre-wrap break-words leading-relaxed text-gray-900">
-          {message.content}
+        {/* 메시지 텍스트 - 완료된 응답만 마크다운 렌더링 적용 */}
+        <div className="break-words leading-relaxed text-gray-900">
+          {isCompleteResponse ? (
+            // 완료된 응답: 마크다운 렌더링 적용
+            <div className="prose prose-slate max-w-none">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  // 제목 스타일링 개선 - 자연스러운 간격과 색상
+                  h1: ({children}) => (
+                    <h1 className="text-2xl font-bold text-emerald-800 mb-4 mt-6 pb-2 border-b-2 border-emerald-200">{children}</h1>
+                  ),
+                  h2: ({children}) => (
+                    <h2 className="text-xl font-semibold text-blue-800 mb-3 mt-5">{children}</h2>
+                  ),
+                  h3: ({children}) => (
+                    <h3 className="text-lg font-medium text-gray-800 mb-2 mt-4">{children}</h3>
+                  ),
+                  h4: ({children}) => (
+                    <h4 className="text-base font-medium text-gray-700 mb-2 mt-3">{children}</h4>
+                  ),
+                  h5: ({children}) => (
+                    <h5 className="text-sm font-medium text-gray-600 mb-1 mt-2">{children}</h5>
+                  ),
+                  h6: ({children}) => (
+                    <h6 className="text-sm font-medium text-gray-500 mb-1 mt-2">{children}</h6>
+                  ),
+                  // 강조 스타일링
+                  strong: ({children}) => (
+                    <strong className="font-semibold text-emerald-700">{children}</strong>
+                  ),
+                  em: ({children}) => (
+                    <em className="italic text-gray-700">{children}</em>
+                  ),
+                  // 리스트 스타일링 - 자연스러운 들여쓰기
+                  ul: ({children}) => (
+                    <ul className="list-disc list-outside space-y-1 my-3 ml-6 pl-2">{children}</ul>
+                  ),
+                  ol: ({children}) => (
+                    <ol className="list-decimal list-outside space-y-1 my-3 ml-6 pl-2">{children}</ol>
+                  ),
+                  li: ({children}) => (
+                    <li className="text-gray-800 leading-relaxed mb-1">{children}</li>
+                  ),
+                  // 표 스타일링
+                  table: ({children}) => (
+                    <div className="overflow-x-auto my-4">
+                      <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg overflow-hidden">{children}</table>
+                    </div>
+                  ),
+                  thead: ({children}) => (
+                    <thead className="bg-emerald-50">{children}</thead>
+                  ),
+                  th: ({children}) => (
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-emerald-800 border-b border-emerald-200">{children}</th>
+                  ),
+                  td: ({children}) => (
+                    <td className="px-4 py-2 text-sm text-gray-700 border-b border-gray-200">{children}</td>
+                  ),
+                  // 인용구 스타일링
+                  blockquote: ({children}) => (
+                    <blockquote className="border-l-4 border-emerald-400 bg-emerald-50/50 pl-4 py-2 my-4 italic text-emerald-800">{children}</blockquote>
+                  ),
+                  // 코드 스타일링
+                  code: ({className, children, ...props}) => {
+                    const match = /language-(\w+)/.exec(className || '');
+                    return !match ? (
+                      <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono" {...props}>
+                        {children}
+                      </code>
+                    ) : (
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    );
+                  },
+                  // 단락 스타일링 - 자연스러운 간격
+                  p: ({children}) => (
+                    <p className="mb-4 leading-relaxed text-gray-800">{children}</p>
+                  ),
+                  // 수평선 스타일링
+                  hr: () => (
+                    <hr className="my-6 border-t border-gray-300" />
+                  ),
+                  // 링크 스타일링
+                  a: ({children, href}) => (
+                    <a href={href} className="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">{children}</a>
+                  ),
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          ) : isStreamingMessage ? (
+            // 스트리밍 중: 원본 텍스트만 표시 (마크다운 렌더링 없음)
+            <div className="whitespace-pre-wrap font-mono text-gray-700 leading-relaxed">
+              {message.content}
+            </div>
+          ) : (
+            // 사용자 메시지: 원본 텍스트 표시
+            <div className="whitespace-pre-wrap">
+              {message.content}
+            </div>
+          )}
         </div>
         
         {/* 타임스탬프 */}

@@ -165,7 +165,9 @@ class ChatbotService:
     async def generate_streaming_response(
         self, 
         message: str, 
-        session_id: str
+        session_id: str,
+        mode: str = "normal",
+        mcp_enabled: bool = False
     ) -> AsyncGenerator[str, None]:
         """스트리밍 응답 생성"""
         chatbot = self.get_session(session_id)
@@ -177,6 +179,14 @@ class ChatbotService:
                 yield f"오류: {session_result['error']}"
                 return
             chatbot = self.get_session(session_id)
+        
+        # 세션의 모드 및 MCP 설정 업데이트
+        if hasattr(chatbot, 'current_mode'):
+            chatbot.current_mode = mode
+        if hasattr(chatbot, 'mcp_enabled'):
+            chatbot.mcp_enabled = mcp_enabled
+        
+        logger.info(f"세션 {session_id} 모드 설정: {mode}, MCP: {mcp_enabled}")
         
         try:
             # Ollama 연결 상태 확인

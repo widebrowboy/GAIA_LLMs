@@ -39,6 +39,21 @@ class ChatRequest(BaseModel):
             {"role": "assistant", "content": "안녕하세요! 신약개발에 대해 무엇을 도와드릴까요?"}
         ]
     )
+    mode: Optional[str] = Field(
+        default="normal",
+        description="응답 모드 (normal/deep_research)",
+        example="deep_research"
+    )
+    mcp_enabled: Optional[bool] = Field(
+        default=False,
+        description="MCP (Model Context Protocol) 활성화 여부",
+        example=True
+    )
+    complete_response: Optional[bool] = Field(
+        default=True,
+        description="전체 응답 수신 여부",
+        example=True
+    )
 
     class Config:
         json_schema_extra = {
@@ -254,7 +269,9 @@ async def stream_message(
     async def generate():
         async for chunk in service.generate_streaming_response(
             request.message, 
-            request.session_id
+            request.session_id,
+            mode=request.mode or "normal",
+            mcp_enabled=request.mcp_enabled or False
         ):
             yield f"data: {chunk}\n\n"
         yield "data: [DONE]\n\n"
