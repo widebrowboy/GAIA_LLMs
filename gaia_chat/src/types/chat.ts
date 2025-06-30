@@ -22,6 +22,10 @@ export interface Message {
    * (Optional) Indicates if the message is a complete response (streaming finished)
    */
   isComplete?: boolean;
+  /**
+   * (Optional) Indicates if the streaming was completed with [DONE] signal
+   */
+  streamCompleted?: boolean;
 }
 
 export interface Conversation {

@@ -289,18 +289,20 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
 
         let fullResponse = '';
         let buffer = ''; // SSE 이벤트가 청크 경계에서 잘릴 수 있으므로 버퍼 사용
+        let streamCompleted = false;
 
         try {
           while (true) {
             const { done, value } = await reader.read();
             
             if (done) {
+              console.log('📖 스트림 리더 완료 (done=true)');
               break;
             }
 
             // 바이트를 텍스트로 변환
             const chunk = decoder.decode(value, { stream: true });
-            console.log(`📦 청크 ${done ? '완료' : '수신'}:`, chunk.substring(0, 100));
+            console.log(`📦 청크 수신:`, chunk.substring(0, 100));
             buffer += chunk;
             
             // 줄 단위로 처리
@@ -319,35 +321,47 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
                 console.log('📤 data 내용:', data);
                 
                 if (data === '[DONE]') {
-                  console.log('🏁 스트리밍 완료 신호 수신');
+                  console.log('🏁 스트리밍 완료 신호 수신 - 루프 종료');
+                  streamCompleted = true;
                   break;
                 }
                 
-                if (data) {
+                if (data && data.trim()) {
                   // 데이터를 fullResponse에 추가
                   fullResponse += data;
                   console.log('💬 응답 누적 길이:', fullResponse.length);
+                  console.log('📝 현재 응답 미리보기:', fullResponse.substring(fullResponse.length - 50));
                   
                   // 실시간으로 UI 업데이트
                   setStreamingResponse(fullResponse);
                 }
               }
             }
+            
+            // [DONE] 신호를 받았으면 outer loop도 종료
+            if (streamCompleted) {
+              console.log('✅ [DONE] 신호로 인한 스트리밍 종료');
+              break;
+            }
           }
-          // 버퍼에 남은 마지막 부분 처리
-          if (buffer.trim()) {
+          
+          // 버퍼에 남은 마지막 부분 처리 (스트림이 완료되지 않은 경우에만)
+          if (!streamCompleted && buffer.trim()) {
             const trimmedLine = buffer.trim();
-            console.log('🔍 버퍼 처리 중인 라인:', trimmedLine);
+            console.log('🔍 버퍼 마지막 라인 처리:', trimmedLine);
             if (trimmedLine.startsWith('data: ')) {
               const data = trimmedLine.slice(6);
               console.log('📤 버퍼 data 내용:', data);
-              if (data && data !== '[DONE]') {
+              if (data && data !== '[DONE]' && data.trim()) {
                 fullResponse += data;
-                console.log('💬 최종 응답 누적 길이:', fullResponse.length);
+                console.log('💬 최종 버퍼 응답 누적 길이:', fullResponse.length);
                 setStreamingResponse(fullResponse);
               }
             }
           }
+          
+          console.log('🎯 스트리밍 처리 완료 - 최종 응답 길이:', fullResponse.length);
+          console.log('📄 최종 응답 전체:', fullResponse);
         } catch (readerError) {
           console.error('스트림 리더 오류:', readerError);
           throw readerError;
@@ -357,6 +371,9 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
         
         // 스트리밍 완료 후 최종 정리
         const finalContent = fullResponse.trim();
+        console.log('🔚 스트리밍 최종 정리 시작');
+        console.log('📏 최종 컨텐츠 길이:', finalContent.length);
+        console.log('🎭 컨트롤러 중단 상태:', controller.signal.aborted);
         
         // After streaming finished, add assistant message with userQuestion field
         if (finalContent && !controller.signal.aborted) {
@@ -367,18 +384,26 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
             timestamp: new Date(),
             conversationId: conversation.id,
             userQuestion: message, // Save the user question for traceability
-            isComplete: true // 완전한 응답임을 표시
+            isComplete: true, // 완전한 응답임을 표시
+            streamCompleted: streamCompleted // 스트림 완료 여부 기록
           };
           addMessage(assistantMessage);
-          console.log(' 완전한 응답 메시지 저장 완료');
-          
-          // 스트리밍 완료 후 즉시 상태 해제
-          setIsLoading(false);
-          setIsStreaming(false);
-          setIsConnecting(false);
-          setStreamingResponse('');
-          console.log(' 스트리밍 완료 - 상태 즉시 해제');
+          console.log('✅ 완전한 응답 메시지 저장 완료 - 길이:', finalContent.length);
+          console.log('📋 저장된 메시지:', assistantMessage.content.substring(0, 100) + '...');
+        } else {
+          console.warn('⚠️ 메시지 저장 건너뜀:', {
+            hasContent: !!finalContent,
+            contentLength: finalContent.length,
+            isAborted: controller.signal.aborted
+          });
         }
+        
+        // 스트리밍 완료 후 즉시 상태 해제
+        setIsLoading(false);
+        setIsStreaming(false);
+        setIsConnecting(false);
+        setStreamingResponse('');
+        console.log('🧹 스트리밍 상태 정리 완료');
       }
     } catch (error) {
       console.error('스트리밍 응답 처리 실패:', error);
@@ -414,6 +439,7 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
       setIsWaitingForResponse(false);
       
       // 모든 로딩 상태 해제 완료
+      console.log('🔄 finally 블록 - 상태 정리 완료');
     }
   };
 

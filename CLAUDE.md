@@ -1,4 +1,4 @@
-# GAIA-BT v3.28 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.29 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
@@ -325,6 +325,7 @@ git reset --hard [커밋해시]
 - **v3.26**: Sidebar.tsx doInitialLoad 함수 fetch TypeError 해결 - apiClient 미들웨어 완전 적용
 - **v3.27**: XMLHttpRequest 기반 fetch 대체 방안 구현 - "Failed to fetch" 오류 완전 해결
 - **v3.28**: 현재 상태 정리 및 향후 로드맵 수립 - 안정성 확보 완료
+- **v3.29**: 스트리밍 응답 토큰 누락 문제 완전 해결 - [DONE] 신호 처리 강화
 
 ### 완료된 Todo 기록 (v3.27)
 
@@ -340,7 +341,7 @@ git reset --hard [커밋해시]
 - ✅ ChatbotService에 `update_current_model` 메서드 추가
 - ✅ 실시간 모델 상태 동기화 개선
 
-#### v3.25-3.27: 네트워크 통신 안정성 확보
+#### v3.25-3.29: 네트워크 통신 안정성 확보 및 스트리밍 완성
 - ✅ SSH 서비스 보호 규칙 및 포트 정리 안전장치 추가
 - ✅ Sidebar.tsx doInitialLoad 함수 fetch TypeError 완전 해결
 - ✅ apiClient 미들웨어 패턴을 모든 API 호출에 적용
@@ -348,6 +349,9 @@ git reset --hard [커밋해시]
 - ✅ 3단계 fallback 시스템 구축 (XHR → fetchWithRetry → simpleFetch)
 - ✅ "Failed to fetch" 오류 완전 근절
 - ✅ 브라우저 호환성 및 네트워크 안정성 대폭 향상
+- ✅ 스트리밍 응답 토큰 누락 문제 완전 해결
+- ✅ [DONE] 신호 처리 강화 및 스트림 완료 감지 개선
+- ✅ SSE 파싱 로직 최적화 및 버퍼 처리 안정화
 
 #### v3.1 이전: 기본 기능
 - ✅ Ollama API 연결 상태 및 설정 확인
@@ -615,4 +619,4 @@ await fetchModelsWithApiClient();
 
 ---
 
-**GAIA-BT v3.28** - 신약개발 연구의 새로운 패러다임 🧬✨
+**GAIA-BT v3.29** - 신약개발 연구의 새로운 패러다임 🧬✨
