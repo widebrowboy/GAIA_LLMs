@@ -248,22 +248,55 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
       console.log('🏗️ 요청 body:', JSON.stringify(requestBody));
       console.log('🎭 현재 모드:', currentMode, 'MCP 활성화:', mcpEnabled);
       
-      const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream'
-          // preflight 문제 해결을 위해 불필요한 헤더 제거
-        },
-        signal: controller.signal,
-        body: JSON.stringify(requestBody, (_, value) => {
-          // 문자열 값에 대해 UTF-8 인코딩 문제 방지
-          if (typeof value === 'string') {
-            return value.normalize('NFC');
-          }
-          return value;
-        })
-      });
+      // 기본 fetch 재시도 (에러 복구 전략 강화)
+      let response: Response;
+      try {
+        console.log('🔄 1차 시도: 기본 fetch 사용');
+        response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream'
+          },
+          signal: controller.signal,
+          body: JSON.stringify(requestBody, (_, value) => {
+            if (typeof value === 'string') {
+              return value.normalize('NFC');
+            }
+            return value;
+          })
+        });
+      } catch (fetchError) {
+        console.warn('⚠️ 기본 fetch 실패, 단순 재시도 후 에러 처리:', fetchError);
+        
+        // 간단한 재시도 한 번 더 시도
+        try {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 대기
+          console.log('🔄 기본 fetch 재시도');
+          
+          response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            signal: controller.signal,
+            body: JSON.stringify(requestBody)
+          });
+          
+          console.log('✅ 재시도 성공:', response.status);
+        } catch (retryError) {
+          console.error('❌ 재시도도 실패:', retryError);
+          
+          // 사용자에게 명확한 에러 메시지 표시
+          setError('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
+          setIsLoading(false);
+          setIsStreaming(false);
+          setIsConnecting(false);
+          
+          // 더 이상 진행하지 않고 종료
+          return;
+        }
+      }
       
       // 응답 상태 확인
       
@@ -457,18 +490,45 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
       setCurrentMode(newMode);
       setMcpEnabled(newMode === 'deep_research');
 
-      // 백엔드에 모드 변경 알림
-      const response = await fetch(`${API_BASE_URL}/api/system/mode/${newMode}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId })
-      });
+      // 백엔드에 모드 변경 알림 (에러 처리 개선)
+      try {
+        console.log('🔄 toggleMode API 호출 시도...');
+        const response = await fetch(`${API_BASE_URL}/api/system/mode/${newMode}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId })
+        });
 
-      if (response.ok) {
-        console.log(' 백엔드 모드 변경 성공');
-      } else {
-        console.warn('Warning: 백엔드 모드 변경 실패, 로컬 상태 유지');
+        if (response.ok) {
+          console.log(' 백엔드 모드 변경 성공');
+        } else {
+          console.warn('⚠️ 백엔드 모드 변경 실패, 로컬 상태는 유지됩니다');
+        }
+      } catch (fetchError) {
+        console.warn('⚠️ toggleMode API 호출 실패, 재시도 중...', fetchError);
+        
+        // 간단한 재시도
+        try {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 대기
+          console.log('🔄 toggleMode 재시도...');
+          
+          const retryResponse = await fetch(`${API_BASE_URL}/api/system/mode/${newMode}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId })
+          });
+          
+          if (retryResponse.ok) {
+            console.log('✅ 재시도 성공: 백엔드 모드 변경 완료');
+          } else {
+            console.warn('⚠️ 재시도도 실패, 하지만 로컬 모드는 변경되었습니다');
+          }
+        } catch (retryError) {
+          // API 호출 실패는 무시하고 로컬 상태만 유지
+          console.warn('⚠️ 백엔드 통신 실패, 로컬 모드만 변경됨:', retryError);
+        }
       }
+      
       return true;
     } catch (error) {
       console.error('모드 변경 실패:', error);
@@ -527,8 +587,9 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
       setCurrentMode(newMode);
       setMcpEnabled(newMode === 'deep_research');
       
-      // 백그라운드에서 API 호출
+      // 백그라운드에서 API 호출 (에러 처리 개선)
       try {
+        console.log('🔄 모드 변경 API 호출 시도...');
         const response = await fetch(`${API_BASE_URL}/api/system/mode/${newMode}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -538,14 +599,35 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
         if (response.ok) {
           console.log(' 백엔드 모드 변경 성공');
         } else {
-          console.warn('Warning: 백엔드 모드 변경 실패, 로컬 상태 유지');
+          console.warn('⚠️ 백엔드 모드 변경 실패, 로컬 상태는 유지됩니다');
         }
-      } catch (error) {
-        console.error('모드 변경 실패:', error);
-        setError('모드 변경에 실패했습니다.');
-        return false;
+      } catch (fetchError) {
+        console.warn('⚠️ 모드 변경 API 호출 실패, 재시도 중...', fetchError);
+        
+        // 간단한 재시도
+        try {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 대기
+          console.log('🔄 모드 변경 재시도...');
+          
+          const retryResponse = await fetch(`${API_BASE_URL}/api/system/mode/${newMode}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId })
+          });
+          
+          if (retryResponse.ok) {
+            console.log('✅ 재시도 성공: 백엔드 모드 변경 완료');
+          } else {
+            console.warn('⚠️ 재시도도 실패, 하지만 로컬 모드는 변경되었습니다');
+          }
+        } catch (retryError) {
+          // API 호출 실패는 무시하고 로컬 상태만 유지
+          console.warn('⚠️ 백엔드 통신 실패, 로컬 모드만 변경됨:', retryError);
+          // 사용자에게는 성공으로 표시 (로컬 변경은 성공했으므로)
+        }
       }
       
+      // 로컬 변경은 성공했으므로 true 반환
       return true;
     } catch (error) {
       console.error('모드 변경 실패:', error);

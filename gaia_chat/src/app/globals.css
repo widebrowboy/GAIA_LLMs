@@ -148,6 +148,221 @@ body {
   background: #a8a8a8;
 }
 
+/* 전문가 수준 보고서 스타일링 */
+.professional-report {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  line-height: 1.7;
+  letter-spacing: 0.02em;
+  color: #1e293b;
+}
+
+/* 전문적인 제목 스타일 강화 */
+.professional-report h1 {
+  page-break-after: avoid;
+  text-align: center;
+  margin-top: 2rem !important;
+  margin-bottom: 2rem !important;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.professional-report h2 {
+  page-break-after: avoid;
+  counter-increment: section;
+  margin-top: 2.5rem !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.professional-report h3 {
+  page-break-after: avoid;
+  margin-top: 2rem !important;
+  margin-bottom: 1rem !important;
+}
+
+/* 전문적인 리스트 스타일 강화 */
+.professional-report ul {
+  margin: 1.5rem 0;
+  padding-left: 0;
+  display: block;
+}
+
+.professional-report ol {
+  margin: 1.5rem 0;
+  padding-left: 0;
+  display: block;
+}
+
+/* 리스트 앞뒤로 명확한 줄바꿈 보장 */
+.professional-report p + ul,
+.professional-report p + ol {
+  margin-top: 1rem;
+}
+
+.professional-report ul + p,
+.professional-report ol + p {
+  margin-top: 1rem;
+}
+
+.professional-report ul li {
+  margin-bottom: 0.75rem;
+  text-align: justify;
+  line-height: 1.7;
+  display: block;
+  position: relative;
+}
+
+.professional-report ol li {
+  margin-bottom: 0.75rem;
+  text-align: justify;
+  line-height: 1.7;
+  display: block;
+  position: relative;
+}
+
+/* 중첩된 리스트를 위한 계층적 스타일 */
+.professional-report ul ul {
+  margin: 0.5rem 0 0.5rem 2rem;
+}
+
+.professional-report ol ol {
+  margin: 0.5rem 0 0.5rem 2rem;
+}
+
+.professional-report ul ol {
+  margin: 0.5rem 0 0.5rem 2rem;
+}
+
+.professional-report ol ul {
+  margin: 0.5rem 0 0.5rem 2rem;
+}
+
+/* 리스트 아이템 내부 요소 간격 */
+.professional-report li p {
+  margin-bottom: 0.5rem;
+}
+
+.professional-report li:last-child {
+  margin-bottom: 0;
+}
+
+/* 전문적인 단락 스타일 강화 */
+.professional-report p {
+  text-align: justify;
+  text-indent: 0;
+  margin-bottom: 1.25rem !important;
+  hyphens: auto;
+  word-spacing: 0.1em;
+}
+
+/* 첫 번째 단락은 들여쓰기 없음 */
+.professional-report h1 + p,
+.professional-report h2 + p,
+.professional-report h3 + p,
+.professional-report h4 + p {
+  text-indent: 0;
+}
+
+/* 전문적인 강조 텍스트 */
+.professional-report strong {
+  font-weight: 700;
+  letter-spacing: 0.025em;
+}
+
+.professional-report em {
+  font-style: italic;
+  font-weight: 500;
+}
+
+/* 전문적인 링크 스타일 */
+.professional-report a {
+  color: #2563eb;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.3);
+  transition: all 0.2s ease;
+}
+
+.professional-report a:hover {
+  color: #1d4ed8;
+  border-bottom-color: #1d4ed8;
+  background-color: rgba(37, 99, 235, 0.05);
+}
+
+/* 전문적인 표 스타일 강화 */
+.professional-report table {
+  margin: 2rem auto;
+  border-collapse: separate;
+  border-spacing: 0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.professional-report th {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+}
+
+.professional-report td {
+  vertical-align: top;
+}
+
+/* 전문적인 인용구 스타일 강화 */
+.professional-report blockquote {
+  font-style: italic;
+  font-size: 1.05em;
+  line-height: 1.8;
+  margin: 2rem 0;
+  position: relative;
+}
+
+/* 전문적인 코드 블록 스타일 */
+.professional-report pre {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.professional-report code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.9em;
+}
+
+/* 섹션 구분을 위한 스타일 */
+.professional-report hr {
+  margin: 3rem 0;
+  border: none;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #10b981, #3b82f6, transparent);
+}
+
+/* 인쇄 시 최적화 */
+@media print {
+  .professional-report {
+    font-size: 11pt;
+    line-height: 1.6;
+  }
+  
+  .professional-report h1 {
+    font-size: 18pt;
+  }
+  
+  .professional-report h2 {
+    font-size: 14pt;
+  }
+  
+  .professional-report h3 {
+    font-size: 12pt;
+  }
+  
+  .professional-report a {
+    color: #000;
+    text-decoration: underline;
+  }
+}
+
 /* 수직 스크롤바 */
 .overflow-y-auto::-webkit-scrollbar {
   width: 8px;
@@ -440,6 +655,286 @@ body {
 .markdown-content > ul + *,
 .markdown-content > ol + * {
   margin-top: 1.5rem !important;
+}
+
+/* 의료 문서 전용 스타일링 (rendering.md 기반) */
+.medical-document {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', 'Apple Gothic', 'Apple SD Gothic Neo', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  line-height: 1.8;
+  color: #2c3e50;
+  background: linear-gradient(135deg, #f8fffe 0%, #f1f8ff 100%);
+  /* 한국어 텍스트 최적화 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 메인 타이틀 - 앞뒤 줄바꿈 강화 */
+.document-main-title {
+  color: #1a365d;
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 2.5rem 0 2.5rem 0;
+  text-align: center;
+  border-bottom: 3px solid #3182ce;
+  padding-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+/* 섹션 타이틀 - 앞뒤 줄바꿈 강화 */
+.section-title {
+  color: #2d3748;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 2.5rem 0 1.5rem 0;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%);
+  border-radius: 12px;
+  border-left: 6px solid #4299e1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* 서브섹션 타이틀 - 앞뒤 줄바꿈 강화 */
+.subsection-title {
+  color: #4a5568;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 2rem 0 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* 의료 경고 박스 */
+.medical-alert {
+  background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+  border: 2px solid #fc8181;
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  display: flex;
+  gap: 1rem;
+  box-shadow: 0 4px 12px rgba(252, 129, 129, 0.15);
+}
+
+.alert-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.alert-content {
+  flex: 1;
+}
+
+.alert-content p {
+  margin: 0.5rem 0;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+/* 의료 리스트 */
+.medical-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.medical-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.8rem;
+  margin: 0.4rem 0;
+  background: #ffffff;
+  border-radius: 8px;
+  border-left: 4px solid #48bb78;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.medical-list-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.list-marker {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.list-content {
+  flex: 1;
+}
+
+/* 의료 문서 문단 스타일 */
+.medical-paragraph {
+  margin: 1.5rem 0;
+  line-height: 1.8;
+  text-align: justify;
+  color: #2d3748;
+  /* 한국어 최적화 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  hanging-punctuation: first last;
+}
+
+/* 의료 강조 텍스트 */
+.medical-emphasis {
+  color: #2b6cb0;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+/* 의료 링크 스타일 */
+.medical-link {
+  color: #3182ce;
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.2s ease;
+}
+
+.medical-link:hover {
+  color: #2c5282;
+  text-decoration: underline;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .medical-document {
+    padding: 1.5rem 0.8rem;
+  }
+  
+  .document-main-title {
+    font-size: 1.8rem;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .section-title {
+    font-size: 1.3rem;
+    padding: 0.8rem 1rem;
+  }
+  
+  .medical-alert {
+    flex-direction: column;
+    padding: 1rem;
+  }
+  
+  .medical-list-item {
+    padding: 0.6rem;
+  }
+}
+
+/* 한국어 유니코드 처리 최적화 */
+.korean-text {
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', 'Apple Gothic', 'Apple SD Gothic Neo', sans-serif;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 스트리밍 텍스트 한국어 최적화 */
+.streaming-text {
+  font-family: 'D2Coding', 'Cascadia Code', 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  /* 한국어 monospace 폰트 최적화 */
+  font-variant-numeric: tabular-nums;
+  text-rendering: optimizeSpeed;
+}
+
+/* 사용자 메시지 텍스트 최적화 */
+.user-text {
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', sans-serif;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  line-height: 1.7;
+  text-rendering: optimizeLegibility;
+}
+
+/* 한국어 텍스트 공통 최적화 */
+.text-korean {
+  /* 한글 자간 최적화 */
+  letter-spacing: -0.01em;
+  /* 한글 단어 단위 줄바꿈 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  /* 한글 조판 최적화 */
+  text-justify: inter-ideograph;
+  /* 한글 폰트 렌더링 최적화 */
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+}
+
+/* 의료 문서 한국어 특화 */
+.medical-document .korean-text,
+.medical-document p,
+.medical-document li,
+.medical-document h1,
+.medical-document h2,
+.medical-document h3,
+.medical-document h4 {
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', 'Apple Gothic', 'Apple SD Gothic Neo', sans-serif;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  text-rendering: optimizeLegibility;
+  /* 한글 자간 미세 조정 */
+  letter-spacing: -0.01em;
+  /* 한글 라인 하이트 최적화 */
+  line-height: 1.8;
+}
+
+/* 의료 용어 및 전문 용어 스타일 */
+.medical-term {
+  font-weight: 600;
+  color: #1e40af;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-feature-settings: "kern" 1;
+}
+
+/* 한국어 숫자 및 단위 처리 */
+.korean-number {
+  font-variant-numeric: proportional-nums;
+  font-feature-settings: "tnum" 0, "pnum" 1;
+}
+
+/* 코드 블록 내 한국어 주석 최적화 */
+.medical-document pre code {
+  font-family: 'D2Coding', 'Cascadia Code', 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-feature-settings: "kern" 1;
+  text-rendering: optimizeSpeed;
+}
+
+/* 인용문 한국어 최적화 */
+.medical-document blockquote {
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', serif;
+  quotes: '「' '」' '『' '』';
+  font-style: normal;
+  letter-spacing: 0.02em;
 }
 
 /* 가이드 기반 마크다운 전용 CSS 스타일 */

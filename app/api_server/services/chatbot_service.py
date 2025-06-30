@@ -64,6 +64,16 @@ class ChatbotService:
         if not model_check:
             return {"error": "사용 가능한 모델이 없습니다"}
         
+        # 기본 프롬프트가 제대로 로드되었는지 확인하고 재로드
+        chatbot.current_prompt_type = "default"
+        chatbot.system_prompt = self.prompt_manager.get_prompt("default")
+        
+        # 프롬프트 로드 확인 로그
+        if chatbot.system_prompt:
+            logger.info(f"세션 {session_id}: default 프롬프트 로드 성공 ({len(chatbot.system_prompt)}자)")
+        else:
+            logger.warning(f"세션 {session_id}: default 프롬프트 로드 실패, 폴백 사용")
+        
         self.sessions[session_id] = chatbot
         
         return {
@@ -186,7 +196,12 @@ class ChatbotService:
         if hasattr(chatbot, 'mcp_enabled'):
             chatbot.mcp_enabled = mcp_enabled
         
-        logger.info(f"세션 {session_id} 모드 설정: {mode}, MCP: {mcp_enabled}")
+        # 프롬프트가 올바르게 로드되었는지 확인하고 필요시 재로드
+        if not chatbot.system_prompt or len(chatbot.system_prompt) < 100:
+            chatbot.system_prompt = self.prompt_manager.get_prompt(chatbot.current_prompt_type)
+            logger.info(f"세션 {session_id}: 프롬프트 재로드 완료 ({len(chatbot.system_prompt)}자)")
+        
+        logger.info(f"세션 {session_id} 모드 설정: {mode}, MCP: {mcp_enabled}, 프롬프트: {chatbot.current_prompt_type}")
         
         try:
             # Ollama 연결 상태 확인

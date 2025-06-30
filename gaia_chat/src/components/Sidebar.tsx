@@ -291,10 +291,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           console.log('📡 apiClient로 백그라운드 API 호출 시도 (재시도 포함)');
           
           // 서버 준비 대기 함수 - 강화된 안정성
-          const waitForServer = async (maxRetries = 10, baseDelay = 2000) => {
-            // 먼저 초기 대기 시간 추가 (서버 완전 시작 대기)
-            console.log('⏳ 서버 완전 시작 대기 (3초)...');
-            await new Promise(resolve => setTimeout(resolve, 3000));
+          const waitForServer = async (maxRetries = 3, baseDelay = 1000) => {
+            // 초기 대기 시간 단축 (서버 완전 시작 대기)
+            console.log('⏳ 서버 준비 대기 (1초)...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
               try {
@@ -309,7 +309,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                       'Cache-Control': 'no-cache'
                     },
                     cache: 'no-cache',
-                    signal: AbortSignal.timeout(5000) // 5초 타임아웃
+                    signal: AbortSignal.timeout(3000) // 3초 타임아웃
                   });
                   
                   if (!healthResponse.ok) {
@@ -330,15 +330,24 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                 return result;
                 
               } catch (error) {
-                const delay = Math.min(baseDelay * Math.pow(1.5, attempt - 1), 10000); // 최대 10초
+                const delay = Math.min(baseDelay * Math.pow(1.5, attempt - 1), 3000); // 최대 3초
                 console.warn(`⚠️ 시도 ${attempt}/${maxRetries} 실패:`, error instanceof Error ? error.message : String(error));
                 
                 if (attempt < maxRetries) {
                   console.log(`⏳ ${delay}ms 대기 후 재시도... (${attempt}/${maxRetries})`);
                   await new Promise(resolve => setTimeout(resolve, delay));
                 } else {
-                  console.error(`❌ 모든 재시도 실패 (${maxRetries}회) - 폴백 데이터 유지`);
-                  throw error;
+                  console.warn(`⚠️ 모든 재시도 실패 (${maxRetries}회) - 기본값으로 계속 진행`);
+                  return { 
+                    success: false, 
+                    error: '서버 연결 실패 - 기본 설정 사용',
+                    data: { 
+                      available: [], 
+                      running: [], 
+                      total_available: 0, 
+                      total_running: 0 
+                    } 
+                  };
                 }
               }
             }
@@ -380,27 +389,26 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               }
             } else {
               console.warn('⚠️ apiClient 응답 오류:', result.error || 'Unknown error', '- 폴백 데이터 유지');
-              console.error('❌ apiClient 오류 내용:', result.error);
+              // 서버 연결 실패는 정상적인 상황일 수 있으므로 경고 레벨로 처리
+              console.warn('🔄 서버 연결 문제 - 기본 설정으로 계속 진행:', result.error);
             }
           } catch (apiError) {
-            console.error('❌ apiClient 호출 실패:', apiError);
-            console.error('🔍 에러 상세 정보:', {
+            console.warn('⚠️ apiClient 호출 실패 - 서버 시작 중이거나 일시적 문제일 수 있음');
+            console.debug('🔍 에러 상세 정보:', {
               name: apiError instanceof Error ? apiError.name : 'Unknown',
-              message: apiError instanceof Error ? apiError.message : String(apiError),
-              stack: apiError instanceof Error ? apiError.stack : undefined
+              message: apiError instanceof Error ? apiError.message : String(apiError)
             });
-            console.warn('🔄 apiClient 오류 - 폴백 데이터 유지');
+            console.info('🔄 기본 설정으로 계속 진행 - UI는 정상 작동됩니다');
           }
           
           setIsLoadingModels(false);
           setIsInitialized(true);
           console.log('✅ Sidebar 초기화 완료');
         } catch (error) {
-          console.error('❌ 초기 로드 중 오류:', error);
-          console.error('🔍 초기화 에러 상세:', {
+          console.warn('⚠️ 초기 로드 중 문제 발생 - 오프라인 모드로 계속 진행');
+          console.debug('🔍 초기화 에러 상세:', {
             name: error instanceof Error ? error.name : 'Unknown',
-            message: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined
+            message: error instanceof Error ? error.message : String(error)
           });
           
           // 폴백 데이터로 최소한의 기능은 유지
@@ -415,6 +423,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           setServerConnected(false);
           setIsLoadingModels(false);
           setIsInitialized(true); // 오류가 있어도 초기화 완료로 설정
+          console.info('🔧 오프라인 모드 초기화 완료 - 기본 기능 사용 가능');
         }
       }
     };

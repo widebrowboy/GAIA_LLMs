@@ -6,7 +6,6 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
-import { processMarkdownText } from '@/utils/markdownProcessor';
 import { Message } from '@/types/chat';
 
 interface MessageItemProps {
@@ -101,75 +100,125 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
           </div>
         )}
 
-        {/* 메시지 텍스트 - 완료된 응답만 마크다운 렌더링 적용 */}
+        {/* 메시지 텍스트 - 완료된 assistant 응답만 마크다운 렌더링 적용 */}
         <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full">
-          {isCompleteResponse ? (
-            // 완료된 응답: 전처리된 마크다운 렌더링 적용
-            <div className="markdown-content prose prose-slate max-w-none overflow-hidden">
+          {isAssistantMessage && isCompleteResponse ? (
+            // 완료된 Assistant 응답: 의료 문서 스타일의 마크다운 렌더링 적용
+            <div className="medical-document prose prose-slate max-w-none overflow-hidden korean-text">
               <ReactMarkdown
-                remarkPlugins={[remarkBreaks, remarkGfm]}
+                remarkPlugins={[
+                  [remarkBreaks, { gfm: true }], // GitHub 스타일 줄바꿈 활성화
+                  remarkGfm
+                ]}
                 rehypePlugins={[rehypeRaw]}
                 components={{
-                  // 제목 스타일링 개선 - 자연스러운 간격과 색상
+                  // 메인 타이틀 - 의료 문서 스타일 (앞뒤 줄바꿈 강화)
                   h1: ({children}) => (
-                    <h1 className="text-2xl font-bold text-emerald-800 mb-4 mt-6 pb-2 border-b-2 border-emerald-200">{children}</h1>
+                    <h1 className="document-main-title text-2xl font-bold text-slate-900 mb-8 mt-8 pb-3 border-b-3 border-blue-600 leading-tight tracking-tight flex items-center gap-3">
+                      <span className="text-2xl">🏥</span>
+                      {children}
+                    </h1>
                   ),
+                  // 섹션 타이틀 - 의료 문서 스타일 (앞뒤 줄바꿈 강화)
                   h2: ({children}) => (
-                    <h2 className="text-xl font-semibold text-blue-800 mb-3 mt-5">{children}</h2>
+                    <h2 className="section-title text-xl font-semibold text-slate-800 mb-6 mt-8 pb-2 px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 border-l-4 border-blue-500 rounded-r-lg leading-tight flex items-center gap-2">
+                      <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                        {(() => {
+                          const text = children?.toString() || '';
+                          const match = text.match(/^(\d+)\./);
+                          return match ? match[1] : '•';
+                        })()}
+                      </span>
+                      {children}
+                    </h2>
                   ),
+                  // 서브섹션 타이틀 (앞뒤 줄바꿈 강화)
                   h3: ({children}) => (
-                    <h3 className="text-lg font-medium text-gray-800 mb-2 mt-4">{children}</h3>
+                    <h3 className="subsection-title text-lg font-medium text-slate-700 mb-4 mt-6 leading-tight flex items-center gap-2">
+                      <span className="text-base">📋</span>
+                      {children}
+                    </h3>
                   ),
                   h4: ({children}) => (
-                    <h4 className="text-base font-medium text-gray-700 mb-2 mt-3">{children}</h4>
+                    <h4 className="text-md font-medium text-slate-700 mb-3 mt-5 leading-tight flex items-center gap-2">
+                      <span className="text-sm">🔹</span>
+                      {children}
+                    </h4>
                   ),
-                  h5: ({children}) => (
-                    <h5 className="text-sm font-medium text-gray-600 mb-1 mt-2">{children}</h5>
+                  // 의료 경고 박스 (blockquote)
+                  blockquote: ({children}) => (
+                    <div className="medical-alert bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-300 rounded-xl p-4 my-4 flex gap-3 shadow-sm">
+                      <div className="text-xl flex-shrink-0">⚠️</div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-red-800 mb-1">중요한 안내사항</div>
+                        <div className="text-red-700">{children}</div>
+                      </div>
+                    </div>
                   ),
-                  h6: ({children}) => (
-                    <h6 className="text-sm font-medium text-gray-500 mb-1 mt-2">{children}</h6>
+                  // 의료 리스트 스타일
+                  ul: ({children}) => (
+                    <ul className="medical-list list-none p-0 my-4 space-y-2">
+                      {children}
+                    </ul>
                   ),
-                  // 강조 스타일링 - 가이드 기반 개선
+                  ol: ({children}) => (
+                    <ol className="medical-list list-none p-0 my-4 space-y-2">
+                      {children}
+                    </ol>
+                  ),
+                  li: ({children}) => (
+                    <li className="medical-list-item flex items-start gap-3 p-3 bg-white border-l-4 border-green-500 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 hover:translate-x-1">
+                      <span className="list-marker text-lg flex-shrink-0">💊</span>
+                      <span className="list-content flex-1">{children}</span>
+                    </li>
+                  ),
+                  // 전문적인 강조 스타일링
                   strong: ({children}) => (
-                    <strong className="font-semibold text-emerald-700 markdown-strong">{children}</strong>
+                    <strong className="medical-emphasis font-semibold text-blue-800 bg-gradient-to-r from-blue-50 to-blue-100 px-2 py-1 rounded">{children}</strong>
                   ),
                   em: ({children}) => (
-                    <em className="italic text-gray-700 markdown-emphasis">{children}</em>
+                    <em className="italic text-slate-600 font-medium">{children}</em>
                   ),
-                  // 리스트 스타일링 - 가이드 기반 개선
-                  ul: ({children, ...props}) => (
-                    <ul className="list-block markdown-list" {...props}>{children}</ul>
+                  // 의료 문서 단락 스타일 - 제목과 문단 앞뒤 줄바꿈 강화
+                  p: ({children}) => (
+                    <p className="medical-paragraph mb-6 mt-4 leading-7 text-slate-700 text-justify">{children}</p>
                   ),
-                  ol: ({children, ...props}) => (
-                    <ol className="list-block markdown-list" {...props}>{children}</ol>
-                  ),
-                  li: ({children, ...props}) => (
-                    <li className="list-item-block markdown-list-item" {...props}>{children}</li>
-                  ),
-                  // 표 스타일링
+                  // 의료 전문 표 스타일링
                   table: ({children}) => (
-                    <div className="overflow-x-auto my-4">
-                      <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg overflow-hidden">{children}</table>
+                    <div className="overflow-x-auto my-6 rounded-lg shadow-sm border border-slate-200">
+                      <table className="min-w-full divide-y divide-slate-300 bg-white">{children}</table>
                     </div>
                   ),
                   thead: ({children}) => (
-                    <thead className="bg-emerald-50">{children}</thead>
+                    <thead className="bg-gradient-to-r from-slate-50 to-slate-100">{children}</thead>
                   ),
                   th: ({children}) => (
-                    <th className="px-4 py-2 text-left text-sm font-semibold text-emerald-800 border-b border-emerald-200">{children}</th>
+                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-800 border-b-2 border-slate-300 tracking-wide uppercase">{children}</th>
                   ),
                   td: ({children}) => (
-                    <td className="px-4 py-2 text-sm text-gray-700 border-b border-gray-200">{children}</td>
+                    <td className="px-6 py-4 text-sm text-slate-700 border-b border-slate-200 leading-6">{children}</td>
                   ),
-                  // 인용구 스타일링
-                  blockquote: ({children}) => (
-                    <blockquote className="border-l-4 border-emerald-400 bg-emerald-50/50 pl-4 py-2 my-4 italic text-emerald-800">{children}</blockquote>
+                  // 의료 전문 링크 스타일링
+                  a: ({href, children}) => (
+                    <a 
+                      href={href} 
+                      className="medical-link text-blue-600 hover:text-blue-800 font-medium underline decoration-2 underline-offset-2 transition-colors duration-200 inline-flex items-center gap-1"
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      {children} 
+                      <span className="text-xs">🔗</span>
+                    </a>
+                  ),
+                  // 수평선 스타일링
+                  hr: () => (
+                    <hr className="my-8 border-t-2 border-gradient-to-r from-slate-300 to-slate-400" />
                   ),
                   // 코드 스타일링
                   code: ({className, children, ...props}) => {
                     const match = /language-(\w+)/.exec(className || '');
                     return !match ? (
-                      <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono" {...props}>
+                      <code className="bg-slate-100 text-slate-800 px-2 py-1 rounded text-sm font-mono border border-slate-200" {...props}>
                         {children}
                       </code>
                     ) : (
@@ -178,32 +227,22 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                       </code>
                     );
                   },
-                  // 단락 스타일링 - 자연스러운 간격과 줄바꿈 처리
-                  p: ({children}) => (
-                    <p className="mb-3 leading-relaxed text-gray-800">{children}</p>
-                  ),
-                  // 수평선 스타일링
-                  hr: () => (
-                    <hr className="my-6 border-t border-gray-300" />
-                  ),
-                  // 링크 스타일링
-                  a: ({children, href}) => (
-                    <a href={href} className="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">{children}</a>
-                  ),
                 }}
               >
-                {processMarkdownText(message.content)}
+                {message.content}
               </ReactMarkdown>
             </div>
-          ) : isStreamingMessage ? (
-            // 스트리밍 중: 고급 전처리 로직 적용
-            <div className="streaming-text text-gray-700 markdown-container" style={{ whiteSpace: 'pre-line' }}>
-              {processMarkdownText(message.content)}
-            </div>
           ) : (
-            // 사용자 메시지: 고급 전처리 로직 적용
-            <div className="user-text markdown-container" style={{ whiteSpace: 'pre-line' }}>
-              {processMarkdownText(message.content)}
+            // 스트리밍 중이거나 사용자 메시지: 원본 텍스트만 표시
+            <div 
+              className={`raw-text ${isStreamingMessage ? 'streaming-text' : 'user-text'} korean-text`}
+              style={{ 
+                whiteSpace: 'pre-line', 
+                lineHeight: '1.6',
+                color: '#374151'
+              }}
+            >
+              {message.content}
             </div>
           )}
         </div>
