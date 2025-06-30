@@ -133,10 +133,26 @@ export class ApiClient {
 
   // XMLHttpRequest 기반 fetch 대체 (fetch 문제 해결용)
   async xhrFetch(endpoint: string, method: string = 'GET', data?: any): Promise<any> {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       try {
         const url = getApiUrl(endpoint);
         console.log(`🔧 XHR Fetch 사용: ${method} ${url}`, data ? { data } : {});
+        
+        // 연결 전 서버 상태 간단 확인 (빠른 health check)
+        try {
+          console.log('🔍 XHR 요청 전 서버 연결 상태 확인...');
+          const quickCheck = await fetch('http://localhost:8000/health', {
+            method: 'HEAD', // HEAD 요청으로 빠른 확인
+            signal: AbortSignal.timeout(2000) // 2초 타임아웃
+          });
+          if (!quickCheck.ok) {
+            console.warn('⚠️ 사전 연결 확인 실패, 그래도 XHR 시도');
+          } else {
+            console.log('✅ 사전 연결 확인 성공');
+          }
+        } catch (quickError) {
+          console.warn('⚠️ 사전 연결 확인 실패:', quickError, '- 그래도 XHR 시도');
+        }
         
         const xhr = new XMLHttpRequest();
         xhr.open(method, url, true);
@@ -201,7 +217,7 @@ export class ApiClient {
           resolve({ success: false, error: 'XHR 타임아웃 - 서버 응답이 너무 늦습니다' });
         };
         
-        xhr.timeout = 10000; // 10초 타임아웃으로 단축
+        xhr.timeout = 15000; // 15초 타임아웃으로 연장 (서버 준비 시간 고려)
         
         // 요청 전송
         if (method === 'POST' || method === 'PUT') {

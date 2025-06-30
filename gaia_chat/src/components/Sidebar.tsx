@@ -290,25 +290,54 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           // 백그라운드에서 실제 API 호출 시도 - 재시도 로직 포함
           console.log('📡 apiClient로 백그라운드 API 호출 시도 (재시도 포함)');
           
-          // 서버 준비 대기 함수
-          const waitForServer = async (maxRetries = 5, baseDelay = 1000) => {
+          // 서버 준비 대기 함수 - 강화된 안정성
+          const waitForServer = async (maxRetries = 10, baseDelay = 2000) => {
+            // 먼저 초기 대기 시간 추가 (서버 완전 시작 대기)
+            console.log('⏳ 서버 완전 시작 대기 (3초)...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
               try {
-                console.log(`🎯 apiClient.getModelsDetailed() 호출 시도 ${attempt}/${maxRetries}`);
+                console.log(`🎯 시도 ${attempt}/${maxRetries}: Health check 먼저 확인`);
                 
+                // 1단계: Health check로 서버 기본 상태 확인
+                try {
+                  const healthResponse = await fetch('http://localhost:8000/health', {
+                    method: 'GET',
+                    headers: {
+                      'Accept': 'application/json',
+                      'Cache-Control': 'no-cache'
+                    },
+                    cache: 'no-cache',
+                    signal: AbortSignal.timeout(5000) // 5초 타임아웃
+                  });
+                  
+                  if (!healthResponse.ok) {
+                    throw new Error(`Health check failed: ${healthResponse.status}`);
+                  }
+                  
+                  const healthData = await healthResponse.json();
+                  console.log(`✅ Health check 성공 (시도 ${attempt}):`, healthData);
+                } catch (healthError) {
+                  console.warn(`⚠️ Health check 실패 (시도 ${attempt}):`, healthError);
+                  throw healthError; // health check 실패시 재시도
+                }
+                
+                // 2단계: 실제 API 호출
+                console.log(`🎯 시도 ${attempt}/${maxRetries}: apiClient.getModelsDetailed() 호출`);
                 const result = await apiClient.getModelsDetailed();
-                console.log(`✅ 시도 ${attempt}: API 호출 성공`, result);
+                console.log(`✅ 시도 ${attempt}: API 호출 완전 성공`, result);
                 return result;
                 
               } catch (error) {
-                const delay = baseDelay * Math.pow(1.5, attempt - 1); // 점진적 백오프
+                const delay = Math.min(baseDelay * Math.pow(1.5, attempt - 1), 10000); // 최대 10초
                 console.warn(`⚠️ 시도 ${attempt}/${maxRetries} 실패:`, error instanceof Error ? error.message : String(error));
                 
                 if (attempt < maxRetries) {
-                  console.log(`⏳ ${delay}ms 대기 후 재시도...`);
+                  console.log(`⏳ ${delay}ms 대기 후 재시도... (${attempt}/${maxRetries})`);
                   await new Promise(resolve => setTimeout(resolve, delay));
                 } else {
-                  console.error(`❌ 모든 재시도 실패 (${maxRetries}회)`);
+                  console.error(`❌ 모든 재시도 실패 (${maxRetries}회) - 폴백 데이터 유지`);
                   throw error;
                 }
               }
