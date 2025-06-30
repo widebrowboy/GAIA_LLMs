@@ -174,15 +174,26 @@ export class ApiClient {
                 resolve({ success: false, error: `JSON 파싱 실패: ${parseError}` });
               }
             } else {
-              console.error(`❌ XHR HTTP 오류: ${xhr.status}`, xhr.responseText);
-              resolve({ success: false, error: `HTTP ${xhr.status}: ${xhr.statusText}` });
+              // HTTP 오류: 0 처리 - 네트워크 연결 실패 또는 서버 미준비 상태
+              if (xhr.status === 0) {
+                console.error(`❌ XHR HTTP 오류: 0 - 네트워크 연결 실패 또는 서버 미준비`);
+                console.error(`🔍 URL: ${url}, Method: ${method}`);
+                console.error(`🔍 Ready State: ${xhr.readyState}, Status: ${xhr.status}`);
+                resolve({ success: false, error: 'Network connection failed or server not ready' });
+              } else {
+                console.error(`❌ XHR HTTP 오류: ${xhr.status}`, xhr.responseText);
+                resolve({ success: false, error: `HTTP ${xhr.status}: ${xhr.statusText}` });
+              }
             }
           }
         };
         
         xhr.onerror = function() {
           console.error('💥 XHR 네트워크 오류');
-          resolve({ success: false, error: 'XHR 네트워크 오류 - 서버에 연결할 수 없습니다' });
+          console.error(`🔍 오류 발생 URL: ${url}`);
+          console.error(`🔍 XHR Status: ${xhr.status}, ReadyState: ${xhr.readyState}`);
+          console.error(`🔍 StatusText: ${xhr.statusText}`);
+          resolve({ success: false, error: 'Network error - 서버에 연결할 수 없습니다 (서버가 시작 중이거나 네트워크 문제)' });
         };
         
         xhr.ontimeout = function() {

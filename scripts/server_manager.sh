@@ -269,11 +269,24 @@ start_api_server() {
     nohup python -m uvicorn app.api_server.main:app --reload --host 0.0.0.0 --port 8000 --timeout-keep-alive 1800 --timeout-graceful-shutdown 60 > /tmp/gaia-bt-api.log 2>&1 &
     local api_pid=$!
     
-    # 시작 확인
+    # 시작 확인 및 health check 대기
     sleep 3
     if kill -0 $api_pid 2>/dev/null; then
         echo -e "${GREEN}✅ FastAPI 서버 시작 완료 (PID: $api_pid)${NC}"
         echo -e "${CYAN}📖 API 문서: http://localhost:8000/docs${NC}"
+        
+        # Health check 대기 - 실제 API 준비 완료까지 대기
+        echo -e "${YELLOW}⏳ API 서버 완전 준비 대기 중...${NC}"
+        for i in {1..20}; do
+            if curl -s -f http://localhost:8000/health >/dev/null 2>&1; then
+                echo -e "${GREEN}✅ API 서버 완전 준비 완료 ($i초)${NC}"
+                return 0
+            fi
+            echo -ne "${YELLOW}⏳ API 준비 대기... ($i/20)\r${NC}"
+            sleep 1
+        done
+        
+        echo -e "${YELLOW}⚠️ API health check 타임아웃 - 서버는 시작되었지만 완전 준비되지 않을 수 있음${NC}"
         return 0
     else
         echo -e "${RED}❌ FastAPI 서버 시작 실패${NC}"

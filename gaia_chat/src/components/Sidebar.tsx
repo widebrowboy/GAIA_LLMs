@@ -284,15 +284,39 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
           setDetailedModels(immediateModels.map(name => ({ name, parameter_size: '12B' })));
           console.log('✅ 폴백 데이터 설정 완료 - 모델 수:', immediateModels.length);
           
-          // 연결 테스트 제거 - 직접 API 호출로 진행
-          console.log('🚀 연결 테스트 생략 - 직접 API 호출로 진행');
+          // 서버 준비 대기 - 점진적 재시도 로직
+          console.log('🚀 서버 준비 대기 시작 - 안정적인 초기 연결 보장');
           
-          // 백그라운드에서 실제 API 호출 시도 - apiClient 사용
-          console.log('📡 apiClient로 백그라운드 API 호출 시도');
+          // 백그라운드에서 실제 API 호출 시도 - 재시도 로직 포함
+          console.log('📡 apiClient로 백그라운드 API 호출 시도 (재시도 포함)');
+          
+          // 서버 준비 대기 함수
+          const waitForServer = async (maxRetries = 5, baseDelay = 1000) => {
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+              try {
+                console.log(`🎯 apiClient.getModelsDetailed() 호출 시도 ${attempt}/${maxRetries}`);
+                
+                const result = await apiClient.getModelsDetailed();
+                console.log(`✅ 시도 ${attempt}: API 호출 성공`, result);
+                return result;
+                
+              } catch (error) {
+                const delay = baseDelay * Math.pow(1.5, attempt - 1); // 점진적 백오프
+                console.warn(`⚠️ 시도 ${attempt}/${maxRetries} 실패:`, error instanceof Error ? error.message : String(error));
+                
+                if (attempt < maxRetries) {
+                  console.log(`⏳ ${delay}ms 대기 후 재시도...`);
+                  await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                  console.error(`❌ 모든 재시도 실패 (${maxRetries}회)`);
+                  throw error;
+                }
+              }
+            }
+          };
+          
           try {
-            console.log('🎯 apiClient.getModelsDetailed() 호출 시작');
-            
-            const result = await apiClient.getModelsDetailed();
+            const result = await waitForServer();
             
             console.log('📥 apiClient 응답 수신:', result);
             
