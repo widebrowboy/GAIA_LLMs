@@ -273,7 +273,10 @@ async def stream_message(
             mode=request.mode or "normal",
             mcp_enabled=request.mcp_enabled or False
         ):
-            yield f"data: {chunk}\n\n"
+            # JSON으로 인코딩하여 줄바꿈과 특수 문자를 안전하게 전송
+            import json
+            encoded_chunk = json.dumps(chunk, ensure_ascii=False)
+            yield f"data: {encoded_chunk}\n\n"
         yield "data: [DONE]\n\n"
     
     return StreamingResponse(

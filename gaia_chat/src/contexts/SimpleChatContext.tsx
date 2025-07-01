@@ -339,8 +339,15 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
                   if (trimmedLine.startsWith('data: ')) {
                     const data = trimmedLine.slice(6);
                     if (data && data !== '[DONE]' && data.trim()) {
-                      fullResponse += data;
-                      console.log('💬 스트림 완료 후 응답 추가:', data);
+                      // JSON 인코딩된 데이터를 디코딩
+                      let decodedData = data;
+                      try {
+                        decodedData = JSON.parse(data);
+                      } catch (e) {
+                        // JSON 파싱 실패 시 원본 사용
+                      }
+                      fullResponse += decodedData;
+                      console.log('💬 스트림 완료 후 응답 추가:', decodedData);
                       setStreamingResponse(fullResponse);
                     }
                   }
@@ -376,8 +383,16 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
                 }
                 
                 if (data && data.trim()) {
+                  // JSON 인코딩된 데이터를 디코딩
+                  let decodedData = data;
+                  try {
+                    decodedData = JSON.parse(data);
+                  } catch (e) {
+                    // JSON 파싱 실패 시 원본 사용
+                  }
+                  
                   // 데이터를 fullResponse에 추가
-                  fullResponse += data;
+                  fullResponse += decodedData;
                   console.log('💬 응답 누적 길이:', fullResponse.length);
                   console.log('📝 현재 응답 미리보기:', fullResponse.substring(fullResponse.length - 50));
                   
