@@ -364,6 +364,8 @@ class DrugDevelopmentChatbot:
             if self.config.show_mcp_output:
                 self.interface.print_thinking("[Research]    MCP Deep Search     ...")
             search_results = []
+            # 데이터 출처 추적을 위한 리스트
+            data_sources = []
             
             #                     
             input_lower = user_input.lower()
@@ -471,6 +473,13 @@ class DrugDevelopmentChatbot:
                                 if drug_text and len(drug_text) > 50:  #    50             
                                     search_results.append(f"[Drug] DrugBank - {term}:\n{drug_text}")
                                     drugbank_success = True
+                                    # 데이터 출처 추가
+                                    data_sources.append({
+                                        'source': 'DrugBank',
+                                        'query': term,
+                                        'url': f'https://www.drugbank.ca/drugs?query={term}',
+                                        'type': 'Drug Database'
+                                    })
                                     if self.settings.get("debug_mode", False):
                                         self.interface.print_thinking(f"[Debug] DrugBank {term}      : {len(drug_text)} ")
                                 
@@ -593,6 +602,13 @@ class DrugDevelopmentChatbot:
                                 if chembl_text and len(chembl_text) > 50:  #    50             
                                     search_results.append(f"[Lab] ChEMBL - {term}:\n{chembl_text}")
                                     chembl_success = True
+                                    # 데이터 출처 추가
+                                    data_sources.append({
+                                        'source': 'ChEMBL',
+                                        'query': term,
+                                        'url': f'https://www.ebi.ac.uk/chembl/g/#search_results/all/query={term}',
+                                        'type': 'Chemical Database'
+                                    })
                                     if self.settings.get("debug_mode", False):
                                         self.interface.print_thinking(f"[Debug] ChEMBL {term}      : {len(chembl_text)} ")
                                 
