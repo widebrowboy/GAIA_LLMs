@@ -3,6 +3,7 @@
 import React, { memo } from 'react';
 import Image from 'next/image';
 import { Message } from '@/types/chat';
+import MarkdownViewer from './MarkdownViewer';
 
 interface MessageItemProps {
   message: Message;
@@ -99,20 +100,27 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
           </div>
         )}
 
-        {/* 메시지 텍스트 - 원본 텍스트 그대로 출력 */}
-        <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full">
-          <div 
-            className="raw-text korean-text"
-            style={{ 
-              whiteSpace: 'pre-line', 
-              lineHeight: '1.6',
-              color: '#374151',
-              fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif'
-            }}
-          >
-            {message.content}
+        {/* 메시지 텍스트 - 완전 응답이면 마크다운 렌더링, 아니면 기존 텍스트 */}
+        {isCompleteResponse ? (
+          <div className="max-w-full">
+            {/* MarkdownViewer는 반드시 먼저 import되어 있어야 함 */}
+            <MarkdownViewer markdown={message.content} />
           </div>
-        </div>
+        ) : (
+          <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full">
+            <div 
+              className="raw-text korean-text"
+              style={{ 
+                whiteSpace: 'pre-line', 
+                lineHeight: '1.6',
+                color: '#374151',
+                fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif'
+              }}
+            >
+              {message.content}
+            </div>
+          </div>
+        )}
         
         {/* 타임스탬프 */}
         {!isCompleteResponse && (

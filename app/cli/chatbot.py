@@ -54,6 +54,70 @@ class DrugDevelopmentChatbot:
     """
 
     def __init__(self, config: Config):
+
+    def format_response_as_markdown(self, question: str, ai_response: str, references: list = None, metadata: dict = None) -> str:
+        """
+        Convert chat response and metadata to a structured Markdown document in CLAUDE.md style.
+
+        Args:
+            question (str): User's research question.
+            ai_response (str): AI-generated answer (raw, not formatted).
+            references (list, optional): List of reference strings. If None or less than 2, basic references will be added.
+            metadata (dict, optional): Metadata such as timestamp, model name, feedback info, etc.
+
+        Returns:
+            str: Professionally formatted Markdown document.
+        """
+        import datetime
+        # 1. Extract topic for title
+        topic = self._extract_topic(question) or "Research Report"
+        # 2. Timestamp
+        now = metadata.get("timestamp") if metadata and "timestamp" in metadata else datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # 3. Model
+        model = metadata.get("model") if metadata and "model" in metadata else getattr(self, "model", "Unknown")
+        # 4. Feedback
+        feedback = metadata.get("feedback") if metadata and "feedback" in metadata else "-"
+        # 5. References (ensure at least 2)
+        ref_list = references or []
+        if len(ref_list) < 2:
+            ref_list += self._generate_basic_references()[:2-len(ref_list)]
+        # 6. Section parsing (split response heuristically)
+        # Try to split by Korean section headers if present
+        section_map = {
+            "문제 정의": "Problem Definition",
+            "핵심 내용": "Core Content",
+            "과학적 근거": "Scientific Evidence",
+            "복용 방법 및 주의사항": "Usage & Precautions",
+            "결론 및 요약": "Conclusion & Summary",
+            "참고 문헌": "References"
+        }
+        # Heuristic: split by numbered or header lines, else fallback
+        def extract_section(text, keyword):
+            import re
+            p = rf"[#]*\s*{keyword}.*?\n(.+?)(?=\n[#]+|\n[A-Z가-힣 ]+\n|$)"
+            m = re.search(p, text, re.DOTALL)
+            return m.group(1).strip() if m else "-"
+        sections = {}
+        for kor, eng in section_map.items():
+            sections[eng] = extract_section(ai_response, kor)
+        # Fallback: if all blank, put all in Core Content
+        if all(v == "-" for v in sections.values()):
+            sections["Core Content"] = ai_response.strip()
+        # 7. Markdown template
+        md = f"""# {topic}\n\n" + \
+             f"**질문:** {question}\n\n" + \
+             f"**생성 시각:** {now}  |  **모델:** {model}  |  **피드백:** {feedback}\n\n" + \
+             "---\n\n" + \
+             f"## 1. 문제 정의\n{sections['Problem Definition']}\n\n" + \
+             f"## 2. 핵심 내용\n{sections['Core Content']}\n\n" + \
+             f"## 3. 과학적 근거\n{sections['Scientific Evidence']}\n\n" + \
+             f"## 4. 복용 방법 및 주의사항\n{sections['Usage & Precautions']}\n\n" + \
+             f"## 5. 결론 및 요약\n{sections['Conclusion & Summary']}\n\n" + \
+             f"## 6. 참고 문헌\n" + "\n".join([f"{i+1}. {ref}" for i, ref in enumerate(ref_list)]) + "\n\n" + \
+             "---\n" + \
+             f"*본 문서는 GAIA-BT 챗봇이 자동 생성하였으며, 과학적 근거와 참고문헌을 포함합니다.*\n"
+        return md
+
         self.config = config
         self.context = []
         self.last_topic = None
