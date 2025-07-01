@@ -8,7 +8,26 @@ interface MarkdownViewerProps {
 }
 
 const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ markdown }) => {
-  const { content, data } = matter(markdown);
+  let content = '';
+  let data: any = {};
+  let parseError = false;
+
+  try {
+    const parsed = matter(markdown);
+    content = parsed.content;
+    data = parsed.data;
+  } catch (e) {
+    parseError = true;
+  }
+
+  if (parseError || !markdown) {
+    return (
+      <div className="prose prose-red">
+        <p>⚠️ 문서 파싱 오류 또는 빈 응답입니다.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mb-4">
       {data.title && (
