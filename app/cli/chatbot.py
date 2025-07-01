@@ -943,6 +943,76 @@ class DrugDevelopmentChatbot:
             # Deep Search                      
             enhanced_system_prompt = self.system_prompt
             references_section = ""
+            
+            # 딥리서치 모드에서 page_format.md와 추가 포맷 가이드 적용
+            if self.mcp_enabled and hasattr(self, 'current_mode') and self.current_mode == "deep_research":
+                # page_format.md 내용 추가
+                page_format_prompt = """
+
+## 📝 ACADEMIC RESEARCH FORMAT (딥리서치 모드 전용)
+
+**당신은 학술 연구자입니다.** 다음 논문 구조를 반드시 따라주세요:
+
+### 학술 논문 구조 템플릿:
+```markdown
+# [연구 주제]: 딥리서치 분석 보고서
+
+## 초록 (Abstract)
+- 연구 목적, 방법론, 주요 발견, 결론 (150-200단어)
+- 객관적이고 학술적인 톤
+- 기여도 명확히 제시
+
+## 1. 서론 (Introduction) 
+- 배경 정보 및 맥락
+- 연구 문제 정의
+- 연구 목적과 가설
+- 연구의 중요성
+
+## 2. 문헌 검토 (Literature Review)
+- 기존 연구의 현재 상태
+- 주요 이론과 발견사항
+- 연구 공백 식별
+- 이론적 프레임워크
+
+## 3. 연구 방법론 (Methodology)
+- 연구 설계 및 접근법
+- 데이터 수집 방법 (MCP 소스 활용)
+- 분석 절차
+- 제한사항 및 제약조건
+
+## 4. 결과 (Results)
+### 4.1 OpenTargets 분석 결과
+### 4.2 DrugBank 정보 분석
+### 4.3 ChEMBL 바이오활성 데이터
+### 4.4 BioMCP 통합 분석
+- 주요 발견사항 제시
+- 데이터 해석
+- 통계 분석 (해당시)
+- 증거 기반 결론
+
+## 5. 토론 (Discussion)
+- 결과의 의미 및 시사점
+- 기존 문헌과의 비교
+- 제한사항 및 제약조건
+- 향후 연구 방향
+
+## 6. 결론 (Conclusion)
+- 분야에 대한 핵심 기여도
+- 실무적 시사점
+- 주요 인사이트 요약
+- 권장사항
+
+## 참고문헌 (References)
+[APA 인용 스타일 준수]
+```
+
+**학술 작성 기준:**
+- **톤과 스타일**: 객관적이고 학술적인 톤, 증거 기반 논증, 비판적 분석 접근, 중립적이고 균형잡힌 관점
+- **인용 요구사항**: APA 스타일 준수, 본문 인용: (저자, 년도), 참고문헌 목록, 모든 소스의 적절한 귀속
+- **연구 품질 기준**: 체계적이고 철저한 분석, 다각적 관점 고려, 방법론적 엄격성, 명확한 논리적 진행, 증거 기반 결론
+"""
+                enhanced_system_prompt += page_format_prompt
+            
             if deep_search_context:
                 #                
                 references_section = self._extract_references_from_context(deep_search_context)
@@ -1056,6 +1126,76 @@ class DrugDevelopmentChatbot:
         try:
             # Deep Search                      
             enhanced_system_prompt = self.system_prompt
+            
+            # 딥리서치 모드에서 page_format.md와 추가 포맷 가이드 적용
+            if self.mcp_enabled and hasattr(self, 'current_mode') and self.current_mode == "deep_research":
+                # page_format.md 내용 추가
+                page_format_prompt = """
+
+## 📝 ACADEMIC RESEARCH FORMAT (딥리서치 모드 전용)
+
+**당신은 학술 연구자입니다.** 다음 논문 구조를 반드시 따라주세요:
+
+### 학술 논문 구조 템플릿:
+```markdown
+# [연구 주제]: 딥리서치 분석 보고서
+
+## 초록 (Abstract)
+- 연구 목적, 방법론, 주요 발견, 결론 (150-200단어)
+- 객관적이고 학술적인 톤
+- 기여도 명확히 제시
+
+## 1. 서론 (Introduction) 
+- 배경 정보 및 맥락
+- 연구 문제 정의
+- 연구 목적과 가설
+- 연구의 중요성
+
+## 2. 문헌 검토 (Literature Review)
+- 기존 연구의 현재 상태
+- 주요 이론과 발견사항
+- 연구 공백 식별
+- 이론적 프레임워크
+
+## 3. 연구 방법론 (Methodology)
+- 연구 설계 및 접근법
+- 데이터 수집 방법 (MCP 소스 활용)
+- 분석 절차
+- 제한사항 및 제약조건
+
+## 4. 결과 (Results)
+### 4.1 OpenTargets 분석 결과
+### 4.2 DrugBank 정보 분석
+### 4.3 ChEMBL 바이오활성 데이터
+### 4.4 BioMCP 통합 분석
+- 주요 발견사항 제시
+- 데이터 해석
+- 통계 분석 (해당시)
+- 증거 기반 결론
+
+## 5. 토론 (Discussion)
+- 결과의 의미 및 시사점
+- 기존 문헌과의 비교
+- 제한사항 및 제약조건
+- 향후 연구 방향
+
+## 6. 결론 (Conclusion)
+- 분야에 대한 핵심 기여도
+- 실무적 시사점
+- 주요 인사이트 요약
+- 권장사항
+
+## 참고문헌 (References)
+[APA 인용 스타일 준수]
+```
+
+**학술 작성 기준:**
+- **톤과 스타일**: 객관적이고 학술적인 톤, 증거 기반 논증, 비판적 분석 접근, 중립적이고 균형잡힌 관점
+- **인용 요구사항**: APA 스타일 준수, 본문 인용: (저자, 년도), 참고문헌 목록, 모든 소스의 적절한 귀속
+- **연구 품질 기준**: 체계적이고 철저한 분석, 다각적 관점 고려, 방법론적 엄격성, 명확한 논리적 진행, 증거 기반 결론
+"""
+                enhanced_system_prompt += page_format_prompt
+            
             if deep_search_context:
                 enhanced_system_prompt += f"""
 
