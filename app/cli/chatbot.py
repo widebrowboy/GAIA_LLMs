@@ -1142,22 +1142,25 @@ class DrugDevelopmentChatbot:
 ### 🔗 Database 소스별 APA 인용 규칙 (실제 링크 포함 필수):
 
 **OpenTargets 인용 (실제 링크로 표시):**
-- 형식: OpenTargets Platform. (2024). [타겟명]. Retrieved from https://platform.opentargets.org/[타겟 정보]
+- 형식: OpenTargets Platform. (2024). [Target Name in English]. Retrieved from https://platform.opentargets.org/[타겟 정보]
 - 예시: OpenTargets Platform. (2024). BRCA1. Retrieved from https://platform.opentargets.org/target/ENSG00000012048
 - 실제 링크 예시: https://platform.opentargets.org/target/ENSG00000141510 (TP53), https://platform.opentargets.org/target/ENSG00000146648 (EGFR)
 - **필수 ID 포함**: ENSG 번호, 질병 연관성 점수, 약물가능성 점수
+- **중요**: 타겟명은 반드시 영문 그대로 사용 (예: BRCA1, TP53, EGFR, KRAS, PIK3CA)
 
 **DrugBank 인용 (실제 링크로 표시):**
-- 형식: DrugBank. (2024). [약물명] ([DB 번호]). Retrieved from https://www.drugbank.ca/drugs/[DB 번호]
+- 형식: DrugBank. (2024). [Drug Name in English] ([DB 번호]). Retrieved from https://www.drugbank.ca/drugs/[DB 번호]
 - 예시: DrugBank. (2024). Aspirin (DB00945). Retrieved from https://www.drugbank.ca/drugs/DB00945
 - 실제 링크 예시: https://www.drugbank.ca/drugs/DB00001 (Lepirudin), https://www.drugbank.ca/drugs/DB00002 (Cetuximab)
 - **필수 ID 포함**: DB 번호, ATC 코드, 작용 기전, 승인 상태
+- **중요**: 약물명은 반드시 영문 그대로 사용 (예: Aspirin, Cetuximab, Bevacizumab, Pembrolizumab)
 
 **ChEMBL 인용 (실제 링크로 표시):**
-- 형식: ChEMBL Database. (2024). [화합물명] ([CHEMBL ID]). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/[CHEMBL ID]
+- 형식: ChEMBL Database. (2024). [Compound Name in English] ([CHEMBL ID]). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/[CHEMBL ID]
 - 예시: ChEMBL Database. (2024). Aspirin (CHEMBL25). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL25
 - 실제 링크 예시: https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL1 (Lepirudin), https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL59 (Cetuximab)
 - **필수 ID 포함**: ChEMBL ID, 분자량, IC50 값, 바이오활성 데이터
+- **중요**: 화합물명은 반드시 영문 그대로 사용 (예: Imatinib, Gefitinib, Erlotinib, Osimertinib)
 
 **BioMCP (PubMed) 인용 (실제 링크로 표시):**
 - 형식: [Author]. ([Year]). [Title]. [Journal], [Volume(Issue)], [Pages]. PMID: [PMID]. Retrieved from https://pubmed.ncbi.nlm.nih.gov/[PMID]/
@@ -1198,13 +1201,35 @@ class DrugDevelopmentChatbot:
 - **최대한 많은 내용 포함**: 각 Database 소스에서 가능한 모든 관련 데이터 활용
 
 **필수 포함 요소:**
-- 각 약물의 DrugBank ID (DB00XXX)
-- 각 타겟의 OpenTargets Gene ID (ENSGXXXXXXXX)
-- 각 화합물의 ChEMBL ID (CHEMBLXXX)
+- 각 약물의 DrugBank ID (DB00XXX) - 약물명은 영문 그대로
+- 각 타겟의 OpenTargets Gene ID (ENSGXXXXXXXX) - 타겟명은 영문 그대로
+- 각 화합물의 ChEMBL ID (CHEMBLXXX) - 화합물명은 영문 그대로
 - 임상시험의 NCT 번호
 - 논문의 PMID 번호
 - 웹 검색 결과의 완전한 URL
 - Sequential Thinking 과정의 명시적 서술
+
+**🔤 전문 용어 사용 규칙 (필수 준수):**
+
+**영문 그대로 사용해야 하는 용어들:**
+- **약물명**: Aspirin (❌ 아스피린), Pembrolizumab (❌ 펨브롤리주맙), Bevacizumab (❌ 베바시주맙), Cetuximab (❌ 세툭시맙), Trastuzumab (❌ 트라스투주맙)
+- **타겟/유전자명**: EGFR (❌ 표피성장인자수용체), BRCA1 (❌ 브르카1), TP53 (❌ p53), KRAS (❌ 케이라스), PIK3CA (❌ 파이케이쓰리시에이), BRAF (❌ 브라프), ALK (❌ 에이엘케이)
+- **단백질명**: PD-1 (❌ 피디원), PD-L1 (❌ 피디엘원), VEGF (❌ 베지에프), HER2 (❌ 허투), CTLA-4 (❌ 시티엘에이포)
+- **화합물명**: Imatinib (❌ 이마티닙), Gefitinib (❌ 게피티닙), Erlotinib (❌ 엘로티닙), Osimertinib (❌ 오시머티닙), Afatinib (❌ 아파티닙)
+- **효소명**: COX-1, COX-2 (❌ 콕스원, 콕스투), PARP (❌ 파프), CDK4/6 (❌ 시디케이포/식스)
+
+**한국어 사용 가능한 용어들:**
+- **일반적인 질환명**: 유방암, 폐암, 당뇨병, 고혈압, 심장병, 간염, 신장병
+- **일반적인 기전**: 혈관신생억제, 면역관문억제, 세포사멸유도, 신호전달차단
+- **임상시험 단계**: 1상, 2상, 3상 임상시험
+- **투여경로**: 정맥주사, 경구투여, 피하주사
+- **부작용**: 오심, 구토, 설사, 피로감, 발진
+
+**혼합 사용 예시 (권장):**
+- "EGFR 표적 항암제" (타겟명 영문 + 설명 한국어)
+- "Pembrolizumab의 면역관문억제 효과" (약물명 영문 + 기전 한국어)
+- "BRCA1 유전자 변이와 유방암의 연관성" (유전자명 영문 + 질환명 한국어)
+- "Imatinib을 이용한 만성골수성백혈병 치료" (약물명 영문 + 질환명 한국어)
 """
                 enhanced_system_prompt += page_format_prompt
             
@@ -1412,22 +1437,25 @@ class DrugDevelopmentChatbot:
 ### 🔗 Database 소스별 APA 인용 규칙 (실제 링크 포함 필수):
 
 **OpenTargets 인용 (실제 링크로 표시):**
-- 형식: OpenTargets Platform. (2024). [타겟명]. Retrieved from https://platform.opentargets.org/[타겟 정보]
+- 형식: OpenTargets Platform. (2024). [Target Name in English]. Retrieved from https://platform.opentargets.org/[타겟 정보]
 - 예시: OpenTargets Platform. (2024). BRCA1. Retrieved from https://platform.opentargets.org/target/ENSG00000012048
 - 실제 링크 예시: https://platform.opentargets.org/target/ENSG00000141510 (TP53), https://platform.opentargets.org/target/ENSG00000146648 (EGFR)
 - **필수 ID 포함**: ENSG 번호, 질병 연관성 점수, 약물가능성 점수
+- **중요**: 타겟명은 반드시 영문 그대로 사용 (예: BRCA1, TP53, EGFR, KRAS, PIK3CA)
 
 **DrugBank 인용 (실제 링크로 표시):**
-- 형식: DrugBank. (2024). [약물명] ([DB 번호]). Retrieved from https://www.drugbank.ca/drugs/[DB 번호]
+- 형식: DrugBank. (2024). [Drug Name in English] ([DB 번호]). Retrieved from https://www.drugbank.ca/drugs/[DB 번호]
 - 예시: DrugBank. (2024). Aspirin (DB00945). Retrieved from https://www.drugbank.ca/drugs/DB00945
 - 실제 링크 예시: https://www.drugbank.ca/drugs/DB00001 (Lepirudin), https://www.drugbank.ca/drugs/DB00002 (Cetuximab)
 - **필수 ID 포함**: DB 번호, ATC 코드, 작용 기전, 승인 상태
+- **중요**: 약물명은 반드시 영문 그대로 사용 (예: Aspirin, Cetuximab, Bevacizumab, Pembrolizumab)
 
 **ChEMBL 인용 (실제 링크로 표시):**
-- 형식: ChEMBL Database. (2024). [화합물명] ([CHEMBL ID]). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/[CHEMBL ID]
+- 형식: ChEMBL Database. (2024). [Compound Name in English] ([CHEMBL ID]). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/[CHEMBL ID]
 - 예시: ChEMBL Database. (2024). Aspirin (CHEMBL25). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL25
 - 실제 링크 예시: https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL1 (Lepirudin), https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL59 (Cetuximab)
 - **필수 ID 포함**: ChEMBL ID, 분자량, IC50 값, 바이오활성 데이터
+- **중요**: 화합물명은 반드시 영문 그대로 사용 (예: Imatinib, Gefitinib, Erlotinib, Osimertinib)
 
 **BioMCP (PubMed) 인용 (실제 링크로 표시):**
 - 형식: [Author]. ([Year]). [Title]. [Journal], [Volume(Issue)], [Pages]. PMID: [PMID]. Retrieved from https://pubmed.ncbi.nlm.nih.gov/[PMID]/
@@ -1468,13 +1496,35 @@ class DrugDevelopmentChatbot:
 - **최대한 많은 내용 포함**: 각 Database 소스에서 가능한 모든 관련 데이터 활용
 
 **필수 포함 요소:**
-- 각 약물의 DrugBank ID (DB00XXX)
-- 각 타겟의 OpenTargets Gene ID (ENSGXXXXXXXX)
-- 각 화합물의 ChEMBL ID (CHEMBLXXX)
+- 각 약물의 DrugBank ID (DB00XXX) - 약물명은 영문 그대로
+- 각 타겟의 OpenTargets Gene ID (ENSGXXXXXXXX) - 타겟명은 영문 그대로
+- 각 화합물의 ChEMBL ID (CHEMBLXXX) - 화합물명은 영문 그대로
 - 임상시험의 NCT 번호
 - 논문의 PMID 번호
 - 웹 검색 결과의 완전한 URL
 - Sequential Thinking 과정의 명시적 서술
+
+**🔤 전문 용어 사용 규칙 (필수 준수):**
+
+**영문 그대로 사용해야 하는 용어들:**
+- **약물명**: Aspirin (❌ 아스피린), Pembrolizumab (❌ 펨브롤리주맙), Bevacizumab (❌ 베바시주맙), Cetuximab (❌ 세툭시맙), Trastuzumab (❌ 트라스투주맙)
+- **타겟/유전자명**: EGFR (❌ 표피성장인자수용체), BRCA1 (❌ 브르카1), TP53 (❌ p53), KRAS (❌ 케이라스), PIK3CA (❌ 파이케이쓰리시에이), BRAF (❌ 브라프), ALK (❌ 에이엘케이)
+- **단백질명**: PD-1 (❌ 피디원), PD-L1 (❌ 피디엘원), VEGF (❌ 베지에프), HER2 (❌ 허투), CTLA-4 (❌ 시티엘에이포)
+- **화합물명**: Imatinib (❌ 이마티닙), Gefitinib (❌ 게피티닙), Erlotinib (❌ 엘로티닙), Osimertinib (❌ 오시머티닙), Afatinib (❌ 아파티닙)
+- **효소명**: COX-1, COX-2 (❌ 콕스원, 콕스투), PARP (❌ 파프), CDK4/6 (❌ 시디케이포/식스)
+
+**한국어 사용 가능한 용어들:**
+- **일반적인 질환명**: 유방암, 폐암, 당뇨병, 고혈압, 심장병, 간염, 신장병
+- **일반적인 기전**: 혈관신생억제, 면역관문억제, 세포사멸유도, 신호전달차단
+- **임상시험 단계**: 1상, 2상, 3상 임상시험
+- **투여경로**: 정맥주사, 경구투여, 피하주사
+- **부작용**: 오심, 구토, 설사, 피로감, 발진
+
+**혼합 사용 예시 (권장):**
+- "EGFR 표적 항암제" (타겟명 영문 + 설명 한국어)
+- "Pembrolizumab의 면역관문억제 효과" (약물명 영문 + 기전 한국어)
+- "BRCA1 유전자 변이와 유방암의 연관성" (유전자명 영문 + 질환명 한국어)
+- "Imatinib을 이용한 만성골수성백혈병 치료" (약물명 영문 + 질환명 한국어)
 - 연구 수행 시간 (YYYY-MM-DD HH:MM 포맷)
 - 응답 마지막에 3가지 추천 후속 질문 포함
 """
