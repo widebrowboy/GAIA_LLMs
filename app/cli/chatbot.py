@@ -106,6 +106,43 @@ class DrugDevelopmentChatbot:
             if self.config.debug_mode:
                 print(f"[Warning] MCP               : {e}")
 
+    def detect_language(self, text: str) -> str:
+        """
+        사용자 입력 텍스트의 언어를 감지합니다.
+        
+        Args:
+            text (str): 분석할 텍스트
+            
+        Returns:
+            str: 'korean' 또는 'english'
+        """
+        import re
+        
+        # 한글 문자 패턴 (한글 음절, 자음, 모음)
+        korean_pattern = r'[가-힣ㄱ-ㅎㅏ-ㅣ]'
+        # 영어 문자 패턴 (알파벳)
+        english_pattern = r'[a-zA-Z]'
+        
+        # 전체 텍스트에서 한글과 영어 문자 개수 세기
+        korean_chars = len(re.findall(korean_pattern, text))
+        english_chars = len(re.findall(english_pattern, text))
+        
+        # 총 문자 수 (공백, 숫자, 특수문자 제외)
+        total_chars = korean_chars + english_chars
+        
+        # 문자가 없으면 기본값 한국어
+        if total_chars == 0:
+            return 'korean'
+        
+        # 한글 비율 계산
+        korean_ratio = korean_chars / total_chars
+        
+        # 한글 비율이 30% 이상이면 한국어, 아니면 영어
+        if korean_ratio >= 0.3:
+            return 'korean'
+        else:
+            return 'english'
+
     def format_response_as_markdown(self, question: str, ai_response: str, references: list = None, metadata: dict = None) -> str:
         """
         Convert chat response and metadata to a structured Markdown document in CLAUDE.md style.
@@ -1033,6 +1070,9 @@ class DrugDevelopmentChatbot:
         Returns:
             str:       
         """
+        # 언어 감지
+        detected_language = self.detect_language(question)
+        
         # MCP Deep Search    (Deep Research      )
         deep_search_context = None
         if self.mcp_enabled and hasattr(self, 'current_mode') and self.current_mode == "deep_research":
@@ -1052,28 +1092,50 @@ class DrugDevelopmentChatbot:
             enhanced_system_prompt = self.system_prompt
             references_section = ""
             
+            # 언어별 기본 응답 지침 추가
+            language_instruction = ""
+            if detected_language == 'english':
+                language_instruction = """
+**IMPORTANT: The user's question is in English. Please respond in English throughout your entire response.**
+- Use English for all explanations, descriptions, and analysis
+- Technical terms (drug names, target names, gene names) should remain in their original English form
+- Keep disease names, mechanisms, and general medical terms in English
+- Maintain professional English academic writing style
+"""
+            else:  # korean
+                language_instruction = """
+**중요: 사용자의 질문이 한국어입니다. 전체 응답을 한국어로 작성해주세요.**
+- 모든 설명, 기술, 분석을 한국어로 작성
+- 전문 용어(약물명, 타겟명, 유전자명)는 영문 그대로 유지
+- 질환명, 기전, 일반 의학 용어는 한국어 사용 가능
+- 전문적인 한국어 학술 문체 유지
+"""
+            
+            enhanced_system_prompt += language_instruction
+            
             # 딥리서치 모드에서 page_format.md와 추가 포맷 가이드 적용
             if self.mcp_enabled and hasattr(self, 'current_mode') and self.current_mode == "deep_research":
-                # page_format.md 내용 추가
-                page_format_prompt = """
+                # 언어별 딥리서치 프롬프트 적용
+                if detected_language == 'english':
+                    page_format_prompt = """
 
-## 📝 ACADEMIC RESEARCH FORMAT (딥리서치 모드 전용)
+## 📝 ACADEMIC RESEARCH FORMAT (Deep Research Mode)
 
-**당신은 학술 연구자입니다.** 다음 논문 구조와 Sequential Thinking 방법론을 반드시 따라주세요:
+**You are an academic researcher.** Please follow this paper structure and Sequential Thinking methodology:
 
-### 🧠 SEQUENTIAL THINKING 방법론 (필수 적용):
+### 🧠 SEQUENTIAL THINKING Methodology (Required):
 
-**THINK STEP 1 - 데이터 수집:**
-"[OpenTargets/DrugBank/ChEMBL/BioMCP/WebSearch]에서 [특정 쿼리]에 대한 체계적 데이터 수집을 시행합니다..."
+**THINK STEP 1 - Data Collection:**
+"I will systematically collect data from [OpenTargets/DrugBank/ChEMBL/BioMCP/WebSearch] for [specific query]..."
 
-**THINK STEP 2 - 데이터 통합:**
-"여러 소스의 결과를 통합하면, OpenTargets는 ...를 보여주고, DrugBank는 ...를 나타내며, ChEMBL은 ...를 밝혀주고, 웹 검색을 통해 최신 동향은 ...를 제시합니다..."
+**THINK STEP 2 - Data Integration:**
+"Integrating results from multiple sources, OpenTargets shows... while DrugBank indicates... and ChEMBL reveals... and web search through recent 3-5 year review papers presents latest trends..."
 
-**THINK STEP 3 - 분석:**
-"통합된 데이터셋을 바탕으로 주요 패턴을 식별합니다: [패턴 분석]. 경쟁 환경 분석 결과..."
+**THINK STEP 3 - Analysis:**
+"Based on the integrated dataset, I can identify key patterns: [pattern analysis]. The competitive landscape analysis shows..."
 
-**THINK STEP 4 - 전략적 인사이트:**
-"이 증거 기반을 토대로 전략적 시사점은... 권고사항은..."
+**THINK STEP 4 - Strategic Insights:**
+"Given this evidence base, the strategic implications are... The recommendations include..."
 
 ### 학술 논문 구조 템플릿:
 ```markdown
@@ -1231,7 +1293,185 @@ class DrugDevelopmentChatbot:
 - "BRCA1 유전자 변이와 유방암의 연관성" (유전자명 영문 + 질환명 한국어)
 - "Imatinib을 이용한 만성골수성백혈병 치료" (약물명 영문 + 질환명 한국어)
 """
-                enhanced_system_prompt += page_format_prompt
+                    enhanced_system_prompt += page_format_prompt
+                else:  # korean
+                    page_format_prompt = """
+
+## 📝 학술 연구 형식 (딥리서치 모드)
+
+**당신은 학술 연구자입니다.** 다음 논문 구조와 Sequential Thinking 방법론을 따라주세요:
+
+### 🧠 SEQUENTIAL THINKING 방법론 (필수):
+
+**THINK STEP 1 - 데이터 수집:**
+"[OpenTargets/DrugBank/ChEMBL/BioMCP/WebSearch]에서 [특정 쿼리]에 대한 데이터를 체계적으로 수집하겠습니다..."
+
+**THINK STEP 2 - 데이터 통합:**
+"여러 소스의 결과를 통합하면, OpenTargets는... DrugBank는... ChEMBL은... 그리고 최근 3-5년 리뷰 논문을 통한 웹 검색은 최신 동향을..."
+
+**THINK STEP 3 - 분석:**
+"통합된 데이터셋을 바탕으로 주요 패턴을 식별할 수 있습니다: [패턴 분석]. 경쟁 환경 분석 결과는..."
+
+**THINK STEP 4 - 전략적 인사이트:**
+"이러한 증거 기반을 바탕으로 전략적 시사점은... 권장사항은..."
+
+### 학술 논문 구조 템플릿:
+```markdown
+# [연구 주제]: 딥리서치 분석 보고서
+
+## 초록 (Abstract)
+- 연구 목적, 방법론, 주요 발견, 결론 (150-200단어)
+- 객관적이고 학술적인 톤
+- 기여도 명확히 제시
+
+## 1. 서론 (Introduction) 
+- 배경 정보 및 맥락
+- 연구 문제 정의
+- 연구 목적과 가설
+- 연구의 중요성
+
+## 2. 문헌 검토 (Literature Review)
+- 기존 연구의 현재 상태
+- 주요 이론과 발견사항
+- 연구 공백 식별
+- 이론적 프레임워크
+
+## 3. 연구 방법론 (Methodology)
+- 연구 설계 및 접근법
+- 데이터 수집 방법 (Database 소스 활용)
+- Sequential Thinking 분석 절차
+- 제한사항 및 제약조건
+
+## 4. 결과 (Results)
+### 4.1 OpenTargets 분석 결과
+### 4.2 DrugBank 정보 분석
+### 4.3 ChEMBL 바이오활성 데이터
+### 4.4 BioMCP 통합 분석
+### 4.5 Sequential Thinking 통합 분석
+- 주요 발견사항 제시
+- 데이터 해석
+- 통계 분석 (해당시)
+- 증거 기반 결론
+
+## 5. 토론 (Discussion)
+- 결과의 의미 및 시사점
+- 기존 문헌과의 비교
+- 제한사항 및 제약조건
+- 향후 연구 방향
+
+## 6. 결론 (Conclusion)
+- 분야에 대한 핵심 기여도
+- 실무적 시사점
+- 주요 인사이트 요약
+- 권장사항
+
+## 참고문헌 (References)
+[APA 인용 스타일 준수 - 아래 세부 규칙 적용]
+
+## 💡 추천 후속 연구 질문
+
+**다음 3가지 질문을 통해 연구를 확장해보세요:**
+
+1. **심화 분석 질문**: "[주요 발견]에 대한 더 상세한 분자 메커니즘이나 작용 기전은 무엇인가요?"
+
+2. **비교 연구 질문**: "[연구 주제]와 관련된 다른 치료법이나 접근 방식과 어떤 차이점이 있나요?"
+
+3. **임상 적용 질문**: "이 연구 결과를 실제 임상 환경에서 어떻게 활용할 수 있을까요?"
+```
+
+### 🔗 Database 소스별 APA 인용 규칙 (실제 링크 포함 필수):
+
+**OpenTargets 인용 (실제 링크로 표시):**
+- 형식: OpenTargets Platform. (2024). [Target Name in English]. Retrieved from https://platform.opentargets.org/[타겟 정보]
+- 예시: OpenTargets Platform. (2024). BRCA1. Retrieved from https://platform.opentargets.org/target/ENSG00000012048
+- 실제 링크 예시: https://platform.opentargets.org/target/ENSG00000141510 (TP53), https://platform.opentargets.org/target/ENSG00000146648 (EGFR)
+- **필수 ID 포함**: ENSG 번호, 질병 연관성 점수, 약물가능성 점수
+- **중요**: 타겟명은 반드시 영문 그대로 사용 (예: BRCA1, TP53, EGFR, KRAS, PIK3CA)
+
+**DrugBank 인용 (실제 링크로 표시):**
+- 형식: DrugBank. (2024). [Drug Name in English] ([DB 번호]). Retrieved from https://www.drugbank.ca/drugs/[DB 번호]
+- 예시: DrugBank. (2024). Aspirin (DB00945). Retrieved from https://www.drugbank.ca/drugs/DB00945
+- 실제 링크 예시: https://www.drugbank.ca/drugs/DB00001 (Lepirudin), https://www.drugbank.ca/drugs/DB00002 (Cetuximab)
+- **필수 ID 포함**: DB 번호, ATC 코드, 작용 기전, 승인 상태
+- **중요**: 약물명은 반드시 영문 그대로 사용 (예: Aspirin, Cetuximab, Bevacizumab, Pembrolizumab)
+
+**ChEMBL 인용 (실제 링크로 표시):**
+- 형식: ChEMBL Database. (2024). [Compound Name in English] ([CHEMBL ID]). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/[CHEMBL ID]
+- 예시: ChEMBL Database. (2024). Aspirin (CHEMBL25). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL25
+- 실제 링크 예시: https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL1 (Lepirudin), https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL59 (Cetuximab)
+- **필수 ID 포함**: ChEMBL ID, 분자량, IC50 값, 바이오활성 데이터
+- **중요**: 화합물명은 반드시 영문 그대로 사용 (예: Imatinib, Gefitinib, Erlotinib, Osimertinib)
+
+**BioMCP (PubMed) 인용 (실제 링크로 표시):**
+- 형식: [Author]. ([Year]). [Title]. [Journal], [Volume(Issue)], [Pages]. PMID: [PMID]. Retrieved from https://pubmed.ncbi.nlm.nih.gov/[PMID]/
+- 예시: Smith, J. et al. (2024). Cancer drug discovery. Nature, 610(7931), 123-130. PMID: 12345678. Retrieved from https://pubmed.ncbi.nlm.nih.gov/12345678/
+- 실제 링크 예시: https://pubmed.ncbi.nlm.nih.gov/38395897/ (Drug Discovery), https://pubmed.ncbi.nlm.nih.gov/38123456/ (Cancer Research)
+- **필수 ID 포함**: PMID, DOI, 저널 Impact Factor, 인용 횟수
+
+**Web Search 인용 (실제 링크로 표시):**
+- 형식: [Website Name]. (2024). [Page Title]. Retrieved from [Full URL]
+- 예시: Reuters. (2024). Drug development breakthrough reported. Retrieved from https://www.reuters.com/healthcare/pharma/...
+- 실제 링크 예시: https://www.nature.com/articles/... (Nature), https://www.science.org/... (Science)
+- **필수 정보 포함**: 웹사이트명, 발행일, 페이지 제목, 완전한 URL
+
+**ClinicalTrials.gov 인용 (실제 링크로 표시):**
+- 형식: ClinicalTrials.gov. (2024). [임상시험 제목]. Identifier: [NCT 번호]. Retrieved from https://clinicaltrials.gov/study/[NCT 번호]
+- 예시: ClinicalTrials.gov. (2024). Phase III Trial of Drug X. Identifier: NCT12345678. Retrieved from https://clinicaltrials.gov/study/NCT12345678
+- 실제 링크 예시: https://clinicaltrials.gov/study/NCT00000102 (HIV Drug Study), https://clinicaltrials.gov/study/NCT00000161 (Cancer Trial)
+- **필수 ID 포함**: NCT 번호, Phase, 연구 상태, 주요 결과, 등록 환자 수
+
+### 📊 학술 작성 강화 기준:
+
+**톤과 스타일:**
+- 객관적이고 학술적인 톤, 증거 기반 논증
+- 비판적 분석 접근, 중립적이고 균형잡힌 관점
+- Sequential Thinking 과정 명시적 표현
+
+**인용 요구사항 (강화):**
+- **APA 스타일 완전 준수** - 모든 Database 소스에 대해
+- **본문 인용**: (Database, Year) 또는 Database (Year)
+- **사이트별 ID 의무 포함**: DB번호, ENSG번호, ChEMBL ID, PMID, NCT번호 등
+- **참고문헌 목록**: 알파벳 순 정렬, 완전한 서지 정보
+- **모든 소스의 적절한 귀속** 및 접근 URL 포함
+
+**연구 품질 기준:**
+- 체계적이고 철저한 분석, 다각적 관점 고려
+- Sequential Thinking 방법론적 엄격성 
+- 명확한 논리적 진행, 증거 기반 결론
+- **최대한 많은 내용 포함**: 각 Database 소스에서 가능한 모든 관련 데이터 활용
+
+**필수 포함 요소:**
+- 각 약물의 DrugBank ID (DB00XXX) - 약물명은 영문 그대로
+- 각 타겟의 OpenTargets Gene ID (ENSGXXXXXXXX) - 타겟명은 영문 그대로
+- 각 화합물의 ChEMBL ID (CHEMBLXXX) - 화합물명은 영문 그대로
+- 임상시험의 NCT 번호
+- 논문의 PMID 번호
+- 웹 검색 결과의 완전한 URL
+- Sequential Thinking 과정의 명시적 서술
+
+**🔤 전문 용어 사용 규칙 (필수 준수):**
+
+**영문 그대로 사용해야 하는 용어들:**
+- **약물명**: Aspirin (❌ 아스피린), Pembrolizumab (❌ 펨브롤리주맙), Bevacizumab (❌ 베바시주맙), Cetuximab (❌ 세툭시맙), Trastuzumab (❌ 트라스투주맙)
+- **타겟/유전자명**: EGFR (❌ 표피성장인자수용체), BRCA1 (❌ 브르카1), TP53 (❌ p53), KRAS (❌ 케이라스), PIK3CA (❌ 파이케이쓰리시에이), BRAF (❌ 브라프), ALK (❌ 에이엘케이)
+- **단백질명**: PD-1 (❌ 피디원), PD-L1 (❌ 피디엘원), VEGF (❌ 베지에프), HER2 (❌ 허투), CTLA-4 (❌ 시티엘에이포)
+- **화합물명**: Imatinib (❌ 이마티닙), Gefitinib (❌ 게피티닙), Erlotinib (❌ 엘로티닙), Osimertinib (❌ 오시머티닙), Afatinib (❌ 아파티닙)
+- **효소명**: COX-1, COX-2 (❌ 콕스원, 콕스투), PARP (❌ 파프), CDK4/6 (❌ 시디케이포/식스)
+
+**한국어 사용 가능한 용어들:**
+- **일반적인 질환명**: 유방암, 폐암, 당뇨병, 고혈압, 심장병, 간염, 신장병
+- **일반적인 기전**: 혈관신생억제, 면역관문억제, 세포사멸유도, 신호전달차단
+- **임상시험 단계**: 1상, 2상, 3상 임상시험
+- **투여경로**: 정맥주사, 경구투여, 피하주사
+- **부작용**: 오심, 구토, 설사, 피로감, 발진
+
+**혼합 사용 예시 (권장):**
+- "EGFR 표적 항암제" (타겟명 영문 + 설명 한국어)
+- "Pembrolizumab의 면역관문억제 효과" (약물명 영문 + 기전 한국어)
+- "BRCA1 유전자 변이와 유방암의 연관성" (유전자명 영문 + 질환명 한국어)
+- "Imatinib을 이용한 만성골수성백혈병 치료" (약물명 영문 + 질환명 한국어)
+"""
+                    enhanced_system_prompt += page_format_prompt
             
             if deep_search_context:
                 #                
@@ -1338,6 +1578,9 @@ class DrugDevelopmentChatbot:
         Yields:
             str:      
         """
+        # 언어 감지
+        detected_language = self.detect_language(question)
+        
         # MCP Deep Search    (Deep Research      )
         deep_search_context = None
         if self.mcp_enabled and hasattr(self, 'current_mode') and self.current_mode == "deep_research":
@@ -1347,28 +1590,50 @@ class DrugDevelopmentChatbot:
             # Deep Search                      
             enhanced_system_prompt = self.system_prompt
             
+            # 언어별 기본 응답 지침 추가
+            language_instruction = ""
+            if detected_language == 'english':
+                language_instruction = """
+**IMPORTANT: The user's question is in English. Please respond in English throughout your entire response.**
+- Use English for all explanations, descriptions, and analysis
+- Technical terms (drug names, target names, gene names) should remain in their original English form
+- Keep disease names, mechanisms, and general medical terms in English
+- Maintain professional English academic writing style
+"""
+            else:  # korean
+                language_instruction = """
+**중요: 사용자의 질문이 한국어입니다. 전체 응답을 한국어로 작성해주세요.**
+- 모든 설명, 기술, 분석을 한국어로 작성
+- 전문 용어(약물명, 타겟명, 유전자명)는 영문 그대로 유지
+- 질환명, 기전, 일반 의학 용어는 한국어 사용 가능
+- 전문적인 한국어 학술 문체 유지
+"""
+            
+            enhanced_system_prompt += language_instruction
+            
             # 딥리서치 모드에서 page_format.md와 추가 포맷 가이드 적용
             if self.mcp_enabled and hasattr(self, 'current_mode') and self.current_mode == "deep_research":
-                # page_format.md 내용 추가
-                page_format_prompt = """
+                # 언어별 딥리서치 프롬프트 적용
+                if detected_language == 'english':
+                    page_format_prompt = """
 
-## 📝 ACADEMIC RESEARCH FORMAT (딥리서치 모드 전용)
+## 📝 ACADEMIC RESEARCH FORMAT (Deep Research Mode)
 
-**당신은 학술 연구자입니다.** 다음 논문 구조와 Sequential Thinking 방법론을 반드시 따라주세요:
+**You are an academic researcher.** Please follow this paper structure and Sequential Thinking methodology:
 
-### 🧠 SEQUENTIAL THINKING 방법론 (필수 적용):
+### 🧠 SEQUENTIAL THINKING Methodology (Required):
 
-**THINK STEP 1 - 데이터 수집:**
-"[OpenTargets/DrugBank/ChEMBL/BioMCP/WebSearch]에서 [특정 쿼리]에 대한 체계적 데이터 수집을 시행합니다..."
+**THINK STEP 1 - Data Collection:**
+"I will systematically collect data from [OpenTargets/DrugBank/ChEMBL/BioMCP/WebSearch] for [specific query]..."
 
-**THINK STEP 2 - 데이터 통합:**
-"여러 소스의 결과를 통합하면, OpenTargets는 ...를 보여주고, DrugBank는 ...를 나타내며, ChEMBL은 ...를 밝혀주고, 웹 검색을 통해 최신 동향은 ...를 제시합니다..."
+**THINK STEP 2 - Data Integration:**
+"Integrating results from multiple sources, OpenTargets shows... while DrugBank indicates... and ChEMBL reveals... and web search through recent 3-5 year review papers presents latest trends..."
 
-**THINK STEP 3 - 분석:**
-"통합된 데이터셋을 바탕으로 주요 패턴을 식별합니다: [패턴 분석]. 경쟁 환경 분석 결과..."
+**THINK STEP 3 - Analysis:**
+"Based on the integrated dataset, I can identify key patterns: [pattern analysis]. The competitive landscape analysis shows..."
 
-**THINK STEP 4 - 전략적 인사이트:**
-"이 증거 기반을 토대로 전략적 시사점은... 권고사항은..."
+**THINK STEP 4 - Strategic Insights:**
+"Given this evidence base, the strategic implications are... The recommendations include..."
 
 ### 학술 논문 구조 템플릿:
 ```markdown
@@ -1527,6 +1792,184 @@ class DrugDevelopmentChatbot:
 - "Imatinib을 이용한 만성골수성백혈병 치료" (약물명 영문 + 질환명 한국어)
 - 연구 수행 시간 (YYYY-MM-DD HH:MM 포맷)
 - 응답 마지막에 3가지 추천 후속 질문 포함
+"""
+                
+                else:  # korean
+                    page_format_prompt = """
+
+## 📝 ACADEMIC RESEARCH FORMAT (딥리서치 모드 전용)
+
+**당신은 학술 연구자입니다.** 다음 논문 구조와 Sequential Thinking 방법론을 반드시 따라주세요:
+
+### 🧠 SEQUENTIAL THINKING 방법론 (필수 적용):
+
+**THINK STEP 1 - 데이터 수집:**
+"[OpenTargets/DrugBank/ChEMBL/BioMCP/WebSearch]에서 [특정 쿼리]에 대한 체계적 데이터 수집을 시행합니다..."
+
+**THINK STEP 2 - 데이터 통합:**
+"여러 소스의 결과를 통합하면, OpenTargets는 ...를 보여주고, DrugBank는 ...를 나타내며, ChEMBL은 ...를 밝혀주고, 웹 검색을 통해 최신 동향은 ...를 제시합니다..."
+
+**THINK STEP 3 - 분석:**
+"통합된 데이터셋을 바탕으로 주요 패턴을 식별합니다: [패턴 분석]. 경쟁 환경 분석 결과..."
+
+**THINK STEP 4 - 전략적 인사이트:**
+"이 증거 기반을 토대로 전략적 시사점은... 권고사항은..."
+
+### 학술 논문 구조 템플릿:
+```markdown
+# [연구 주제]: 딥리서치 분석 보고서
+
+## 초록 (Abstract)
+- 연구 목적, 방법론, 주요 발견, 결론 (150-200단어)
+- 객관적이고 학술적인 톤
+- 기여도 명확히 제시
+
+## 1. 서론 (Introduction) 
+- 배경 정보 및 맥락
+- 연구 문제 정의
+- 연구 목적과 가설
+- 연구의 중요성
+
+## 2. 문헌 검토 (Literature Review)
+- 기존 연구의 현재 상태
+- 주요 이론과 발견사항
+- 연구 공백 식별
+- 이론적 프레임워크
+
+## 3. 연구 방법론 (Methodology)
+- 연구 설계 및 접근법
+- 데이터 수집 방법 (Database 소스 활용)
+- Sequential Thinking 분석 절차
+- 제한사항 및 제약조건
+
+## 4. 결과 (Results)
+### 4.1 OpenTargets 분석 결과
+### 4.2 DrugBank 정보 분석
+### 4.3 ChEMBL 바이오활성 데이터
+### 4.4 BioMCP 통합 분석
+### 4.5 Sequential Thinking 통합 분석
+- 주요 발견사항 제시
+- 데이터 해석
+- 통계 분석 (해당시)
+- 증거 기반 결론
+
+## 5. 토론 (Discussion)
+- 결과의 의미 및 시사점
+- 기존 문헌과의 비교
+- 제한사항 및 제약조건
+- 향후 연구 방향
+
+## 6. 결론 (Conclusion)
+- 분야에 대한 핵심 기여도
+- 실무적 시사점
+- 주요 인사이트 요약
+- 권장사항
+
+## 참고문헌 (References)
+[APA 인용 스타일 준수 - 아래 세부 규칙 적용]
+
+## 💡 추천 후속 연구 질문
+
+**다음 3가지 질문을 통해 연구를 확장해보세요:**
+
+1. **심화 분석 질문**: "[주요 발견]에 대한 더 상세한 분자 메커니즘이나 작용 기전은 무엇인가요?"
+
+2. **비교 연구 질문**: "[연구 주제]와 관련된 다른 치료법이나 접근 방식과 어떤 차이점이 있나요?"
+
+3. **임상 적용 질문**: "이 연구 결과를 실제 임상 환경에서 어떻게 활용할 수 있을까요?"
+```
+
+### 🔗 Database 소스별 APA 인용 규칙 (실제 링크 포함 필수):
+
+**OpenTargets 인용 (실제 링크로 표시):**
+- 형식: OpenTargets Platform. (2024). [Target Name in English]. Retrieved from https://platform.opentargets.org/[타겟 정보]
+- 예시: OpenTargets Platform. (2024). BRCA1. Retrieved from https://platform.opentargets.org/target/ENSG00000012048
+- 실제 링크 예시: https://platform.opentargets.org/target/ENSG00000141510 (TP53), https://platform.opentargets.org/target/ENSG00000146648 (EGFR)
+- **필수 ID 포함**: ENSG 번호, 질병 연관성 점수, 약물가능성 점수
+- **중요**: 타겟명은 반드시 영문 그대로 사용 (예: BRCA1, TP53, EGFR, KRAS, PIK3CA)
+
+**DrugBank 인용 (실제 링크로 표시):**
+- 형식: DrugBank. (2024). [Drug Name in English] ([DB 번호]). Retrieved from https://www.drugbank.ca/drugs/[DB 번호]
+- 예시: DrugBank. (2024). Aspirin (DB00945). Retrieved from https://www.drugbank.ca/drugs/DB00945
+- 실제 링크 예시: https://www.drugbank.ca/drugs/DB00001 (Lepirudin), https://www.drugbank.ca/drugs/DB00002 (Cetuximab)
+- **필수 ID 포함**: DB 번호, ATC 코드, 작용 기전, 승인 상태
+- **중요**: 약물명은 반드시 영문 그대로 사용 (예: Aspirin, Cetuximab, Bevacizumab, Pembrolizumab)
+
+**ChEMBL 인용 (실제 링크로 표시):**
+- 형식: ChEMBL Database. (2024). [Compound Name in English] ([CHEMBL ID]). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/[CHEMBL ID]
+- 예시: ChEMBL Database. (2024). Aspirin (CHEMBL25). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL25
+- 실제 링크 예시: https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL1 (Lepirudin), https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL59 (Cetuximab)
+- **필수 ID 포함**: ChEMBL ID, 분자량, IC50 값, 바이오활성 데이터
+- **중요**: 화합물명은 반드시 영문 그대로 사용 (예: Imatinib, Gefitinib, Erlotinib, Osimertinib)
+
+**BioMCP (PubMed) 인용 (실제 링크로 표시):**
+- 형식: [Author]. ([Year]). [Title]. [Journal], [Volume(Issue)], [Pages]. PMID: [PMID]. Retrieved from https://pubmed.ncbi.nlm.nih.gov/[PMID]/
+- 예시: Smith, J. et al. (2024). Cancer drug discovery. Nature, 610(7931), 123-130. PMID: 12345678. Retrieved from https://pubmed.ncbi.nlm.nih.gov/12345678/
+- 실제 링크 예시: https://pubmed.ncbi.nlm.nih.gov/38395897/ (Drug Discovery), https://pubmed.ncbi.nlm.nih.gov/38123456/ (Cancer Research)
+- **필수 ID 포함**: PMID, DOI, 저널 Impact Factor, 인용 횟수
+
+**Web Search 인용 (실제 링크로 표시):**
+- 형식: [Website Name]. (2024). [Page Title]. Retrieved from [Full URL]
+- 예시: Reuters. (2024). Drug development breakthrough reported. Retrieved from https://www.reuters.com/healthcare/pharma/...
+- 실제 링크 예시: https://www.nature.com/articles/... (Nature), https://www.science.org/... (Science)
+- **필수 정보 포함**: 웹사이트명, 발행일, 페이지 제목, 완전한 URL
+
+**ClinicalTrials.gov 인용 (실제 링크로 표시):**
+- 형식: ClinicalTrials.gov. (2024). [임상시험 제목]. Identifier: [NCT 번호]. Retrieved from https://clinicaltrials.gov/study/[NCT 번호]
+- 예시: ClinicalTrials.gov. (2024). Phase III Trial of Drug X. Identifier: NCT12345678. Retrieved from https://clinicaltrials.gov/study/NCT12345678
+- 실제 링크 예시: https://clinicaltrials.gov/study/NCT00000102 (HIV Drug Study), https://clinicaltrials.gov/study/NCT00000161 (Cancer Trial)
+- **필수 ID 포함**: NCT 번호, Phase, 연구 상태, 주요 결과, 등록 환자 수
+
+### 📊 학술 작성 강화 기준:
+
+**톤과 스타일:**
+- 객관적이고 학술적인 톤, 증거 기반 논증
+- 비판적 분석 접근, 중립적이고 균형잡힌 관점
+- Sequential Thinking 과정 명시적 표현
+
+**인용 요구사항 (강화):**
+- **APA 스타일 완전 준수** - 모든 Database 소스에 대해
+- **본문 인용**: (Database, Year) 또는 Database (Year)
+- **사이트별 ID 의무 포함**: DB번호, ENSG번호, ChEMBL ID, PMID, NCT번호 등
+- **참고문헌 목록**: 알파벳 순 정렬, 완전한 서지 정보
+- **모든 소스의 적절한 귀속** 및 접근 URL 포함
+
+**연구 품질 기준:**
+- 체계적이고 철저한 분석, 다각적 관점 고려
+- Sequential Thinking 방법론적 엄격성 
+- 명확한 논리적 진행, 증거 기반 결론
+- **최대한 많은 내용 포함**: 각 Database 소스에서 가능한 모든 관련 데이터 활용
+
+**필수 포함 요소:**
+- 각 약물의 DrugBank ID (DB00XXX) - 약물명은 영문 그대로
+- 각 타겟의 OpenTargets Gene ID (ENSGXXXXXXXX) - 타겟명은 영문 그대로
+- 각 화합물의 ChEMBL ID (CHEMBLXXX) - 화합물명은 영문 그대로
+- 임상시험의 NCT 번호
+- 논문의 PMID 번호
+- 웹 검색 결과의 완전한 URL
+- Sequential Thinking 과정의 명시적 서술
+
+**🔤 전문 용어 사용 규칙 (필수 준수):**
+
+**영문 그대로 사용해야 하는 용어들:**
+- **약물명**: Aspirin (❌ 아스피린), Pembrolizumab (❌ 펨브롤리주맙), Bevacizumab (❌ 베바시주맙), Cetuximab (❌ 세툭시맙), Trastuzumab (❌ 트라스투주맙)
+- **타겟/유전자명**: EGFR (❌ 표피성장인자수용체), BRCA1 (❌ 브르카1), TP53 (❌ p53), KRAS (❌ 케이라스), PIK3CA (❌ 파이케이쓰리시에이), BRAF (❌ 브라프), ALK (❌ 에이엘케이)
+- **단백질명**: PD-1 (❌ 피디원), PD-L1 (❌ 피디엘원), VEGF (❌ 베지에프), HER2 (❌ 허투), CTLA-4 (❌ 시티엘에이포)
+- **화합물명**: Imatinib (❌ 이마티닙), Gefitinib (❌ 게피티닙), Erlotinib (❌ 엘로티닙), Osimertinib (❌ 오시머티닙), Afatinib (❌ 아파티닙)
+- **효소명**: COX-1, COX-2 (❌ 콕스원, 콕스투), PARP (❌ 파프), CDK4/6 (❌ 시디케이포/식스)
+
+**한국어 사용 가능한 용어들:**
+- **일반적인 질환명**: 유방암, 폐암, 당뇨병, 고혈압, 심장병, 간염, 신장병
+- **일반적인 기전**: 혈관신생억제, 면역관문억제, 세포사멸유도, 신호전달차단
+- **임상시험 단계**: 1상, 2상, 3상 임상시험
+- **투여경로**: 정맥주사, 경구투여, 피하주사
+- **부작용**: 오심, 구토, 설사, 피로감, 발진
+
+**혼합 사용 예시 (권장):**
+- "EGFR 표적 항암제" (타겟명 영문 + 설명 한국어)
+- "Pembrolizumab의 면역관문억제 효과" (약물명 영문 + 기전 한국어)
+- "BRCA1 유전자 변이와 유방암의 연관성" (유전자명 영문 + 질환명 한국어)
+- "Imatinib을 이용한 만성골수성백혈병 치료" (약물명 영문 + 질환명 한국어)
 """
                 
                 # 추천 질문 관련 프롬프트 추가
