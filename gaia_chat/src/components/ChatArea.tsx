@@ -336,10 +336,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({ onToggleSidebar, isSidebarOpen }) =
                 <div 
                   className="streaming-text korean-text text-gray-900"
                   style={{ 
-                    whiteSpace: 'pre-line', 
-                    lineHeight: '1.6',
+                    whiteSpace: 'pre-wrap', 
+                    lineHeight: '1.8',
                     color: '#374151',
-                    fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif'
+                    fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word'
                   }}
                 >
                   {streamingResponse}

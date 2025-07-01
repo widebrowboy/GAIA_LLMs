@@ -597,6 +597,7 @@ class OllamaClient:
                                 if "response" in chunk and chunk["response"]:
                                     chunk_count += 1
                                     print(f"📝 마지막 청크 {chunk_count} 수신")
+                                    # 줄바꿈을 명시적으로 보존
                                     yield chunk["response"]
                                 print(f"✅ 스트리밍 완료 (총 {chunk_count}개 청크)")
                                 break  # return 대신 break 사용하여 정상 완료

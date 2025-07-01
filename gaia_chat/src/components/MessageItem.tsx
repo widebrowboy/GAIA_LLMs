@@ -76,7 +76,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
             className="raw-text korean-text prose prose-slate max-w-none"
             style={{ 
               whiteSpace: 'pre-wrap', 
-              lineHeight: '1.6',
+              lineHeight: '1.8',
               color: '#374151',
               fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif',
               wordBreak: 'break-word',
