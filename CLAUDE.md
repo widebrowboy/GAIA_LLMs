@@ -1,4 +1,4 @@
-# GAIA-BT v3.55 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.56 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
@@ -360,6 +360,7 @@ git reset --hard [커밋해시]
 - **v3.53**: 딥리서치 모드 데이터 소스 추적 시스템 완성 - 실제 활용한 데이터베이스 링크와 검색어 정보 제공
 - **v3.54**: 딥리서치 모드 학술 논문 포맷 통합 완성 - page_format.md와 prompt_default.txt 프롬프트를 일반/스트리밍 응답 모두에 적용
 - **v3.55**: 딥리서치 모드 고급 APA 인용 및 Sequential Thinking 완성 - MCP별 상세 ID 인용, 4단계 사고 과정, 최대 내용 포함 강화
+- **v3.56**: MCP 용어 Database 통일 및 딥리서치 추천 질문 시스템 구현 - 모든 응답에서 Database 용어 사용, 3가지 후속 연구 질문 자동 생성
 
 ### 완료된 Todo 기록 (v3.31)
 

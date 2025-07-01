@@ -347,8 +347,8 @@ class DrugDevelopmentChatbot:
 
         print("             .")
 
-    async def deep_search_with_mcp(self, user_input):
-        """MCP         Deep Search    - DrugBank, OpenTargets, ChEMBL, BioMCP      """
+    async def deep_search_with_database(self, user_input):
+        """Database         Deep Search    - DrugBank, OpenTargets, ChEMBL, BioMCP      """
         #          MCP Deep Search         
         if hasattr(self, 'current_mode') and self.current_mode == "normal":
             if self.settings.get("debug_mode", False):
@@ -357,12 +357,12 @@ class DrugDevelopmentChatbot:
         
         if not self.mcp_enabled:
             if self.settings.get("debug_mode", False):
-                self.interface.print_thinking("[Error] MCP             ")
+                self.interface.print_thinking("[Error] Database             ")
             return None
         
         try:
             if self.config.show_mcp_output:
-                self.interface.print_thinking("[Research]    MCP Deep Search     ...")
+                self.interface.print_thinking("[Research]    Database Deep Search     ...")
             search_results = []
             # 데이터 출처 추적을 위한 리스트
             data_sources = []
@@ -857,7 +857,7 @@ class DrugDevelopmentChatbot:
                 result_stats = f"""
 [Research] **GAIA-BT v2.0 Alpha    Deep Search      **
 
-[Data] **          MCP       :**
+[Data] **          Database       :**
 {' + '.join(set(successful_dbs)) if successful_dbs else '        '}
 
   **             :**
@@ -879,23 +879,23 @@ class DrugDevelopmentChatbot:
                 
                 return combined_results
             else:
-                self.interface.print_thinking("[Warning]    MCP                      ")
+                self.interface.print_thinking("[Warning]    Database                      ")
                 
-                # MCP                          
+                # Database                          
                 fallback_message = f"""
-[Search] **MCP Deep Search      **
+[Search] **Database Deep Search      **
 
   **      :** "{user_input}"
 
 [Warning] **      :**
-- MCP             ('/mcp start'       )
+- Database             ('/database start'       )
 -                            
 -                  
-- MCP         ("Method not implemented: tools/call")
+- Database         ("Method not implemented: tools/call")
 
    **     :**
-1. '/mcp status'      MCP         
-2. '/mcp stop'   '/mcp start'        
+1. '/database status'      Database         
+2. '/database stop'   '/database start'        
 3.                      
 4. '/debug'                      
 
@@ -928,7 +928,7 @@ class DrugDevelopmentChatbot:
         # MCP Deep Search    (Deep Research      )
         deep_search_context = None
         if self.mcp_enabled and hasattr(self, 'current_mode') and self.current_mode == "deep_research":
-            deep_search_context = await self.deep_search_with_mcp(question)
+            deep_search_context = await self.deep_search_with_database(question)
             
             # MCP     Deep Search           (        )
         
@@ -990,7 +990,7 @@ class DrugDevelopmentChatbot:
 
 ## 3. 연구 방법론 (Methodology)
 - 연구 설계 및 접근법
-- 데이터 수집 방법 (MCP 소스 활용)
+- 데이터 수집 방법 (Database 소스 활용)
 - Sequential Thinking 분석 절차
 - 제한사항 및 제약조건
 
@@ -1019,34 +1019,49 @@ class DrugDevelopmentChatbot:
 
 ## 참고문헌 (References)
 [APA 인용 스타일 준수 - 아래 세부 규칙 적용]
+
+## 💡 추천 후속 연구 질문
+
+**다음 3가지 질문을 통해 연구를 확장해보세요:**
+
+1. **심화 분석 질문**: "[주요 발견]에 대한 더 상세한 분자 메커니즘이나 작용 기전은 무엇인가요?"
+
+2. **비교 연구 질문**: "[연구 주제]와 관련된 다른 치료법이나 접근 방식과 어떤 차이점이 있나요?"
+
+3. **임상 적용 질문**: "이 연구 결과를 실제 임상 환경에서 어떻게 활용할 수 있을까요?"
 ```
 
-### 🔗 MCP 소스별 APA 인용 규칙 (필수):
+### 🔗 Database 소스별 APA 인용 규칙 (실제 링크 포함 필수):
 
-**OpenTargets 인용:**
-- 형식: OpenTargets Platform. (2024). [Target/Disease Name]. Retrieved from https://platform.opentargets.org/target/[GENE_ID] 또는 https://platform.opentargets.org/disease/[DISEASE_ID]
-- 예시: OpenTargets Platform. (2024). BRCA1 target information. Retrieved from https://platform.opentargets.org/target/ENSG00000012048
-- **필수 ID 포함**: ENSG 번호, EFO 질병 코드, 연관성 점수
+**OpenTargets 인용 (실제 링크로 표시):**
+- 형식: OpenTargets Platform. (2024). [타겟명]. Retrieved from https://platform.opentargets.org/[타겟 정보]
+- 예시: OpenTargets Platform. (2024). BRCA1. Retrieved from https://platform.opentargets.org/target/ENSG00000012048
+- 실제 링크 예시: https://platform.opentargets.org/target/ENSG00000141510 (TP53), https://platform.opentargets.org/target/ENSG00000146648 (EGFR)
+- **필수 ID 포함**: ENSG 번호, 질병 연관성 점수, 약물가능성 점수
 
-**DrugBank 인용:**
-- 형식: DrugBank. (2024). [Drug Name] ([Drug ID]). Retrieved from https://www.drugbank.ca/drugs/[DB_ID]
+**DrugBank 인용 (실제 링크로 표시):**
+- 형식: DrugBank. (2024). [약물명] ([DB 번호]). Retrieved from https://www.drugbank.ca/drugs/[DB 번호]
 - 예시: DrugBank. (2024). Aspirin (DB00945). Retrieved from https://www.drugbank.ca/drugs/DB00945
-- **필수 ID 포함**: DB 번호, ATC 코드, CAS 번호
+- 실제 링크 예시: https://www.drugbank.ca/drugs/DB00001 (Lepirudin), https://www.drugbank.ca/drugs/DB00002 (Cetuximab)
+- **필수 ID 포함**: DB 번호, ATC 코드, 작용 기전, 승인 상태
 
-**ChEMBL 인용:**
-- 형식: ChEMBL Database. (2024). [Compound Name] ([ChEMBL ID]). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/[CHEMBL_ID]
-- 예시: ChEMBL Database. (2024). Compound data (CHEMBL25). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL25
-- **필수 ID 포함**: ChEMBL ID, Target ID, Assay ID
+**ChEMBL 인용 (실제 링크로 표시):**
+- 형식: ChEMBL Database. (2024). [화합물명] ([CHEMBL ID]). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/[CHEMBL ID]
+- 예시: ChEMBL Database. (2024). Aspirin (CHEMBL25). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL25
+- 실제 링크 예시: https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL1 (Lepirudin), https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL59 (Cetuximab)
+- **필수 ID 포함**: ChEMBL ID, 분자량, IC50 값, 바이오활성 데이터
 
-**BioMCP (PubMed) 인용:**
+**BioMCP (PubMed) 인용 (실제 링크로 표시):**
 - 형식: [Author]. ([Year]). [Title]. [Journal], [Volume(Issue)], [Pages]. PMID: [PMID]. Retrieved from https://pubmed.ncbi.nlm.nih.gov/[PMID]/
 - 예시: Smith, J. et al. (2024). Cancer drug discovery. Nature, 610(7931), 123-130. PMID: 12345678. Retrieved from https://pubmed.ncbi.nlm.nih.gov/12345678/
-- **필수 ID 포함**: PMID, DOI
+- 실제 링크 예시: https://pubmed.ncbi.nlm.nih.gov/38395897/ (Drug Discovery), https://pubmed.ncbi.nlm.nih.gov/38123456/ (Cancer Research)
+- **필수 ID 포함**: PMID, DOI, 저널 Impact Factor, 인용 횟수
 
-**ClinicalTrials.gov 인용:**
-- 형식: ClinicalTrials.gov. (2024). [Study Title]. Identifier: [NCT Number]. Retrieved from https://clinicaltrials.gov/study/[NCT_NUMBER]
+**ClinicalTrials.gov 인용 (실제 링크로 표시):**
+- 형식: ClinicalTrials.gov. (2024). [임상시험 제목]. Identifier: [NCT 번호]. Retrieved from https://clinicaltrials.gov/study/[NCT 번호]
 - 예시: ClinicalTrials.gov. (2024). Phase III Trial of Drug X. Identifier: NCT12345678. Retrieved from https://clinicaltrials.gov/study/NCT12345678
-- **필수 ID 포함**: NCT 번호, Phase, Status
+- 실제 링크 예시: https://clinicaltrials.gov/study/NCT00000102 (HIV Drug Study), https://clinicaltrials.gov/study/NCT00000161 (Cancer Trial)
+- **필수 ID 포함**: NCT 번호, Phase, 연구 상태, 주요 결과, 등록 환자 수
 
 ### 📊 학술 작성 강화 기준:
 
@@ -1056,7 +1071,7 @@ class DrugDevelopmentChatbot:
 - Sequential Thinking 과정 명시적 표현
 
 **인용 요구사항 (강화):**
-- **APA 스타일 완전 준수** - 모든 MCP 소스에 대해
+- **APA 스타일 완전 준수** - 모든 Database 소스에 대해
 - **본문 인용**: (Database, Year) 또는 Database (Year)
 - **사이트별 ID 의무 포함**: DB번호, ENSG번호, ChEMBL ID, PMID, NCT번호 등
 - **참고문헌 목록**: 알파벳 순 정렬, 완전한 서지 정보
@@ -1066,7 +1081,7 @@ class DrugDevelopmentChatbot:
 - 체계적이고 철저한 분석, 다각적 관점 고려
 - Sequential Thinking 방법론적 엄격성 
 - 명확한 논리적 진행, 증거 기반 결론
-- **최대한 많은 내용 포함**: 각 MCP 소스에서 가능한 모든 관련 데이터 활용
+- **최대한 많은 내용 포함**: 각 Database 소스에서 가능한 모든 관련 데이터 활용
 
 **필수 포함 요소:**
 - 각 약물의 DrugBank ID (DB00XXX)
@@ -1186,7 +1201,7 @@ class DrugDevelopmentChatbot:
         # MCP Deep Search    (Deep Research      )
         deep_search_context = None
         if self.mcp_enabled and hasattr(self, 'current_mode') and self.current_mode == "deep_research":
-            deep_search_context = await self.deep_search_with_mcp(question)
+            deep_search_context = await self.deep_search_with_database(question)
         
         try:
             # Deep Search                      
@@ -1238,7 +1253,7 @@ class DrugDevelopmentChatbot:
 
 ## 3. 연구 방법론 (Methodology)
 - 연구 설계 및 접근법
-- 데이터 수집 방법 (MCP 소스 활용)
+- 데이터 수집 방법 (Database 소스 활용)
 - Sequential Thinking 분석 절차
 - 제한사항 및 제약조건
 
@@ -1267,34 +1282,49 @@ class DrugDevelopmentChatbot:
 
 ## 참고문헌 (References)
 [APA 인용 스타일 준수 - 아래 세부 규칙 적용]
+
+## 💡 추천 후속 연구 질문
+
+**다음 3가지 질문을 통해 연구를 확장해보세요:**
+
+1. **심화 분석 질문**: "[주요 발견]에 대한 더 상세한 분자 메커니즘이나 작용 기전은 무엇인가요?"
+
+2. **비교 연구 질문**: "[연구 주제]와 관련된 다른 치료법이나 접근 방식과 어떤 차이점이 있나요?"
+
+3. **임상 적용 질문**: "이 연구 결과를 실제 임상 환경에서 어떻게 활용할 수 있을까요?"
 ```
 
-### 🔗 MCP 소스별 APA 인용 규칙 (필수):
+### 🔗 Database 소스별 APA 인용 규칙 (실제 링크 포함 필수):
 
-**OpenTargets 인용:**
-- 형식: OpenTargets Platform. (2024). [Target/Disease Name]. Retrieved from https://platform.opentargets.org/target/[GENE_ID] 또는 https://platform.opentargets.org/disease/[DISEASE_ID]
-- 예시: OpenTargets Platform. (2024). BRCA1 target information. Retrieved from https://platform.opentargets.org/target/ENSG00000012048
-- **필수 ID 포함**: ENSG 번호, EFO 질병 코드, 연관성 점수
+**OpenTargets 인용 (실제 링크로 표시):**
+- 형식: OpenTargets Platform. (2024). [타겟명]. Retrieved from https://platform.opentargets.org/[타겟 정보]
+- 예시: OpenTargets Platform. (2024). BRCA1. Retrieved from https://platform.opentargets.org/target/ENSG00000012048
+- 실제 링크 예시: https://platform.opentargets.org/target/ENSG00000141510 (TP53), https://platform.opentargets.org/target/ENSG00000146648 (EGFR)
+- **필수 ID 포함**: ENSG 번호, 질병 연관성 점수, 약물가능성 점수
 
-**DrugBank 인용:**
-- 형식: DrugBank. (2024). [Drug Name] ([Drug ID]). Retrieved from https://www.drugbank.ca/drugs/[DB_ID]
+**DrugBank 인용 (실제 링크로 표시):**
+- 형식: DrugBank. (2024). [약물명] ([DB 번호]). Retrieved from https://www.drugbank.ca/drugs/[DB 번호]
 - 예시: DrugBank. (2024). Aspirin (DB00945). Retrieved from https://www.drugbank.ca/drugs/DB00945
-- **필수 ID 포함**: DB 번호, ATC 코드, CAS 번호
+- 실제 링크 예시: https://www.drugbank.ca/drugs/DB00001 (Lepirudin), https://www.drugbank.ca/drugs/DB00002 (Cetuximab)
+- **필수 ID 포함**: DB 번호, ATC 코드, 작용 기전, 승인 상태
 
-**ChEMBL 인용:**
-- 형식: ChEMBL Database. (2024). [Compound Name] ([ChEMBL ID]). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/[CHEMBL_ID]
-- 예시: ChEMBL Database. (2024). Compound data (CHEMBL25). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL25
-- **필수 ID 포함**: ChEMBL ID, Target ID, Assay ID
+**ChEMBL 인용 (실제 링크로 표시):**
+- 형식: ChEMBL Database. (2024). [화합물명] ([CHEMBL ID]). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/[CHEMBL ID]
+- 예시: ChEMBL Database. (2024). Aspirin (CHEMBL25). Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL25
+- 실제 링크 예시: https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL1 (Lepirudin), https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL59 (Cetuximab)
+- **필수 ID 포함**: ChEMBL ID, 분자량, IC50 값, 바이오활성 데이터
 
-**BioMCP (PubMed) 인용:**
+**BioMCP (PubMed) 인용 (실제 링크로 표시):**
 - 형식: [Author]. ([Year]). [Title]. [Journal], [Volume(Issue)], [Pages]. PMID: [PMID]. Retrieved from https://pubmed.ncbi.nlm.nih.gov/[PMID]/
 - 예시: Smith, J. et al. (2024). Cancer drug discovery. Nature, 610(7931), 123-130. PMID: 12345678. Retrieved from https://pubmed.ncbi.nlm.nih.gov/12345678/
-- **필수 ID 포함**: PMID, DOI
+- 실제 링크 예시: https://pubmed.ncbi.nlm.nih.gov/38395897/ (Drug Discovery), https://pubmed.ncbi.nlm.nih.gov/38123456/ (Cancer Research)
+- **필수 ID 포함**: PMID, DOI, 저널 Impact Factor, 인용 횟수
 
-**ClinicalTrials.gov 인용:**
-- 형식: ClinicalTrials.gov. (2024). [Study Title]. Identifier: [NCT Number]. Retrieved from https://clinicaltrials.gov/study/[NCT_NUMBER]
+**ClinicalTrials.gov 인용 (실제 링크로 표시):**
+- 형식: ClinicalTrials.gov. (2024). [임상시험 제목]. Identifier: [NCT 번호]. Retrieved from https://clinicaltrials.gov/study/[NCT 번호]
 - 예시: ClinicalTrials.gov. (2024). Phase III Trial of Drug X. Identifier: NCT12345678. Retrieved from https://clinicaltrials.gov/study/NCT12345678
-- **필수 ID 포함**: NCT 번호, Phase, Status
+- 실제 링크 예시: https://clinicaltrials.gov/study/NCT00000102 (HIV Drug Study), https://clinicaltrials.gov/study/NCT00000161 (Cancer Trial)
+- **필수 ID 포함**: NCT 번호, Phase, 연구 상태, 주요 결과, 등록 환자 수
 
 ### 📊 학술 작성 강화 기준:
 
@@ -1304,7 +1334,7 @@ class DrugDevelopmentChatbot:
 - Sequential Thinking 과정 명시적 표현
 
 **인용 요구사항 (강화):**
-- **APA 스타일 완전 준수** - 모든 MCP 소스에 대해
+- **APA 스타일 완전 준수** - 모든 Database 소스에 대해
 - **본문 인용**: (Database, Year) 또는 Database (Year)
 - **사이트별 ID 의무 포함**: DB번호, ENSG번호, ChEMBL ID, PMID, NCT번호 등
 - **참고문헌 목록**: 알파벳 순 정렬, 완전한 서지 정보
@@ -1314,7 +1344,7 @@ class DrugDevelopmentChatbot:
 - 체계적이고 철저한 분석, 다각적 관점 고려
 - Sequential Thinking 방법론적 엄격성 
 - 명확한 논리적 진행, 증거 기반 결론
-- **최대한 많은 내용 포함**: 각 MCP 소스에서 가능한 모든 관련 데이터 활용
+- **최대한 많은 내용 포함**: 각 Database 소스에서 가능한 모든 관련 데이터 활용
 
 **필수 포함 요소:**
 - 각 약물의 DrugBank ID (DB00XXX)
