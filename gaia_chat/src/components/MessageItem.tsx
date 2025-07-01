@@ -3,7 +3,6 @@
 import React, { memo } from 'react';
 import Image from 'next/image';
 import { Message } from '@/types/chat';
-import MarkdownRenderer from './MarkdownRenderer';
 
 interface MessageItemProps {
   message: Message;
@@ -14,7 +13,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
   const isUserMessage = message.role === 'user';
   const isAssistantMessage = message.role === 'assistant';
   const isSystemMessage = message.role === 'system';
-  const isCompleteResponse = isAssistantMessage && message.isComplete;
+  // 모든 응답을 원본 텍스트로 출력
 
   
   const timestamp = new Date(message.timestamp).toLocaleTimeString('ko-KR', {
@@ -49,38 +48,9 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
       <div className={`max-w-3xl w-full ${
         isUserMessage 
           ? 'bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200' 
-          : isCompleteResponse
-            ? 'bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-2 border-blue-300 shadow-lg'
-            : 'bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200'
+          : 'bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200'
       } rounded-2xl px-6 py-5 shadow-sm`}>
 
-        {/* 헤더 - 완전한 응답에 대해서만 표시 */}
-        {isCompleteResponse && (
-          <div className="mb-6 pb-4 border-b border-gray-200">
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-sm font-semibold text-gray-700">📄 연구 보고서</span>
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                  GitHub 마크다운 렌더링
-                </span>
-              </div>
-              <div className="flex-1 h-px bg-gray-300"></div>
-              <span className="text-xs text-gray-500">
-                완료 {timestamp}
-              </span>
-            </div>
-            {message.userQuestion && (
-              <div className="bg-gray-50 border border-gray-200 p-3 rounded-md">
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className="text-sm">🔍</span>
-                  <span className="text-xs font-medium text-gray-700">연구 질문</span>
-                </div>
-                <p className="text-sm text-gray-800 font-medium">"{message.userQuestion}"</p>
-              </div>
-            )}
-          </div>
-        )}
         
         {/* 메시지 내용 */}
         {isUserMessage ? (
@@ -88,7 +58,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
             <span className="text-sm">🔬</span>
             <span className="text-xs font-bold text-emerald-700">연구자</span>
           </div>
-        ) : isAssistantMessage && !isCompleteResponse && (
+        ) : isAssistantMessage && (
           <div className="flex items-center space-x-3 mb-3">
             <span className="text-sm">🧠</span>
             <span className="text-xs font-bold text-blue-700">GAIA-BT 연구지원</span>
@@ -100,39 +70,27 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
           </div>
         )}
 
-        {/* 메시지 텍스트 - 완전 응답이면 마크다운 렌더링, 아니면 기존 텍스트 */}
-        {isCompleteResponse ? (
-          <div className="max-w-full">
-            {/* react-markdown + gray-matter + @tailwindcss/typography 적용 */}
-            <MarkdownRenderer 
-              content={message.content} 
-              className="prose-emerald prose-sm sm:prose-base lg:prose-lg" 
-            />
+        {/* 메시지 텍스트 - 모든 응답을 원본 텍스트로 출력 */}
+        <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full">
+          <div 
+            className="raw-text korean-text prose prose-slate max-w-none"
+            style={{ 
+              whiteSpace: 'pre-wrap', 
+              lineHeight: '1.6',
+              color: '#374151',
+              fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif',
+              wordBreak: 'break-word',
+              overflowWrap: 'break-word'
+            }}
+          >
+            {message.content}
           </div>
-        ) : (
-          <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full">
-            <div 
-              className="raw-text korean-text prose prose-slate max-w-none"
-              style={{ 
-                whiteSpace: 'pre-wrap', 
-                lineHeight: '1.6',
-                color: '#374151',
-                fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif',
-                wordBreak: 'break-word',
-                overflowWrap: 'break-word'
-              }}
-            >
-              {message.content}
-            </div>
-          </div>
-        )}
+        </div>
         
         {/* 타임스탬프 */}
-        {!isCompleteResponse && (
-          <div className="flex justify-end mt-3">
-            <span className="text-xs text-gray-500">{timestamp}</span>
-          </div>
-        )}
+        <div className="flex justify-end mt-3">
+          <span className="text-xs text-gray-500">{timestamp}</span>
+        </div>
       </div>
     </div>
   );
