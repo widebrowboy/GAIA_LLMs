@@ -122,8 +122,7 @@ class DrugDevelopmentChatbot:
         import datetime
         # 1. Extract topic for title
         topic = self._extract_topic(question) or "Research Report"
-        # 2. Timestamp
-        now = metadata.get("timestamp") if metadata and "timestamp" in metadata else datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # 2. Remove timestamp display
         # 3. Model
         model = metadata.get("model") if metadata and "model" in metadata else getattr(self, "model", "Unknown")
         # 4. Feedback
@@ -820,7 +819,114 @@ class DrugDevelopmentChatbot:
                     if "Method not implemented" in str(e):
                         self.interface.print_thinking("[Debug] BioRxiv               MCP           ")
             
-            # 7.           
+            # 7. Web Search               
+            web_search_success = False
+            try:
+                self.interface.print_thinking("[Web] Web Search            ...")
+                
+                # Sequential Thinking                         
+                web_queries = []
+                
+                # THINK STEP 1: 리뷰 논문 중심 질의 생성
+                if is_drug_related:
+                    web_queries.append(f"{user_input} drug development review")
+                    web_queries.append(f"{user_input} therapeutic review recent advances")
+                
+                if is_target_related:
+                    web_queries.append(f"{user_input} target validation review")
+                    web_queries.append(f"{user_input} therapeutic target systematic review")
+                
+                if is_disease_related:
+                    web_queries.append(f"{user_input} treatment review")
+                    web_queries.append(f"{user_input} therapy systematic review")
+                
+                if is_chemical_related:
+                    web_queries.append(f"{user_input} compound review")
+                    web_queries.append(f"{user_input} chemical biology review")
+                
+                # 기본 질의가 없다면 일반적인 리뷰 질의 추가
+                if not web_queries:
+                    web_queries.append(f"{user_input} review recent advances")
+                    web_queries.append(f"{user_input} systematic review")
+                
+                # 최대 3개 질의로 제한 (API 호출 최적화)
+                web_queries = web_queries[:3]
+                
+                if self.settings.get("debug_mode", False):
+                    self.interface.print_thinking(f"[Debug] Web Search      : {web_queries}")
+                
+                # 각 질의에 대해 웹 검색 수행
+                for query in web_queries:
+                    try:
+                        web_result = await self.mcp_commands.call_tool(
+                            client_id='web-search',
+                            tool_name='search',
+                            arguments={
+                                'query': query,
+                                'limit': 3,  # 각 질의당 3개 결과
+                                'reviewOnly': True,  # 리뷰 논문만 검색
+                                'timeRange': 'recent',  # 최근 3-5년 범위
+                                'excludePrimary': True  # 1차 연구 논문 제외
+                            }
+                        )
+                        
+                        if self.settings.get("debug_mode", False):
+                            self.interface.print_thinking(f"[Debug] Web Search '{query[:30]}...'      : {web_result}")
+                        
+                        # 웹 검색 결과 처리
+                        if (web_result and 
+                            'content' in web_result and 
+                            web_result['content'] and 
+                            len(web_result['content']) > 0):
+                            
+                            web_text = web_result['content'][0].get('text', '').strip()
+                            if web_text and len(web_text) > 20:  # 최소 20자 이상 결과만 포함
+                                # JSON 형태의 결과를 파싱하여 사용자 친화적으로 포맷
+                                try:
+                                    import json
+                                    web_data = json.loads(web_text)
+                                    if isinstance(web_data, list) and len(web_data) > 0:
+                                        formatted_results = []
+                                        for item in web_data[:3]:  # 최대 3개 결과만 포함
+                                            title = item.get('title', 'No title')
+                                            url = item.get('url', 'No URL')
+                                            description = item.get('description', 'No description')
+                                            formatted_results.append(f"• **{title}**\n  {description}\n  URL: {url}")
+                                        
+                                        search_results.append(f"[Web] Web Search '{query}':\n" + "\n\n".join(formatted_results))
+                                        web_search_success = True
+                                        
+                                        # 데이터 출처 추가
+                                        data_sources.append({
+                                            'source': 'Web Search',
+                                            'query': query,
+                                            'url': f'https://www.google.com/search?q={query.replace(" ", "+")}',
+                                            'type': 'Web Results'
+                                        })
+                                        
+                                        if self.settings.get("debug_mode", False):
+                                            self.interface.print_thinking(f"[Debug] Web Search      : {len(formatted_results)}     ")
+                                except json.JSONDecodeError:
+                                    # JSON 파싱 실패 시 원본 텍스트 사용
+                                    search_results.append(f"[Web] Web Search '{query}':\n{web_text}")
+                                    web_search_success = True
+                    
+                    except Exception as query_error:
+                        if self.settings.get("debug_mode", False):
+                            self.interface.print_thinking(f"[Debug] Web Search '{query}'      : {query_error}")
+                
+                if web_search_success:
+                    self.interface.print_thinking("O Web Search      ")
+                else:
+                    self.interface.print_thinking("[Warning] Web Search         ")
+                    
+            except Exception as e:
+                self.interface.print_thinking(f"[No] Web Search      : {e}")
+                if self.settings.get("debug_mode", False):
+                    import traceback
+                    self.interface.print_thinking(f"[Debug] Web Search      : {traceback.format_exc()}")
+            
+            # 8.           
             if search_results:
                 self.interface.print_thinking("[Data]    Deep Search    -         ...")
                 
@@ -837,6 +943,8 @@ class DrugDevelopmentChatbot:
                         successful_dbs.append("[Doc] BioMCP")
                     elif "[Note] BioRxiv" in result:
                         successful_dbs.append("[Note] BioRxiv")
+                    elif "[Web] Web Search" in result:
+                        successful_dbs.append("[Web] Web Search")
                     elif "[Brain] AI" in result:
                         successful_dbs.append("[Brain] Sequential Thinking")
                 
@@ -956,10 +1064,10 @@ class DrugDevelopmentChatbot:
 ### 🧠 SEQUENTIAL THINKING 방법론 (필수 적용):
 
 **THINK STEP 1 - 데이터 수집:**
-"[OpenTargets/DrugBank/ChEMBL/BioMCP]에서 [특정 쿼리]에 대한 체계적 데이터 수집을 시행합니다..."
+"[OpenTargets/DrugBank/ChEMBL/BioMCP/WebSearch]에서 [특정 쿼리]에 대한 체계적 데이터 수집을 시행합니다..."
 
 **THINK STEP 2 - 데이터 통합:**
-"여러 소스의 결과를 통합하면, OpenTargets는 ...를 보여주고, DrugBank는 ...를 나타내며, ChEMBL은 ...를 밝혀줍니다..."
+"여러 소스의 결과를 통합하면, OpenTargets는 ...를 보여주고, DrugBank는 ...를 나타내며, ChEMBL은 ...를 밝혀주고, 웹 검색을 통해 최신 동향은 ...를 제시합니다..."
 
 **THINK STEP 3 - 분석:**
 "통합된 데이터셋을 바탕으로 주요 패턴을 식별합니다: [패턴 분석]. 경쟁 환경 분석 결과..."
@@ -1057,6 +1165,12 @@ class DrugDevelopmentChatbot:
 - 실제 링크 예시: https://pubmed.ncbi.nlm.nih.gov/38395897/ (Drug Discovery), https://pubmed.ncbi.nlm.nih.gov/38123456/ (Cancer Research)
 - **필수 ID 포함**: PMID, DOI, 저널 Impact Factor, 인용 횟수
 
+**Web Search 인용 (실제 링크로 표시):**
+- 형식: [Website Name]. (2024). [Page Title]. Retrieved from [Full URL]
+- 예시: Reuters. (2024). Drug development breakthrough reported. Retrieved from https://www.reuters.com/healthcare/pharma/...
+- 실제 링크 예시: https://www.nature.com/articles/... (Nature), https://www.science.org/... (Science)
+- **필수 정보 포함**: 웹사이트명, 발행일, 페이지 제목, 완전한 URL
+
 **ClinicalTrials.gov 인용 (실제 링크로 표시):**
 - 형식: ClinicalTrials.gov. (2024). [임상시험 제목]. Identifier: [NCT 번호]. Retrieved from https://clinicaltrials.gov/study/[NCT 번호]
 - 예시: ClinicalTrials.gov. (2024). Phase III Trial of Drug X. Identifier: NCT12345678. Retrieved from https://clinicaltrials.gov/study/NCT12345678
@@ -1089,6 +1203,7 @@ class DrugDevelopmentChatbot:
 - 각 화합물의 ChEMBL ID (CHEMBLXXX)
 - 임상시험의 NCT 번호
 - 논문의 PMID 번호
+- 웹 검색 결과의 완전한 URL
 - Sequential Thinking 과정의 명시적 서술
 """
                 enhanced_system_prompt += page_format_prompt
@@ -1219,10 +1334,10 @@ class DrugDevelopmentChatbot:
 ### 🧠 SEQUENTIAL THINKING 방법론 (필수 적용):
 
 **THINK STEP 1 - 데이터 수집:**
-"[OpenTargets/DrugBank/ChEMBL/BioMCP]에서 [특정 쿼리]에 대한 체계적 데이터 수집을 시행합니다..."
+"[OpenTargets/DrugBank/ChEMBL/BioMCP/WebSearch]에서 [특정 쿼리]에 대한 체계적 데이터 수집을 시행합니다..."
 
 **THINK STEP 2 - 데이터 통합:**
-"여러 소스의 결과를 통합하면, OpenTargets는 ...를 보여주고, DrugBank는 ...를 나타내며, ChEMBL은 ...를 밝혀줍니다..."
+"여러 소스의 결과를 통합하면, OpenTargets는 ...를 보여주고, DrugBank는 ...를 나타내며, ChEMBL은 ...를 밝혀주고, 웹 검색을 통해 최신 동향은 ...를 제시합니다..."
 
 **THINK STEP 3 - 분석:**
 "통합된 데이터셋을 바탕으로 주요 패턴을 식별합니다: [패턴 분석]. 경쟁 환경 분석 결과..."
@@ -1320,6 +1435,12 @@ class DrugDevelopmentChatbot:
 - 실제 링크 예시: https://pubmed.ncbi.nlm.nih.gov/38395897/ (Drug Discovery), https://pubmed.ncbi.nlm.nih.gov/38123456/ (Cancer Research)
 - **필수 ID 포함**: PMID, DOI, 저널 Impact Factor, 인용 횟수
 
+**Web Search 인용 (실제 링크로 표시):**
+- 형식: [Website Name]. (2024). [Page Title]. Retrieved from [Full URL]
+- 예시: Reuters. (2024). Drug development breakthrough reported. Retrieved from https://www.reuters.com/healthcare/pharma/...
+- 실제 링크 예시: https://www.nature.com/articles/... (Nature), https://www.science.org/... (Science)
+- **필수 정보 포함**: 웹사이트명, 발행일, 페이지 제목, 완전한 URL
+
 **ClinicalTrials.gov 인용 (실제 링크로 표시):**
 - 형식: ClinicalTrials.gov. (2024). [임상시험 제목]. Identifier: [NCT 번호]. Retrieved from https://clinicaltrials.gov/study/[NCT 번호]
 - 예시: ClinicalTrials.gov. (2024). Phase III Trial of Drug X. Identifier: NCT12345678. Retrieved from https://clinicaltrials.gov/study/NCT12345678
@@ -1352,24 +1473,63 @@ class DrugDevelopmentChatbot:
 - 각 화합물의 ChEMBL ID (CHEMBLXXX)
 - 임상시험의 NCT 번호
 - 논문의 PMID 번호
+- 웹 검색 결과의 완전한 URL
 - Sequential Thinking 과정의 명시적 서술
+- 연구 수행 시간 (YYYY-MM-DD HH:MM 포맷)
+- 응답 마지막에 3가지 추천 후속 질문 포함
 """
+                
+                # 추천 질문 관련 프롬프트 추가
+                timestamp_prompt = f"""
+
+### 🔄 Sequential Thinking with Web Search Integration
+
+**THINK STEP 1 - 종합 데이터 수집:**
+"OpenTargets/DrugBank/ChEMBL/BioMCP/Web Search에서 [특정 쿼리]에 대한 체계적 데이터 수집을 시행합니다..."
+
+**THINK STEP 2 - 통합 데이터 분석:**
+"여러 소스의 결과를 통합하면, OpenTargets는 ...를 보여주고, DrugBank는 ...를 나타내며, ChEMBL은 ...를 밝혀주고, 웹 검색(최근 3-5년 리뷰 논문)을 통해 최신 동향은 ...를 제시합니다..."
+
+**THINK STEP 3 - 경쟁 환경 분석:**
+"통합된 데이터셋을 바탕으로 주요 패턴을 식별합니다: [패턴 분석]. 경쟁 환경 분석 결과..."
+
+**THINK STEP 4 - 전략적 인사이트:**
+"이 증거 기반을 토대로 전략적 시사점은... 권고사항은..."
+
+### 📝 필수 추천 후속 질문 (응답 마지막에 포함)
+
+**모든 딥리서치 응답 마지막에 다음 3가지 전략적 후속 질문을 반드시 포함하세요:**
+
+#### 💡 추천 후속 연구 질문
+
+1. **경쟁 분석 심화**: "이 타겟/기전에 대한 경쟁사 파이프라인 분석을 더 자세히 진행하시겠습니까?"
+
+2. **치료 전략 확장**: "해당 적응증에서의 combination therapy 전략이나 다른 치료 접근법을 탐색해보시겠습니까?"
+
+3. **IP/특허 분석**: "이 기전이나 화합물에 대한 특허 landscape 분석이 필요하시겠습니까?"
+
+**참고**: 각 질문은 사용자의 연구 주제와 맥락에 맞게 구체적으로 조정하여 제시하세요.
+"""
+                
+                # page_format_prompt += timestamp_prompt  # 시간 정보 제거됨
                 enhanced_system_prompt += page_format_prompt
             
             if deep_search_context:
                 enhanced_system_prompt += f"""
 
-[Research] **   Deep Research MCP      :**
+[Research] **딥리서치 Database 검색 결과:**
 {deep_search_context}
 
-**[Data] MCP          :**
-1.   MCP                                  
-2. DrugBank, OpenTargets, ChEMBL, BioMCP                        
-3.             MCP               ( : "DrugBank           ...", "OpenTargets          ...")
-4. Sequential Thinking                        
-5.                                  
+**[Data] Database 소스 활용 지침:**
+1. 모든 Database 소스 (Web Search 포함)를 체계적으로 활용하세요
+2. DrugBank, OpenTargets, ChEMBL, BioMCP, Web Search 결과를 통합 분석하세요
+3. 각 소스별 데이터를 명시적으로 인용하세요 (예: "DrugBank 데이터에 따르면...", "OpenTargets 분석 결과...")
+4. Sequential Thinking 방법론을 단계별로 적용하세요
+5. 시간 정보 표시는 제거되었습니다
+6. 웹 검색 결과는 최근 3-5년 리뷰 논문에 집중하세요
+7. 응답 마지막에 반드시 3가지 추천 후속 질문을 포함하세요
 
-  MCP                                               ."""
+위 Database 정보를 활용하여 종합적이고 상세한 연구 분석 보고서를 작성해주세요."""
             
             #            (OllamaClient                  )
             #                         

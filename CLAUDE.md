@@ -1,4 +1,4 @@
-# GAIA-BT v3.56 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.61 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
@@ -361,6 +361,11 @@ git reset --hard [커밋해시]
 - **v3.54**: 딥리서치 모드 학술 논문 포맷 통합 완성 - page_format.md와 prompt_default.txt 프롬프트를 일반/스트리밍 응답 모두에 적용
 - **v3.55**: 딥리서치 모드 고급 APA 인용 및 Sequential Thinking 완성 - MCP별 상세 ID 인용, 4단계 사고 과정, 최대 내용 포함 강화
 - **v3.56**: MCP 용어 Database 통일 및 딥리서치 추천 질문 시스템 구현 - 모든 응답에서 Database 용어 사용, 3가지 후속 연구 질문 자동 생성
+- **v3.57**: 딥리서치 모드 Database 인용 규칙 실제 링크 형식 적용 - DrugBank, OpenTargets, ChEMBL, ClinicalTrials.gov, PubMed APA 인용을 실제 접근 가능한 URL로 변경
+- **v3.58**: Web Search MCP 통합 및 Sequential Thinking 확장 - 구글 웹 검색을 통한 최신 연구 동향 수집, 맞춤형 검색 쿼리 생성, 웹 검색 APA 인용 규칙 추가
+- **v3.59**: Web Search MCP 리뷰 논문 중심 검색 강화 - "[keywords] AND Review" 쿼리, 최근 3-5년 제한, 1차 연구 논문 제외 필터링, 학술 도메인 우선 검색
+- **v3.60**: 딥리서치 모드 Web Search & Sequential Thinking 통합 완성 + 타임스탬프 시스템 구현 - 프롬프트에 웹 검색 및 순차 사고 통합, YYYY-MM-DD HH:MM 포맷 시간 기록, 3가지 추천 후속 질문 자동 생성
+- **v3.61**: 딥리서치 응답 시간 표시 완전 제거 - 연구 시작 시간, 데이터베이스 쿼리 수행 시간, 각 소스별 접근 시간, 분석 완료 시간 등 모든 사용자 대면 시간 정보 삭제
 
 ### 완료된 Todo 기록 (v3.31)
 

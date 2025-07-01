@@ -108,7 +108,55 @@ class PromptChangeRequest(BaseModel):
     prompt_type: str
     session_id: str = "default"
 
-@router.get("/info", response_model=SystemInfo)
+@router.get("/info", 
+    response_model=SystemInfo,
+    summary="🖥️ 시스템 정보 조회",
+    description="""
+## 시스템 정보 조회
+
+GAIA-BT API 서버의 현재 상태와 설정을 조회합니다.
+
+### 반환 정보
+- **version**: API 버전
+- **model**: 현재 활성 AI 모델
+- **mode**: 작동 모드 (normal/deep_research)
+- **mcp_enabled**: Database 검색 기능 활성화 여부
+- **debug**: 디버그 모드 상태
+- **available_models**: 사용 가능한 Ollama 모델 목록
+- **available_prompts**: 사용 가능한 프롬프트 템플릿
+
+### 사용 예시
+시스템 상태를 확인하여 현재 설정을 파악하고, 사용 가능한 모델과 프롬프트를 확인할 수 있습니다.
+""",
+    responses={
+        200: {
+            "description": "시스템 정보 조회 성공",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "version": "3.60.0",
+                        "model": "gemma3-12b:latest",
+                        "mode": "normal",
+                        "mcp_enabled": True,
+                        "debug": False,
+                        "available_models": [
+                            "gemma3-12b:latest",
+                            "txgemma-chat:latest",
+                            "llama3.2:latest"
+                        ],
+                        "available_prompts": [
+                            "default",
+                            "clinical",
+                            "research",
+                            "chemistry",
+                            "regulatory"
+                        ]
+                    }
+                }
+            }
+        }
+    }
+)
 async def get_system_info(
     service: ChatbotService = Depends(get_chatbot_service)
 ) -> Dict[str, Any]:
@@ -132,7 +180,66 @@ async def get_system_info(
         ))()
     }
 
-@router.post("/model")
+@router.post("/model",
+    summary="🤖 AI 모델 변경",
+    description="""
+## AI 모델 변경
+
+현재 사용 중인 AI 모델을 다른 모델로 변경합니다.
+
+### 작동 방식
+1. 요청된 모델이 Ollama에 설치되어 있는지 확인
+2. 기존 모델을 중지하고 새 모델 시작
+3. ChatbotService의 모델 설정 업데이트
+4. 모델 실행 상태 확인 및 반환
+
+### 지원 모델
+- **gemma3-12b:latest**: 12B 파라미터, 기본 추천 모델
+- **txgemma-chat:latest**: 채팅 최적화 모델
+- **llama3.2:latest**: Meta의 최신 LLaMA 모델
+- **mistral:latest**: Mistral AI 모델
+
+### ⚠️ 주의사항
+- 모델 변경 시 기존 대화 컨텍스트가 초기화될 수 있습니다
+- 큰 모델은 로딩에 시간이 걸릴 수 있습니다
+- GPU 메모리 제한에 따라 일부 모델은 실행되지 않을 수 있습니다
+""",
+    responses={
+        200: {
+            "description": "모델 변경 성공",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "model": "gemma3-12b:latest",
+                        "model_running": True,
+                        "message": "모델이 'gemma3-12b:latest'로 변경되었습니다"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "잘못된 요청",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "모델 'invalid-model'이 Ollama에 설치되어 있지 않습니다"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "서버 오류",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Ollama 모델 실행 실패: Connection error"
+                    }
+                }
+            }
+        }
+    }
+)
 async def change_model(
     request: ModelChangeRequest,
     service: ChatbotService = Depends(get_chatbot_service)

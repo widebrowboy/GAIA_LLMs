@@ -116,9 +116,171 @@ async def lifespan(app: FastAPI):
 # FastAPI 애플리케이션 생성
 app = FastAPI(
     title="GAIA-BT Drug Development Research API",
-    description="신약개발 연구 AI 어시스턴트 RESTful API",
-    version="2.0.0",
-    lifespan=lifespan
+    description="""
+## 🧬 GAIA-BT API v3.60 - 신약개발 AI 연구 어시스턴트
+
+GAIA-BT는 **Ollama LLM**과 **Database (MCP)** 통합을 활용한 최첨단 신약개발 전문 AI 연구 어시스턴트입니다.
+
+### 📋 주요 기능
+
+#### 1. **딥리서치 모드** 🔬
+- **Database 통합 검색**: DrugBank, OpenTargets, ChEMBL, BioMCP, Web Search
+- **Sequential Thinking**: 4단계 체계적 사고 프로세스
+- **실시간 데이터 수집**: 최신 3-5년 리뷰 논문 중점 검색
+- **APA 스타일 인용**: 모든 데이터 소스에 대한 표준 학술 인용
+
+#### 2. **대화형 AI 챗봇** 💬
+- **실시간 스트리밍 응답**: SSE(Server-Sent Events) 기반
+- **다중 세션 지원**: 사용자별 독립적인 대화 관리
+- **마크다운 포맷팅**: 전문적인 연구 보고서 형식 지원
+
+#### 3. **모델 관리 시스템** 🎯
+- **자동 모델 검증**: 서버 시작 시 Ollama 모델 상태 확인
+- **동적 모델 전환**: 실시간 모델 변경 가능
+- **모델 상태 모니터링**: 실행 중인 모델 목록 및 상태 추적
+
+#### 4. **Database 통합 (MCP)** 🌐
+- **BioMCP**: PubMed, ClinicalTrials, MyVariant 통합
+- **DrugBank**: 약물 정보 및 상호작용 데이터
+- **OpenTargets**: 타겟 검증 및 질환 연관성
+- **ChEMBL**: 화합물 바이오활성 데이터
+- **Web Search**: 학술 리뷰 논문 중심 검색
+
+### 🚀 빠른 시작
+
+1. **헬스 체크**: `GET /health`
+2. **채팅 시작**: `POST /api/chat/message`
+3. **스트리밍 채팅**: `POST /api/chat/stream`
+4. **WebSocket 연결**: `ws://localhost:8000/ws/{session_id}`
+
+### 📌 주요 엔드포인트
+
+- **Chat API**: 대화형 AI 기능 (`/api/chat/*`)
+- **System API**: 시스템 상태 및 모델 관리 (`/api/system/*`)
+- **Database API**: Database 검색 기능 (`/api/mcp/*`)
+- **Session API**: 세션 관리 (`/api/session/*`)
+
+### 💡 사용 예시
+
+#### 일반 대화
+```bash
+curl -X POST "http://localhost:8000/api/chat/message" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "아스피린의 작용 메커니즘을 설명해주세요", "session_id": "default"}'
+```
+
+#### 딥리서치 모드 활성화
+```bash
+# 1. 딥리서치 모드 시작
+curl -X POST "http://localhost:8000/api/chat/command" \
+  -H "Content-Type: application/json" \
+  -d '{"command": "/mcp start", "session_id": "research"}'
+
+# 2. 딥리서치 질문
+curl -X POST "http://localhost:8000/api/chat/message" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "EGFR 표적 항암제의 최신 임상시험 결과를 분석해주세요", "session_id": "research"}'
+```
+
+#### 스트리밍 응답
+```javascript
+const response = await fetch('http://localhost:8000/api/chat/stream', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    message: "BRCA1 유전자 변이와 관련된 최신 치료법은?",
+    session_id: "stream_demo"
+  })
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  
+  const chunk = decoder.decode(value);
+  const lines = chunk.split('\\n');
+  
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      const data = line.slice(6);
+      if (data === '[DONE]') {
+        console.log('스트리밍 완료');
+        break;
+      }
+      console.log('청크:', JSON.parse(data));
+    }
+  }
+}
+```
+
+### 📊 응답 형식
+
+#### 일반 응답
+```json
+{
+  "response": "아스피린은 COX-1과 COX-2 효소를 비가역적으로 억제하여...",
+  "mode": "normal",
+  "model": "gemma3-12b:latest"
+}
+```
+
+#### 딥리서치 응답
+```json
+{
+  "response": "# EGFR 표적 항암제 최신 임상시험 분석\n\n## 데이터베이스 검색 결과\n\n### OpenTargets 데이터\n- EGFR (ENSG00000146648) 타겟 검증 점수: 0.95\n...",
+  "mode": "deep_research",
+  "model": "gemma3-12b:latest",
+  "sources": ["OpenTargets", "DrugBank", "ChEMBL", "ClinicalTrials"]
+}
+```
+
+### 🔒 인증 및 보안
+
+현재 버전은 개발용으로 인증이 필요하지 않습니다. 프로덕션 환경에서는 다음을 권장합니다:
+- API 키 기반 인증
+- HTTPS 사용
+- Rate limiting 적용
+- CORS 정책 강화
+
+### 🔗 관련 링크
+
+- **API 문서**: http://localhost:8000/docs
+- **WebUI**: http://localhost:3003
+- **GitHub**: https://github.com/your-repo/gaia-bt
+""",
+    version="3.60.0",
+    lifespan=lifespan,
+    openapi_tags=[
+        {
+            "name": "chat",
+            "description": "대화형 AI 챗봇 기능 - 일반 대화 및 딥리서치 모드 지원"
+        },
+        {
+            "name": "system",
+            "description": "시스템 관리 - 모델 상태, 설정, 프롬프트 관리"
+        },
+        {
+            "name": "mcp",
+            "description": "Database 검색 및 통합 - DrugBank, OpenTargets, ChEMBL 등 생명과학 데이터베이스 접근"
+        },
+        {
+            "name": "session",
+            "description": "세션 관리 - 다중 사용자 대화 세션 처리"
+        }
+    ],
+    servers=[
+        {
+            "url": "http://localhost:8000",
+            "description": "로컬 개발 서버"
+        },
+        {
+            "url": "https://api.gaia-bt.com",
+            "description": "프로덕션 서버 (예시)"
+        }
+    ]
 )
 
 # UTF-8 인코딩 강제 설정을 위한 미들웨어
@@ -198,12 +360,39 @@ app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(mcp.router, prefix="/api/mcp", tags=["mcp"])
 app.include_router(session.router, prefix="/api/session", tags=["session"])
 
-@app.get("/")
+@app.get("/", 
+    summary="API 루트 정보",
+    description="GAIA-BT API 서버의 기본 정보와 사용 가능한 엔드포인트 목록을 반환합니다.",
+    response_description="API 서버 정보 및 엔드포인트 목록",
+    responses={
+        200: {
+            "description": "성공적인 응답",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "name": "GAIA-BT API Server",
+                        "version": "3.60.0",
+                        "description": "신약개발 연구 AI 어시스턴트",
+                        "model": "gemma3-12b:latest",
+                        "endpoints": {
+                            "chat": "/api/chat",
+                            "system": "/api/system",
+                            "mcp": "/api/mcp",
+                            "session": "/api/session",
+                            "docs": "/docs",
+                            "websocket": "/ws"
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 async def root():
-    """루트 엔드포인트"""
+    """루트 엔드포인트 - API 서버 정보 제공"""
     return {
         "name": "GAIA-BT API Server",
-        "version": "2.0.0",
+        "version": "3.60.0",
         "description": "신약개발 연구 AI 어시스턴트",
         "model": OLLAMA_MODEL,
         "endpoints": {
@@ -216,7 +405,38 @@ async def root():
         }
     }
 
-@app.get("/health")
+@app.get("/health",
+    summary="서버 상태 확인",
+    description="""
+API 서버의 상태를 확인합니다. 다음 정보를 포함합니다:
+
+- **서버 상태**: 정상 작동 여부
+- **현재 모델**: 활성화된 Ollama 모델
+- **작동 모드**: normal(일반) 또는 deep_research(딥리서치)
+- **MCP 상태**: Database 검색 기능 활성화 여부
+- **실행 중인 모델 목록**: 모든 활성 Ollama 모델
+
+이 엔드포인트는 모니터링 시스템이나 로드 밸런서에서 주기적으로 호출하여 서버 상태를 확인하는 용도로 사용됩니다.
+""",
+    response_description="서버 상태 정보",
+    responses={
+        200: {
+            "description": "서버 정상 작동",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "healthy",
+                        "model": "gemma3-12b:latest",
+                        "mode": "normal",
+                        "mcp_enabled": True,
+                        "debug": False,
+                        "running_models": ["gemma3-12b:latest", "txgemma-chat:latest"]
+                    }
+                }
+            }
+        }
+    }
+)
 async def health_check():
     """헬스 체크 엔드포인트
 

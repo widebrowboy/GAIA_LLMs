@@ -29,7 +29,8 @@ class BioMCPIntegration:
         self.server_capabilities = {
             "biomcp": ["search_articles", "search_trials", "search_variants", "get_article", "get_trial"],
             "pubmed-mcp": ["search_pubmed", "get_article_details", "find_related_articles", "search_by_author", "get_citations"],
-            "clinicaltrials-mcp": ["search_clinical_trials", "get_trial_details", "search_trials_by_sponsor", "search_trials_by_condition", "get_trial_results"]
+            "clinicaltrials-mcp": ["search_clinical_trials", "get_trial_details", "search_trials_by_sponsor", "search_trials_by_condition", "get_trial_results"],
+            "web-search": ["search"]
         }
     
     async def search_biomedical_articles(
@@ -297,26 +298,119 @@ class BioMCPIntegration:
                 "trial_id": trial_id
             }
     
+    async def search_web(
+        self,
+        query: str,
+        limit: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Search the web using the web-search MCP server
+        
+        Args:
+            query: Search query
+            limit: Maximum number of results (1-10, default 5)
+            
+        Returns:
+            Web search results with title, URL, and description
+        """
+        try:
+            if not self.mcp_manager:
+                raise RuntimeError("MCP manager not available")
+            
+            # Use web-search MCP server
+            result = await self.call_tool_safe(
+                client_id="web-search",
+                tool_name="search",
+                arguments={
+                    "query": query,
+                    "limit": min(max(limit, 1), 10),  # Ensure limit is between 1-10
+                    "reviewOnly": True,  # Focus on review articles
+                    "timeRange": "recent",  # Last 3-5 years only
+                    "excludePrimary": True  # Exclude primary research papers
+                }
+            )
+            
+            if not result:
+                raise RuntimeError("Web search MCP server not available")
+            
+            return self._process_web_search_result(result, query)
+            
+        except Exception as e:
+            self.logger.error(f"Error performing web search: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "query": query,
+                "results": []
+            }
+    
+    def _process_web_search_result(self, result: Dict[str, Any], query: str) -> Dict[str, Any]:
+        """
+        Process web search results from MCP server
+        
+        Args:
+            result: Raw result from web-search MCP
+            query: Original search query
+            
+        Returns:
+            Processed web search results
+        """
+        try:
+            # Parse the JSON content from MCP result
+            if 'content' in result and len(result['content']) > 0:
+                content_text = result['content'][0].get('text', '{}')
+                search_results = json.loads(content_text) if content_text else []
+            else:
+                search_results = []
+            
+            return {
+                "success": True,
+                "query": query,
+                "results": search_results,
+                "result_count": len(search_results),
+                "data_source": "web-search",
+                "timestamp": asyncio.get_event_loop().time()
+            }
+            
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Error parsing web search results: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to parse search results: {str(e)}",
+                "query": query,
+                "results": []
+            }
+        except Exception as e:
+            self.logger.error(f"Error processing web search result: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "query": query,
+                "results": []
+            }
+    
     async def comprehensive_biomedical_research(
         self,
         topic: str,
         include_articles: bool = True,
         include_trials: bool = True,
         include_variants: bool = False,
+        include_web_search: bool = True,
         max_results_per_type: int = 5
     ) -> Dict[str, Any]:
         """
-        Perform comprehensive biomedical research on a topic
+        Perform comprehensive biomedical research on a topic using multiple data sources
         
         Args:
             topic: Research topic
             include_articles: Whether to search articles
             include_trials: Whether to search clinical trials
             include_variants: Whether to search genetic variants
+            include_web_search: Whether to include web search results
             max_results_per_type: Maximum results per search type
             
         Returns:
-            Comprehensive research results
+            Comprehensive research results from multiple sources
         """
         results = {
             "topic": topic,
@@ -346,6 +440,18 @@ class BioMCPIntegration:
                     self.search_genetic_variants(topic, limit=max_results_per_type)
                 )
             
+            # Search web for additional information (review articles focus)
+            if include_web_search:
+                # Create focused web search queries for review articles
+                web_queries = [
+                    f"{topic} review recent advances",
+                    f"{topic} systematic review meta-analysis"
+                ]
+                for query in web_queries:
+                    tasks.append(
+                        self.search_web(query, limit=max(max_results_per_type // 2, 2))
+                    )
+            
             # Execute all searches concurrently
             if tasks:
                 search_results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -368,6 +474,27 @@ class BioMCPIntegration:
                     
                     if len(search_results) > variant_index:
                         results["data"]["variants"] = search_results[variant_index]
+                
+                if include_web_search:
+                    # Process web search results (last 2 results if included)
+                    web_start_index = 0
+                    if include_articles:
+                        web_start_index += 1
+                    if include_trials:
+                        web_start_index += 1
+                    if include_variants:
+                        web_start_index += 1
+                    
+                    web_results = []
+                    for i in range(web_start_index, len(search_results)):
+                        if i < len(search_results) and not isinstance(search_results[i], Exception):
+                            web_results.append(search_results[i])
+                    
+                    if web_results:
+                        results["data"]["web_search"] = {
+                            "combined_results": web_results,
+                            "result_count": sum(len(wr.get("results", [])) for wr in web_results if isinstance(wr, dict))
+                        }
             
             # Generate summary
             results["summary"] = self._generate_research_summary(results["data"])

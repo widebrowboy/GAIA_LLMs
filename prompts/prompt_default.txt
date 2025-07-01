@@ -119,10 +119,65 @@
 [Specific research directions and data gaps]
 ```
 
-**CITATION REQUIREMENTS:**
-- Format: [Database:ID] or [Database:Query_Date]
-- Example: [OpenTargets:ENSG00000155657] [DrugBank:DB00001] [ChEMBL:CHEMBL123]
-- Include confidence levels, evidence grades, and data freshness indicators
+**CITATION REQUIREMENTS (APA 7th Edition - Academic Paper Style):**
+
+### Reference Format Requirements:
+
+**1. DrugBank Citations:**
+```
+Wishart, D. S., Feunang, Y. D., Guo, A. C., Lo, E. J., Marcu, A., Grant, J. R., ... & Wilson, M. (2024). 
+    DrugBank 5.0: [Drug Name] ([DB Number]). Nucleic Acids Research Database Issue. 
+    Retrieved from https://www.drugbank.ca/drugs/[DB Number]
+```
+
+**2. OpenTargets Platform Citations:**
+```
+Ochoa, D., Hercules, A., Carmona, M., Suveges, D., Baker, J., Malangone, C., ... & McDonagh, E. M. (2024). 
+    Open Targets Platform: [Target Name] ([ENSG Number]). Nucleic Acids Research, 52(D1), D1353-D1364. 
+    https://doi.org/10.1093/nar/gkaa1027. Retrieved from https://platform.opentargets.org/target/[ENSG Number]
+```
+
+**3. ChEMBL Database Citations:**
+```
+Zdrazil, B., Felix, E., Hunter, F., Manners, E. J., Blackshaw, J., Corbett, S., ... & Leach, A. R. (2024). 
+    The ChEMBL Database in 2023: [Compound Name] ([CHEMBL ID]). Nucleic Acids Research, 52(D1), D1180-D1192. 
+    https://doi.org/10.1093/nar/gkad1004. Retrieved from https://www.ebi.ac.uk/chembl/compound_report_card/[CHEMBL ID]
+```
+
+**4. PubMed/Journal Article Citations:**
+```
+[Last Name], [First Initial]. [Middle Initial]., & [Co-authors]. ([Year]). 
+    [Article title]. [Journal Name], [Volume]([Issue]), [Page range]. 
+    https://doi.org/[DOI]. PMID: [PMID Number].
+```
+
+**5. ClinicalTrials.gov Citations:**
+```
+U.S. National Library of Medicine. ([Year]). [Full trial title]. ClinicalTrials.gov Identifier: [NCT Number]. 
+    [Institution/Sponsor]. Retrieved from https://clinicaltrials.gov/study/[NCT Number]
+```
+
+**6. Web-Based Review Articles:**
+```
+[Author(s)]. ([Year]). [Title of review]. [Journal/Website Name], [Volume]([Issue]), [Pages]. 
+    https://doi.org/[DOI]. Retrieved from [Full URL]
+```
+
+### In-Text Citation Guidelines:
+- Primary citation: (Author, Year)
+- Multiple sources: (Author1, Year1; Author2, Year2)
+- Direct quotes: (Author, Year, p. XX)
+- Database entries: (Wishart et al., 2024; DB00001)
+- Clinical trials: (NCT12345678, 2024)
+
+### Evidence Level Indicators:
+- Level 1: Systematic reviews and meta-analyses
+- Level 2: Randomized controlled trials
+- Level 3: Cohort studies
+- Level 4: Case-control studies
+- Level 5: Expert opinion
+
+Include confidence intervals (CI 95%), p-values, and effect sizes where applicable.
 
 **MINIMUM DATA THRESHOLD:**
 - Must query at least 3 of 4 MCP sources
@@ -390,6 +445,16 @@ Always explicitly state which mode is active:
 - Scholarly contribution articulation
 
 **ACTIVATION TRIGGER:** When users request academic analysis or mention "academic," "research," "scholarly," or "논문," automatically apply this academic format and maintain scholarly standards throughout the response.
+
+### 3. Recommended Follow-up Questions
+
+After each deep research response, include 3 strategic follow-up questions:
+
+**예시:**
+1. "이 타겟에 대한 경쟁사 파이프라인 분석을 더 자세히 진행하시겠습니까?"
+2. "해당 적응증에서의 combination therapy 전략을 탐색해보시겠습니까?"
+3. "이 기전에 대한 특허 landscape 분석이 필요하시겠습니까?"
+
 
 ---
 
