@@ -542,6 +542,13 @@ class DrugDevelopmentChatbot:
                                 if targets_text and len(targets_text) > 50:  #    50             
                                     search_results.append(f"[Target] OpenTargets - {term}:\n{targets_text}")
                                     opentargets_success = True
+                                    # 데이터 출처 추가
+                                    data_sources.append({
+                                        'source': 'OpenTargets',
+                                        'query': term,
+                                        'url': f'https://platform.opentargets.org/search?query={term}',
+                                        'type': 'Target/Disease Database'
+                                    })
                                     if self.settings.get("debug_mode", False):
                                         self.interface.print_thinking(f"[Debug] OpenTargets {term}      : {len(targets_text)} ")
                                 
@@ -661,6 +668,13 @@ class DrugDevelopmentChatbot:
                         if articles_text and len(articles_text) > 50:  #    50             
                             search_results.append(f"[Doc] BioMCP   :\n{articles_text}")
                             biomcp_success = True
+                            # 데이터 출처 추가
+                            data_sources.append({
+                                'source': 'BioMCP (PubMed)',
+                                'query': user_input,
+                                'url': f'https://pubmed.ncbi.nlm.nih.gov/?term={user_input}',
+                                'type': 'Scientific Literature'
+                            })
                             if self.settings.get("debug_mode", False):
                                 self.interface.print_thinking(f"[Debug] BioMCP         : {len(articles_text)} ")
                 
@@ -698,6 +712,13 @@ class DrugDevelopmentChatbot:
                             if trials_text and len(trials_text) > 50:  #    50             
                                 search_results.append(f"[Hospital] BioMCP     :\n{trials_text}")
                                 biomcp_success = True
+                                # 데이터 출처 추가
+                                data_sources.append({
+                                    'source': 'BioMCP (ClinicalTrials)',
+                                    'query': user_input,
+                                    'url': f'https://clinicaltrials.gov/search?cond={user_input}',
+                                    'type': 'Clinical Trials'
+                                })
                                 if self.settings.get("debug_mode", False):
                                     self.interface.print_thinking(f"[Debug] BioMCP           : {len(trials_text)} ")
                     
@@ -770,6 +791,13 @@ class DrugDevelopmentChatbot:
                         if biorxiv_text and len(biorxiv_text) > 50:  #    50             
                             search_results.append(f"[Note] BioRxiv      :\n{biorxiv_text}")
                             biorxiv_success = True
+                            # 데이터 출처 추가
+                            data_sources.append({
+                                'source': 'BioRxiv',
+                                'query': ' '.join(search_terms[:3]),
+                                'url': f'https://www.biorxiv.org/search/{"%20".join(search_terms[:3])}',
+                                'type': 'Preprint Repository'
+                            })
                             if self.settings.get("debug_mode", False):
                                 self.interface.print_thinking(f"[Debug] BioRxiv      : {len(biorxiv_text)} ")
                     
@@ -812,6 +840,20 @@ class DrugDevelopmentChatbot:
                     elif "[Brain] AI" in result:
                         successful_dbs.append("[Brain] Sequential Thinking")
                 
+                # 데이터 출처 섹션 생성
+                data_sources_section = ""
+                if data_sources:
+                    data_sources_section = f"""
+
+[References] **실제 활용된 데이터 출처:**
+"""
+                    for idx, source in enumerate(data_sources, 1):
+                        data_sources_section += f"""
+{idx}. **{source['source']}** ({source['type']})
+   - 검색어: "{source['query']}"
+   - 링크: {source['url']}
+"""
+
                 result_stats = f"""
 [Research] **GAIA-BT v2.0 Alpha    Deep Search      **
 
@@ -830,7 +872,7 @@ class DrugDevelopmentChatbot:
 ------------------------------------------------------------------------------
 """
                 
-                combined_results = result_stats + "\n\n" + "\n\n".join(search_results)
+                combined_results = result_stats + "\n\n" + "\n\n".join(search_results) + data_sources_section
                 
                 if self.settings.get("debug_mode", False):
                     self.interface.print_thinking(f"[Debug]            : {len(combined_results)} ")
