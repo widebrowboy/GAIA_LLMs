@@ -3,6 +3,7 @@
 import React, { memo } from 'react';
 import Image from 'next/image';
 import { Message } from '@/types/chat';
+import AcademicMarkdownRenderer from './AcademicMarkdownRenderer';
 
 interface MessageItemProps {
   message: Message;
@@ -13,7 +14,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
   const isUserMessage = message.role === 'user';
   const isAssistantMessage = message.role === 'assistant';
   const isSystemMessage = message.role === 'system';
-  // 모든 응답을 원본 텍스트로 출력
+  const isCompleteResponse = isAssistantMessage && message.isComplete;
 
   
   const timestamp = new Date(message.timestamp).toLocaleTimeString('ko-KR', {
@@ -48,9 +49,39 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
       <div className={`max-w-3xl w-full ${
         isUserMessage 
           ? 'bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200' 
-          : 'bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200'
+          : isCompleteResponse
+            ? 'bg-white border-2 border-emerald-300 shadow-lg'
+            : 'bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200'
       } rounded-2xl px-6 py-5 shadow-sm`}>
 
+        {/* 헤더 - 완료된 응답에는 학술 보고서 헤더 표시 */}
+        {isCompleteResponse && (
+          <div className="mb-6 pb-4 border-b-2 border-emerald-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
+                  <span className="text-white text-lg">📄</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">Research Analysis Report</h3>
+                  <p className="text-xs text-gray-600">GAIA-BT Academic Response</p>
+                </div>
+              </div>
+              <div className="text-xs text-gray-500">
+                {timestamp}
+              </div>
+            </div>
+            {message.userQuestion && (
+              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
+                <div className="flex items-center space-x-2 mb-1">
+                  <span className="text-sm">🔍</span>
+                  <span className="text-xs font-semibold text-emerald-700">Research Question</span>
+                </div>
+                <p className="text-sm text-gray-700 italic">"{message.userQuestion}"</p>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* 메시지 내용 */}
         {isUserMessage ? (
@@ -58,7 +89,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
             <span className="text-sm">🔬</span>
             <span className="text-xs font-bold text-emerald-700">연구자</span>
           </div>
-        ) : isAssistantMessage && (
+        ) : isAssistantMessage && !isCompleteResponse && (
           <div className="flex items-center space-x-3 mb-3">
             <span className="text-sm">🧠</span>
             <span className="text-xs font-bold text-blue-700">GAIA-BT 연구지원</span>
@@ -70,27 +101,38 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
           </div>
         )}
 
-        {/* 메시지 텍스트 - 모든 응답을 원본 텍스트로 출력 */}
-        <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full">
-          <div 
-            className="raw-text korean-text prose prose-slate max-w-none"
-            style={{ 
-              whiteSpace: 'pre-wrap', 
-              lineHeight: '1.8',
-              color: '#374151',
-              fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif',
-              wordBreak: 'break-word',
-              overflowWrap: 'break-word'
-            }}
-          >
-            {message.content}
+        {/* 메시지 텍스트 - 완료된 assistant 응답은 마크다운 렌더링 */}
+        {isCompleteResponse ? (
+          <div className="academic-response">
+            <AcademicMarkdownRenderer 
+              content={message.content} 
+              className="text-gray-800"
+            />
           </div>
-        </div>
+        ) : (
+          <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full">
+            <div 
+              className="raw-text korean-text prose prose-slate max-w-none"
+              style={{ 
+                whiteSpace: 'pre-wrap', 
+                lineHeight: '1.8',
+                color: '#374151',
+                fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif',
+                wordBreak: 'break-word',
+                overflowWrap: 'break-word'
+              }}
+            >
+              {message.content}
+            </div>
+          </div>
+        )}
         
-        {/* 타임스탬프 */}
-        <div className="flex justify-end mt-3">
-          <span className="text-xs text-gray-500">{timestamp}</span>
-        </div>
+        {/* 타임스탬프 - 완료된 응답은 헤더에 표시되므로 제외 */}
+        {!isCompleteResponse && (
+          <div className="flex justify-end mt-3">
+            <span className="text-xs text-gray-500">{timestamp}</span>
+          </div>
+        )}
       </div>
     </div>
   );
