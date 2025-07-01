@@ -1186,18 +1186,22 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                   const isCurrent = currentModel === model.name;
                   
                   return (
-                    <button
+                    <div
                       key={model.name}
-                      onClick={() => handleModelChange(model.name)}
-                      disabled={isModelChanging}
-                      className={`w-full text-left p-3 rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`w-full text-left p-3 rounded-lg border transition-colors ${
                         isCurrent
                           ? 'bg-blue-50 border-blue-200 text-blue-800'
                           : 'bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-700'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <div className="font-medium text-sm">{model.name}</div>
+                        <button
+                          onClick={() => handleModelChange(model.name)}
+                          disabled={isModelChanging}
+                          className="font-medium text-sm flex-1 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {model.name}
+                        </button>
                         <div className="flex items-center space-x-2">
                           {isRunning && (
                             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="실행 중"></div>
@@ -1251,7 +1255,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                         <div>크기: {model.parameter_size}</div>
                         <div>상태: {isRunning ? '🟢 실행 중' : '⚪ 대기 중'}</div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })
               ) : (

@@ -3,7 +3,7 @@
 import React, { memo } from 'react';
 import Image from 'next/image';
 import { Message } from '@/types/chat';
-import MarkdownViewer from './MarkdownViewer';
+import MarkdownRenderer from './MarkdownRenderer';
 
 interface MessageItemProps {
   message: Message;
@@ -103,18 +103,23 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
         {/* 메시지 텍스트 - 완전 응답이면 마크다운 렌더링, 아니면 기존 텍스트 */}
         {isCompleteResponse ? (
           <div className="max-w-full">
-            {/* MarkdownViewer는 반드시 먼저 import되어 있어야 함 */}
-            <MarkdownViewer markdown={message.content} />
+            {/* react-markdown + gray-matter + @tailwindcss/typography 적용 */}
+            <MarkdownRenderer 
+              content={message.content} 
+              className="prose-emerald prose-sm sm:prose-base lg:prose-lg" 
+            />
           </div>
         ) : (
           <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full">
             <div 
-              className="raw-text korean-text"
+              className="raw-text korean-text prose prose-slate max-w-none"
               style={{ 
-                whiteSpace: 'pre-line', 
+                whiteSpace: 'pre-wrap', 
                 lineHeight: '1.6',
                 color: '#374151',
-                fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif'
+                fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif',
+                wordBreak: 'break-word',
+                overflowWrap: 'break-word'
               }}
             >
               {message.content}

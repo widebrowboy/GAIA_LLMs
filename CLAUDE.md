@@ -1,4 +1,4 @@
-# GAIA-BT v3.34 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.47 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
@@ -352,6 +352,10 @@ git reset --hard [커밋해시]
 - **v3.41**: XHR HTTP 오류: 0 완전 근절 - 강화된 서버 준비 대기 및 사전 연결 확인
 - **v3.42**: 고급 마크다운 렌더링 완성 - remark-breaks + 컨텍스트 인식 전처리 + 전용 CSS
 - **v3.43**: 대화창 연구 보고서 응답 마크다운 완전 적용 - ChatArea 스트리밍 응답 고급 처리
+- **v3.44**: 모든 핵심 시스템 완전 복구 완료 - chatbot.py 구문 오류 수정 및 API/WebUI 정상 작동 확인
+- **v3.45**: react-markdown + gray-matter + @tailwindcss/typography 마크다운 렌더링 시스템 완성
+- **v3.46**: 고급 줄바꿈 처리 및 한국어 텍스트 최적화 - remark-breaks + 전처리 로직 + 한국어 폰트 완성
+- **v3.47**: 전문 문서 포맷 가이드라인 통합 - 기본 프롬프트에 마크다운 작성 규칙 및 문서 구조 템플릿 추가
 
 ### 완료된 Todo 기록 (v3.31)
 
