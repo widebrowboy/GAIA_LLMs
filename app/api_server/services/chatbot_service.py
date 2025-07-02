@@ -51,14 +51,21 @@ class ChatbotService:
         if session_id in self.sessions:
             return {"error": f"세션 {session_id}가 이미 존재합니다"}
         
-        # 현재 실행 중인 모델 감지
+        # 현재 실행 중인 모델 감지 또는 사용자 설정 기본 모델 사용
         from app.utils.ollama_manager import list_running_models
         try:
             running_models = await list_running_models()
-            current_model = running_models[-1] if running_models else "gemma3-12b:latest"
-            logger.info(f"세션 {session_id} 생성 시 현재 실행 중인 모델 사용: {current_model}")
+            if running_models:
+                # 실행 중인 모델이 있으면 그것을 사용 (모델 변경 방지)
+                current_model = running_models[-1]
+                logger.info(f"세션 {session_id} 생성 시 현재 실행 중인 모델 유지: {current_model}")
+            else:
+                # 실행 중인 모델이 없으면 사용자 설정 기본 모델 사용하지 않고 현재 실행된 모델 유지
+                # 모델 변경을 방지하기 위해 현재 클라이언트의 모델을 유지
+                current_model = "gemma3-12b:latest"  # 최후 폴백
+                logger.info(f"세션 {session_id} 생성 시 실행 중인 모델이 없어 폴백 모델 사용: {current_model}")
         except Exception as e:
-            logger.warning(f"실행 중인 모델 감지 실패, 기본 모델 사용: {e}")
+            logger.warning(f"실행 중인 모델 감지 실패, 폴백 모델 사용: {e}")
             current_model = "gemma3-12b:latest"
         
         config = Config(debug_mode=False, model=current_model)
@@ -89,10 +96,12 @@ class ChatbotService:
                 logger.info(f"✅ 모델 {current_model} 시작 완료")
             except Exception as e:
                 logger.error(f"❌ 모델 {current_model} 시작 실패: {e}")
-                # 폴백으로 auto_select_model 사용
-                model_check = await chatbot.auto_select_model()
-                if not model_check:
-                    return {"error": "사용 가능한 모델이 없습니다"}
+                # auto_select_model 사용을 비활성화하여 자동 모델 변경 방지
+                # 대신 현재 모델 설정을 유지하고 경고만 로그
+                logger.warning(f"모델 {current_model} 시작 실패, 하지만 auto_select_model 호출 건너뛰기 (자동 모델 변경 방지)")
+                chatbot.client._model_name = current_model
+                if not hasattr(chatbot.client, 'model_name') or chatbot.client.model_name != current_model:
+                    chatbot.client.model_name = current_model
         
         # 기본 프롬프트가 제대로 로드되었는지 확인하고 재로드
         chatbot.current_prompt_type = "default"
@@ -267,15 +276,17 @@ class ChatbotService:
                 yield error_msg
                 return
             
-            # 모델이 실행되지 않은 경우 자동 시작
+            # 모델이 실행되지 않은 경우 현재 모델 시작 (다른 모델로 변경하지 않음)
             if not connection_status.get("current_model_running", False):
-                logger.info(f"모델 '{chatbot.client.model}'이 실행되지 않음. 자동 시작 시도 중...")
+                logger.info(f"모델 '{chatbot.client.model}'이 실행되지 않음. 현재 모델 시작 시도 중... (자동 모델 변경 비활성화)")
                 start_result = await chatbot.client.ensure_model_running()
                 if not start_result["success"]:
                     error_msg = f"[모델 시작 오류] {start_result['message']}"
                     logger.error(error_msg)
-                    yield error_msg
-                    return
+                    # 모델 시작 실패 시에도 기존 모델 설정 유지하고 계속 진행
+                    logger.warning(f"모델 시작 실패했지만 기존 모델 설정 유지하고 계속 진행")
+                    # yield error_msg
+                    # return
                 else:
                     logger.info(f"✅ {start_result['message']}")
             

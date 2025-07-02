@@ -8,6 +8,7 @@ Ollama LLM      CLI
 
 import datetime
 import json
+import logging
 import os
 import sys
 import re
@@ -57,6 +58,7 @@ class DrugDevelopmentChatbot:
         self.config = config
         self.context = []
         self.last_topic = None
+        self.logger = logging.getLogger(__name__)
         #                      
         self.settings = {
             "debug_mode": config.debug_mode,
@@ -305,34 +307,31 @@ class DrugDevelopmentChatbot:
 
     async def auto_select_model(self):
         """
-                                  .
-        Gemma3:latest            ,                        .
+        모델 자동 선택 (자동 모델 변경 비활성화)
+        현재 설정된 모델을 그대로 유지하고 설치 여부만 확인
         """
         try:
-            #                  
+            # 설치된 모델 목록 확인
             models = await self.client.list_models()
             available_models = [m.get("name") for m in models]
 
-            #                      
+            # 현재 모델이 설치되어 있는지 확인만 하고 변경하지 않음
             if self.client.model not in available_models:
-                #    Gemma3:latest        
-                preferred_model = "Gemma3:latest"
-                if preferred_model in available_models:
-                    self.client.model = preferred_model
-                    self.interface.display_welcome()
-                # Gemma3                     
-                elif available_models and available_models[0]:
-                    self.client.model = available_models[0]
-                    self.interface.display_error(f"Gemma3:latest             '{available_models[0]}'         .")
-                else:
-                    self.interface.display_error("       Ollama         . Ollama        .")
-                    return False
-
-            return True
+                # 모델이 설치되어 있지 않아도 변경하지 않고 경고만 출력
+                self.interface.display_error(f"현재 모델 '{self.client.model}'이 설치되어 있지 않습니다. 하지만 자동 변경을 하지 않고 유지합니다.")
+                self.logger.warning(f"모델 {self.client.model}이 설치되어 있지 않지만 자동 변경 비활성화로 인해 유지")
+                # 모델을 변경하지 않고 그대로 유지
+                return True
+            else:
+                # 모델이 설치되어 있으면 성공
+                self.logger.info(f"현재 모델 {self.client.model}이 설치되어 있음을 확인")
+                return True
 
         except Exception as e:
-            self.interface.display_error(f"             : {e!s}")
-            return False
+            self.interface.display_error(f"모델 확인 중 오류: {e!s}")
+            self.logger.error(f"auto_select_model 오류: {e}")
+            # 오류가 있어도 현재 모델 설정 유지
+            return True
 
     async def start(self):
         """
