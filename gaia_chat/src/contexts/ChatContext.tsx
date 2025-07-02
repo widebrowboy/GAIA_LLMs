@@ -18,8 +18,14 @@ interface ChatProviderProps {
   children: ReactNode;
 }
 
-// 기본 설정
-const DEFAULT_MODEL = 'gemma3-12b:latest';
+// 기본 설정 - 사용자 정의 기본 모델 시스템 사용
+const getDefaultModel = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('gaia-default-model') || 'gemma3-12b:latest';
+  }
+  return 'gemma3-12b:latest';
+};
+
 const DEFAULT_MODE = 'normal';
 
 export const ChatProvider = ({ children }: ChatProviderProps) => {
@@ -30,7 +36,7 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
   const [sessionId] = useState('gaia_gpt_web_' + Date.now());
   
   // 시스템 상태
-  const [currentModel, setCurrentModel] = useState(DEFAULT_MODEL);
+  const [currentModel, setCurrentModel] = useState(getDefaultModel());
   const [currentMode, setCurrentMode] = useState(DEFAULT_MODE);
   const [mcpEnabled, setMcpEnabled] = useState(false);
   const [currentPromptType, setCurrentPromptType] = useState('default');
@@ -107,6 +113,9 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
           message: content,
           session_id: sessionId,
           conversation_history: conversationHistory,
+          mode: currentMode,
+          mcp_enabled: mcpEnabled,
+          model: currentModel,
         }),
         signal: controller.signal,
       });

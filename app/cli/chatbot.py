@@ -2544,35 +2544,61 @@ class DrugDevelopmentChatbot:
             await self.save_research_result(question, best_response, {})
 
     async def switch_to_deep_research_mode(self):
-        """Deep Research        (MCP         )"""
+        """Deep Research 모드 전환 (MCP 활성화) - 현재 모델 유지"""
         if self.current_mode != "deep_research":
+            # 현재 모델을 기록해서 변경되지 않도록 보장
+            current_model_before = self.client.model_name
+            self.logger.info(f"딥리서치 모드 전환 시작 - 현재 모델 유지: {current_model_before}")
+            
             self.current_mode = "deep_research"
-            self.mode_banner_shown = False  #            
+            self.mode_banner_shown = False  # 배너 재표시
             self._show_mode_banner()
             
-            # MCP         
+            # MCP 활성화
             if hasattr(self, 'mcp_commands') and self.mcp_commands:
                 try:
-                    print("  MCP                ...")
+                    print("🔬 MCP 통합 검색 시스템 시작 중...")
                     await self.mcp_commands.start_mcp()
                 except Exception as e:
-                    print(f"[Warning] MCP            : {e}")
-                    print("[Tip]      '/mcp start'            .")
+                    print(f"[Warning] MCP 시작 실패: {e}")
+                    print("[Tip] 수동으로 '/mcp start' 명령어를 실행해보세요.")
+            
+            # 모델이 변경되지 않았는지 확인
+            current_model_after = self.client.model_name
+            if current_model_before != current_model_after:
+                self.logger.warning(f"딥리서치 모드 전환 중 모델이 변경됨: {current_model_before} -> {current_model_after}. 원래 모델로 복원 중...")
+                self.client._model_name = current_model_before
+                if hasattr(self.client, 'model_name'):
+                    self.client.model_name = current_model_before
+                print(f"⚠️ 모델이 자동 변경되어 원래 모델 {current_model_before}로 복원했습니다.")
 
     async def switch_to_normal_mode(self):
-        """          (MCP         )"""
+        """일반 모드 전환 (MCP 비활성화) - 현재 모델 유지"""
         if self.current_mode != "normal":
-            # MCP          (           )
+            # 현재 모델을 기록해서 변경되지 않도록 보장
+            current_model_before = self.client.model_name
+            self.logger.info(f"일반 모드 전환 시작 - 현재 모델 유지: {current_model_before}")
+            
+            # MCP 비활성화 (설정에 따라)
             if hasattr(self, 'mcp_commands') and self.mcp_commands and self.mcp_enabled:
                 try:
-                    print("  MCP                ...")
+                    print("🔬 MCP 통합 검색 시스템 중지 중...")
                     await self.mcp_commands.stop_mcp()
                 except Exception as e:
-                    print(f"[Warning] MCP            : {e}")
+                    print(f"[Warning] MCP 중지 실패: {e}")
             
             self.current_mode = "normal"
-            self.mode_banner_shown = False  #            
+            self.mode_banner_shown = False  # 배너 재표시
             self._show_mode_banner()
+            
+            # 모델이 변경되지 않았는지 확인
+            current_model_after = self.client.model_name
+            if current_model_before != current_model_after:
+                self.logger.warning(f"일반 모드 전환 중 모델이 변경됨: {current_model_before} -> {current_model_after}. 원래 모델로 복원 중...")
+                self.client._model_name = current_model_before
+                if hasattr(self.client, 'model_name'):
+                    self.client.model_name = current_model_before
+                print(f"⚠️ 모델이 자동 변경되어 원래 모델 {current_model_before}로 복원했습니다.")
 
     def toggle_mcp_output(self):
         """MCP         """

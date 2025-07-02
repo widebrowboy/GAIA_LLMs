@@ -60,13 +60,14 @@ class ChatbotService:
                 current_model = running_models[-1]
                 logger.info(f"세션 {session_id} 생성 시 현재 실행 중인 모델 유지: {current_model}")
             else:
-                # 실행 중인 모델이 없으면 사용자 설정 기본 모델 사용하지 않고 현재 실행된 모델 유지
-                # 모델 변경을 방지하기 위해 현재 클라이언트의 모델을 유지
-                current_model = "gemma3-12b:latest"  # 최후 폴백
-                logger.info(f"세션 {session_id} 생성 시 실행 중인 모델이 없어 폴백 모델 사용: {current_model}")
+                # 실행 중인 모델이 없으면 기본 모델 사용 (자동 변경 방지)
+                from app.utils.config import OLLAMA_MODEL
+                current_model = OLLAMA_MODEL  # 설정된 기본 모델 사용
+                logger.info(f"세션 {session_id} 생성 시 실행 중인 모델이 없어 설정된 기본 모델 사용: {current_model}")
         except Exception as e:
-            logger.warning(f"실행 중인 모델 감지 실패, 폴백 모델 사용: {e}")
-            current_model = "gemma3-12b:latest"
+            logger.warning(f"실행 중인 모델 감지 실패, 설정된 기본 모델 사용: {e}")
+            from app.utils.config import OLLAMA_MODEL
+            current_model = OLLAMA_MODEL
         
         config = Config(debug_mode=False, model=current_model)
         chatbot = DrugDevelopmentChatbot(config)
@@ -370,26 +371,53 @@ class ChatbotService:
                 }
             
             elif command == "/normal":
+                # 일반 모드로 전환 - 현재 모델 유지
+                current_model_before = chatbot.client.model_name
+                logger.info(f"일반 모드 전환 시작 - 현재 모델 유지: {current_model_before}")
+                
                 await chatbot.switch_to_normal_mode()
+                
+                # 모델이 변경되지 않았는지 확인
+                current_model_after = chatbot.client.model_name
+                if current_model_before != current_model_after:
+                    logger.warning(f"일반 모드 전환 중 모델이 변경됨: {current_model_before} -> {current_model_after}. 원래 모델로 복원 중...")
+                    chatbot.client._model_name = current_model_before
+                    if hasattr(chatbot.client, 'model_name'):
+                        chatbot.client.model_name = current_model_before
+                
                 return {
                     "type": "mode",
                     "mode": "normal",
-                    "message": "일반 모드로 전환되었습니다."
+                    "message": f"일반 모드로 전환되었습니다. (모델: {current_model_before})",
+                    "model": current_model_before
                 }
             
             elif command == "/deep":
-                # Deep Research 모드로 전환 (MCP 시작)
+                # Deep Research 모드로 전환 (MCP 시작) - 현재 모델 유지
                 if not chatbot.mcp_commands:
                     return {"error": "MCP 기능을 사용할 수 없습니다"}
+                
+                # 현재 모델을 기록해서 변경되지 않도록 보장
+                current_model_before = chatbot.client.model_name
+                logger.info(f"딥리서치 모드 전환 시작 - 현재 모델 유지: {current_model_before}")
                 
                 result = await chatbot.mcp_commands.handle_mcp_command("start")
                 chatbot.config.mcp_enabled = True
                 
+                # 모델이 변경되지 않았는지 확인
+                current_model_after = chatbot.client.model_name
+                if current_model_before != current_model_after:
+                    logger.warning(f"딥리서치 모드 전환 중 모델이 변경됨: {current_model_before} -> {current_model_after}. 원래 모델로 복원 중...")
+                    chatbot.client._model_name = current_model_before
+                    if hasattr(chatbot.client, 'model_name'):
+                        chatbot.client.model_name = current_model_before
+                
                 return {
                     "type": "mode",
                     "mode": "deep_research",
-                    "message": "Deep Research 모드로 전환되었습니다. MCP 통합 검색이 활성화됩니다.",
-                    "mcp_enabled": True
+                    "message": f"Deep Research 모드로 전환되었습니다. MCP 통합 검색이 활성화됩니다. (모델: {current_model_before})",
+                    "mcp_enabled": True,
+                    "model": current_model_before
                 }
             
             elif command == "/mcpshow":
@@ -426,9 +454,19 @@ class ChatbotService:
             "mcp_enabled": chatbot.config.mcp_enabled,
             "debug": chatbot.config.debug_mode,
             "mcp_output_visible": chatbot.config.show_mcp_output,
-            "available_models": ["gemma3-12b:latest", "txgemma-chat:latest", "txgemma-predict:latest", "Gemma3:27b-it-q4_K_M"],
+            "available_models": await self._get_available_models(),
             "available_prompts": list(self.prompt_manager.templates.keys()) if hasattr(self.prompt_manager, 'templates') and self.prompt_manager.templates else []
         }
+    
+    async def _get_available_models(self) -> List[str]:
+        """사용 가능한 모델 목록 가져오기"""
+        try:
+            from app.utils.ollama_manager import list_available_models
+            models = await list_available_models()
+            return models if models else ["gemma3-12b:latest", "txgemma-chat:latest", "txgemma-predict:latest", "Gemma3:27b-it-q4_K_M"]
+        except Exception as e:
+            logger.warning(f"모델 목록 조회 실패, 기본 목록 사용: {e}")
+            return ["gemma3-12b:latest", "txgemma-chat:latest", "txgemma-predict:latest", "Gemma3:27b-it-q4_K_M"]
     
     def get_all_sessions(self) -> List[Dict[str, Any]]:
         """모든 세션 정보 가져오기"""
