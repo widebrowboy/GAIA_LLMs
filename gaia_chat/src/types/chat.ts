@@ -80,4 +80,7 @@ export interface ChatContextType {
   setCurrentPromptType?: (promptType: string) => void;
   // 시스템 상태 새로고침 함수 (선택적)
   refreshSystemStatus?: () => Promise<void>;
+  // 기본 모델 관리 함수들 (선택적)
+  changeDefaultModel?: (newDefaultModel: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  getCurrentDefaultModel?: () => string;
 }

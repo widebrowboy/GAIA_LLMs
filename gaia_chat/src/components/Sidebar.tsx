@@ -41,7 +41,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     setCurrentMode,
     setMcpEnabled,
     setCurrentPromptType,
-    refreshSystemStatus
+    refreshSystemStatus,
+    changeDefaultModel,
+    getCurrentDefaultModel
   } = useChatContext();
   
   const { isDesktop } = useResponsive();
@@ -1103,6 +1105,63 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               </div>
             )}
             
+            {/* 기본 모델 설정 섹션 */}
+            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-emerald-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm">⚙️</span>
+                  <h3 className="text-sm font-semibold text-gray-800">기본 모델 설정</h3>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600 mb-3">페이지 새로고침 및 새 연구 시작 시 자동으로 실행될 모델을 설정합니다.</p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-700">현재 기본 모델:</span>
+                <select
+                  value={getCurrentDefaultModel ? getCurrentDefaultModel() : 'gemma3-12b:latest'}
+                  onChange={async (e) => {
+                    const newDefaultModel = e.target.value;
+                    if (changeDefaultModel) {
+                      try {
+                        setIsModelOperationInProgress(true);
+                        setModelChangeProgress('기본 모델 변경 중...');
+                        
+                        const result = await changeDefaultModel(newDefaultModel);
+                        if (result.success) {
+                          setModelChangeProgress('기본 모델 변경 완료!');
+                          console.log('✅ 기본 모델 변경 성공:', result.message);
+                          
+                          // 상태 새로고침
+                          if (typeof refreshSystemStatus === 'function') {
+                            await refreshSystemStatus();
+                          }
+                          await checkSystemStatus();
+                          await fetchModelsWithApiClient();
+                        } else {
+                          console.error('❌ 기본 모델 변경 실패:', result.error);
+                          alert(`기본 모델 변경에 실패했습니다: ${result.error}`);
+                        }
+                      } catch (error) {
+                        console.error('❌ 기본 모델 변경 오류:', error);
+                        alert(`기본 모델 변경 중 오류가 발생했습니다: ${error}`);
+                      } finally {
+                        setIsModelOperationInProgress(false);
+                        setTimeout(() => setModelChangeProgress(''), 2000);
+                      }
+                    }
+                  }}
+                  disabled={isModelOperationInProgress}
+                  className="text-xs px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {availableModels.map(model => (
+                    <option key={model} value={model}>{model}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                💡 기본 모델은 브라우저에 저장되며, 언제든지 변경할 수 있습니다.
+              </div>
+            </div>
+
             <div className="space-y-2 mb-4">
               <p className="text-sm text-gray-600">사용할 AI 모델을 선택하세요:</p>
               <div className="flex items-center justify-between text-xs text-gray-500 mb-2">

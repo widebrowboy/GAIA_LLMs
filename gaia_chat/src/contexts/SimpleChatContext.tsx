@@ -21,9 +21,39 @@ interface ChatProviderProps {
 // GAIA-BT API 서버 URL
 const API_BASE_URL = 'http://localhost:8000';
 
-// 기본 설정
-const DEFAULT_MODEL = 'gemma3-12b:latest';
+// 기본 설정 (로컬 스토리지에서 사용자 설정을 불러오거나 기본값 사용)
+const getDefaultModel = (): string => {
+  if (typeof window !== 'undefined') {
+    const savedDefaultModel = localStorage.getItem('gaia_default_model');
+    if (savedDefaultModel) {
+      console.log(`📋 저장된 기본 모델 불러오기: ${savedDefaultModel}`);
+      return savedDefaultModel;
+    }
+  }
+  return 'gemma3-12b:latest';
+};
+
+const DEFAULT_MODEL = getDefaultModel();
 const DEFAULT_MODE = 'normal';
+
+// 기본 모델 자동 시작 함수 (최신 기본 모델 설정 반영)
+const ensureDefaultModel = async () => {
+  try {
+    const currentDefault = getDefaultModel(); // 항상 최신 기본 모델 사용
+    console.log(`🔄 기본 모델 확인 및 시작: ${currentDefault}`);
+    const result = await apiClient.switchModelSafely(currentDefault);
+    if (result.success) {
+      console.log(`✅ 기본 모델 시작 완료: ${currentDefault}`);
+      return true;
+    } else {
+      console.warn(`⚠️ 기본 모델 시작 실패: ${result.error}`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`❌ 기본 모델 시작 오류:`, error);
+    return false;
+  }
+};
 
 export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -46,10 +76,11 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
   // 제어 참조
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // 로컬 스토리지에서 대화 목록 로드
+  // 초기화 및 기본 모델 설정
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
+        // 로컬 스토리지에서 대화 목록 로드
         const savedConversations = localStorage.getItem('gaia_gpt_conversations');
         if (savedConversations) {
           const parsed = JSON.parse(savedConversations);
@@ -62,8 +93,30 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
             }
           }
         }
+        
+        // 기본 모델 자동 시작
+        const initializeDefaultModel = async () => {
+          console.log('🚀 페이지 로드 시 기본 모델 초기화 시작');
+          
+          // 최신 기본 모델 설정을 가져와서 Context 상태 설정
+          const currentDefault = getDefaultModel();
+          setCurrentModel(currentDefault);
+          console.log(`📝 currentModel 상태를 최신 기본값으로 설정: ${currentDefault}`);
+          
+          // 3초 지연 후 기본 모델 시작 (서버 안정화 대기)
+          setTimeout(async () => {
+            const success = await ensureDefaultModel();
+            if (success) {
+              console.log('✅ 기본 모델 초기화 완료');
+            } else {
+              console.warn('⚠️ 기본 모델 초기화 실패 - 수동 시작 필요');
+            }
+          }, 3000);
+        };
+        
+        initializeDefaultModel();
       } catch (error) {
-        console.error('로컬 스토리지에서 대화 로드 실패:', error);
+        console.error('초기화 중 오류:', error);
       }
     }
   }, []);
@@ -100,7 +153,7 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
   };
 
   // 새 대화 시작
-  const startNewConversation = () => {
+  const startNewConversation = async () => {
     const newConversation = createConversation();
     setCurrentConversation(newConversation);
     
@@ -110,6 +163,25 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
     setStreamingResponse('');
     setIsConnecting(false);
     setError(null);
+    
+    // 새 연구 시작 시 기본 모델 확인 및 설정
+    console.log('🆕 새 연구 시작 - 기본 모델 확인 중...');
+    try {
+      // 최신 기본 모델 설정을 가져와서 Context 상태 재설정
+      const currentDefault = getDefaultModel();
+      setCurrentModel(currentDefault);
+      console.log(`📝 새 연구 시 currentModel 상태를 최신 기본값으로 재설정: ${currentDefault}`);
+      
+      // 기본 모델이 실행 중인지 확인하고 필요시 시작
+      const success = await ensureDefaultModel();
+      if (success) {
+        console.log('✅ 새 연구 시 기본 모델 설정 완료');
+      } else {
+        console.warn('⚠️ 새 연구 시 기본 모델 설정 실패');
+      }
+    } catch (error) {
+      console.error('❌ 새 연구 시 모델 설정 오류:', error);
+    }
   };
 
   // 대화 선택
@@ -517,6 +589,44 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
     }
   };
 
+  // 기본 모델 변경 함수
+  const changeDefaultModel = async (newDefaultModel: string) => {
+    try {
+      console.log(`🔧 기본 모델 변경 요청: ${newDefaultModel}`);
+      
+      // 로컬 스토리지에 새로운 기본 모델 저장
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('gaia_default_model', newDefaultModel);
+        console.log(`💾 새로운 기본 모델 저장됨: ${newDefaultModel}`);
+      }
+      
+      // 현재 Context 상태도 즉시 업데이트
+      setCurrentModel(newDefaultModel);
+      console.log(`📝 currentModel 상태 업데이트: ${newDefaultModel}`);
+      
+      // 새로운 기본 모델 실행
+      const success = await apiClient.switchModelSafely(newDefaultModel);
+      if (success && success.success) {
+        console.log(`✅ 기본 모델 전환 완료: ${newDefaultModel}`);
+        return { success: true, message: `기본 모델이 '${newDefaultModel}'로 변경되었습니다.` };
+      } else {
+        console.warn(`⚠️ 기본 모델 전환 실패: ${success?.error || 'Unknown error'}`);
+        return { success: false, error: success?.error || '모델 전환 실패' };
+      }
+    } catch (error) {
+      console.error('❌ 기본 모델 변경 실패:', error);
+      return { success: false, error: error instanceof Error ? error.message : '알 수 없는 오류' };
+    }
+  };
+
+  // 현재 기본 모델 조회 함수
+  const getCurrentDefaultModel = (): string => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('gaia_default_model') || 'gemma3-12b:latest';
+    }
+    return 'gemma3-12b:latest';
+  };
+
   return (
     <ChatContext.Provider value={{
       conversations,
@@ -543,7 +653,9 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
       setCurrentMode,
       setMcpEnabled,
       setCurrentPromptType,
-      refreshSystemStatus
+      refreshSystemStatus,
+      changeDefaultModel,
+      getCurrentDefaultModel
     }}>
       {children}
     </ChatContext.Provider>
