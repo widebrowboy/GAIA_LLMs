@@ -8,10 +8,19 @@ import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 import json
+import torch
 
 from .embeddings import EmbeddingService
 from .vector_store_lite import MilvusLiteVectorStore
 import requests
+
+# PyMilvus BGE Reranker 임포트
+try:
+    from pymilvus.model.reranker import BGERerankFunction
+    RERANKER_AVAILABLE = True
+except ImportError:
+    BGERerankFunction = None
+    RERANKER_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -32,18 +41,40 @@ class RAGPipeline:
                  embedding_model: str = "mxbai-embed-large",
                  generation_model: str = "gemma3-12b:latest",
                  milvus_lite_db: str = "./milvus_lite.db",
-                 collection_name: str = "gaia_bt_documents"):
+                 collection_name: str = "gaia_bt_documents",
+                 enable_reranking: bool = True,
+                 reranker_model: str = "BAAI/bge-reranker-v2-gemma"):
         """
         Args:
             embedding_model: 임베딩 모델 이름
             generation_model: 생성 모델 이름
             milvus_lite_db: Milvus Lite 데이터베이스 파일 경로
             collection_name: Milvus 컬렉션 이름
+            enable_reranking: 리랭킹 기능 활성화 여부
+            reranker_model: 리랭킹에 사용할 모델 이름
         """
         # 서비스 초기화
         self.embedding_service = EmbeddingService(model_name=embedding_model)
         self.generation_model = generation_model
         self.ollama_base_url = "http://localhost:11434"
+        
+        # 리랭킹 설정
+        self.enable_reranking = enable_reranking and RERANKER_AVAILABLE
+        self.reranker = None
+        
+        if self.enable_reranking:
+            try:
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                self.reranker = BGERerankFunction(
+                    model_name=reranker_model,
+                    device=device
+                )
+                logger.info(f"BGE Reranker initialized: {reranker_model} on {device}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize reranker: {str(e)}")
+                self.enable_reranking = False
+        else:
+            logger.info("Reranking disabled or BGERerankFunction not available")
         
         # 임베딩 차원 확인
         dimension = self.embedding_service.get_embedding_dimension()
@@ -167,30 +198,72 @@ class RAGPipeline:
             logger.error(f"Failed to add documents: {str(e)}")
             return False
     
-    def retrieve(self, query: str, top_k: int = 5) -> List[Tuple[str, float, Dict[str, Any]]]:
+    def retrieve(self, query: str, top_k: int = 5, top_k_initial: int = None) -> List[Tuple[str, float, Dict[str, Any]]]:
         """
-        쿼리와 관련된 문서 검색
+        쿼리와 관련된 문서 검색 (2단계 검색 아키텍처)
         
         Args:
             query: 검색 쿼리
-            top_k: 반환할 결과 수
+            top_k: 최종 반환할 결과 수
+            top_k_initial: 1단계 검색에서 가져올 결과 수 (리랭킹용)
             
         Returns:
             [(텍스트, 점수, 메타데이터)] 리스트
         """
-        # 쿼리 임베딩
+        # 리랭킹이 활성화된 경우 초기 검색 결과 수를 더 많이 가져옴
+        if self.enable_reranking and top_k_initial is None:
+            top_k_initial = min(top_k * 4, 20)  # 최대 20개
+        elif top_k_initial is None:
+            top_k_initial = top_k
+        
+        # 1단계: 벡터 유사도 검색 (mxbai-embed-large)
         query_embedding = self.embedding_service.embed_text(query)
         if not query_embedding:
             logger.error("Failed to embed query")
             return []
         
-        # 벡터 검색
-        results = self.vector_store.search(
+        # 초기 검색 결과
+        initial_results = self.vector_store.search(
             query_embedding=query_embedding,
-            top_k=top_k
+            top_k=top_k_initial
         )
         
-        return results
+        if not initial_results:
+            return []
+        
+        # 2단계: BGE Reranker를 사용한 리랭킹
+        if self.enable_reranking and self.reranker and len(initial_results) > top_k:
+            try:
+                # 리랭킹을 위한 데이터 준비
+                documents = [result[0] for result in initial_results]
+                
+                # BGE Reranker 실행
+                reranked_results = self.reranker(query, documents, top_k=top_k)
+                
+                # 리랭킹 결과를 원래 형식으로 변환
+                final_results = []
+                for result in reranked_results:
+                    # reranked_results는 {'index': int, 'text': str, 'score': float} 형식
+                    original_index = result['index']
+                    original_result = initial_results[original_index]
+                    
+                    # 리랭킹 점수로 업데이트
+                    final_results.append((
+                        original_result[0],  # text
+                        result['score'],     # reranking score
+                        original_result[2]   # metadata
+                    ))
+                
+                logger.info(f"Reranking applied: {len(initial_results)} -> {len(final_results)} results")
+                return final_results
+                
+            except Exception as e:
+                logger.warning(f"Reranking failed, falling back to vector search: {str(e)}")
+                # 리랭킹 실패 시 원래 결과 반환
+                return initial_results[:top_k]
+        
+        # 리랭킹이 비활성화되거나 필요하지 않은 경우
+        return initial_results[:top_k]
     
     def generate_response(self, 
                          query: str,
@@ -257,7 +330,8 @@ class RAGPipeline:
     def query(self, 
               query: str,
               top_k: int = 5,
-              system_prompt: Optional[str] = None) -> RAGResponse:
+              system_prompt: Optional[str] = None,
+              top_k_initial: Optional[int] = None) -> RAGResponse:
         """
         전체 RAG 파이프라인 실행
         
@@ -265,12 +339,13 @@ class RAGPipeline:
             query: 사용자 쿼리
             top_k: 검색할 문서 수
             system_prompt: 시스템 프롬프트
+            top_k_initial: 1단계 검색 결과 수
             
         Returns:
             RAG 응답 객체
         """
         # 1. 관련 문서 검색
-        retrieved_docs = self.retrieve(query, top_k=top_k)
+        retrieved_docs = self.retrieve(query, top_k=top_k, top_k_initial=top_k_initial)
         
         if not retrieved_docs:
             return RAGResponse(
@@ -303,8 +378,15 @@ class RAGPipeline:
     
     def get_stats(self) -> Dict[str, Any]:
         """시스템 통계 정보 반환"""
-        return {
+        stats = {
             "vector_store": self.vector_store.get_collection_stats(),
             "embedding_model": self.embedding_service.model_name,
-            "generation_model": self.generation_model
+            "generation_model": self.generation_model,
+            "reranking": {
+                "enabled": self.enable_reranking,
+                "available": RERANKER_AVAILABLE,
+                "model": "BAAI/bge-reranker-v2-gemma" if self.enable_reranking else None,
+                "device": "cuda" if torch.cuda.is_available() else "cpu"
+            }
         }
+        return stats
