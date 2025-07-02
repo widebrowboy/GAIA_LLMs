@@ -253,6 +253,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         // 내부 상태도 업데이트
         setModelChangeProgress('내부 상태 업데이트 중...');
         
+        // Context의 currentModel 즉시 업데이트
+        setCurrentModel(modelName);
+        console.log(`✅ 모델 전환 후 Context currentModel 즉시 업데이트: ${modelName}`);
+        
         // Context에서 모델 전환 (추가 안전성)
         if (changeModel) {
           try {
@@ -560,13 +564,20 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               const newRunningModels = data.running || [];
               const currentRunningModel = newRunningModels.length > 0 ? newRunningModels[newRunningModels.length - 1]?.name : null;
               
-              // 현재 모델이 변경되었으면 UI 업데이트
-              if (currentRunningModel && currentRunningModel !== currentModel) {
-                console.log(`🔄 실행 중인 모델 변경 감지: ${currentModel} → ${currentRunningModel}`);
-                
-                // Context의 currentModel 업데이트
-                setCurrentModel(currentRunningModel);
-                console.log(`✅ Context currentModel 업데이트: ${currentRunningModel}`);
+              // 현재 실행 중인 모델 감지 및 Context 동기화
+              if (currentRunningModel) {
+                // Context의 currentModel과 실제 실행 중인 모델이 다르면 동기화
+                if (currentRunningModel !== currentModel) {
+                  console.log(`🔄 실행 중인 모델 변경 감지: ${currentModel} → ${currentRunningModel}`);
+                  
+                  // Context의 currentModel 업데이트
+                  setCurrentModel(currentRunningModel);
+                  console.log(`✅ Context currentModel 업데이트: ${currentRunningModel}`);
+                }
+              } else if (newRunningModels.length === 0 && currentModel) {
+                // 실행 중인 모델이 없으면 currentModel도 초기화
+                console.log(`🔄 실행 중인 모델이 없음. currentModel 초기화`);
+                setCurrentModel('');
               }
               
               // 모델 목록 업데이트
@@ -1102,7 +1113,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               ) : detailedModels.length > 0 ? (
                 detailedModels.map((model) => {
                   const isRunning = runningModels.some(running => running.name === model.name);
-                  const isCurrent = currentModel === model.name;
+                  // 선택됨 표시는 실제 실행 중인 모델을 기준으로 함
+                  const isCurrent = isRunning && runningModels.length > 0 && runningModels[runningModels.length - 1]?.name === model.name;
                   
                   return (
                     <div
@@ -1159,6 +1171,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                                   if (action === 'start') {
                                     console.log(`🔄 시작된 모델을 현재 모델로 설정: ${model.name}`);
                                     setCurrentModel(model.name);
+                                  } else if (action === 'stop') {
+                                    // 모델 중지 시 다른 실행 중인 모델이 있다면 그것을 현재 모델로 설정
+                                    console.log(`🔄 모델 중지됨: ${model.name}`);
+                                    // 실시간 업데이트에서 자동으로 처리됨
                                   }
                                   
                                   setModelChangeProgress('상태 업데이트 중...');
