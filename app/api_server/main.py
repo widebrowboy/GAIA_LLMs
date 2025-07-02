@@ -15,7 +15,7 @@ from typing import Dict, Any
 import traceback
 import asyncio
 
-from app.api_server.routers import chat, system, mcp, session
+from app.api_server.routers import chat, system, mcp, session, rag
 from app.api_server.services.chatbot_service import ChatbotService
 from app.api_server.websocket_manager import WebSocketManager
 from app.utils.config import OLLAMA_MODEL
@@ -360,6 +360,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(mcp.router, prefix="/api/mcp", tags=["mcp"])
 app.include_router(session.router, prefix="/api/session", tags=["session"])
+app.include_router(rag.router, tags=["rag"])
 
 @app.get("/", 
     summary="API 루트 정보",

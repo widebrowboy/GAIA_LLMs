@@ -3,3 +3,6 @@ asyncio==3.4.3
 typing-extensions==4.9.0
 uvicorn
 fastapi
+pymilvus==2.3.4
+numpy==1.26.2
+requests==2.31.0

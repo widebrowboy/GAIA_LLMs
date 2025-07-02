@@ -1,4 +1,4 @@
-# GAIA-BT v3.74 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.76 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 전문 AI 연구 어시스턴트 시스템입니다.
@@ -36,6 +36,14 @@ GAIA-BT v2.0은 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개
 - ✅ **Deep Search** - 다중 데이터베이스 검색
 - ✅ **프롬프트 관리** - 파일 기반 시스템
 
+### RAG 시스템 (완료)
+- ✅ **Milvus Lite 벡터 데이터베이스** - 로컬 임베디드 벡터 저장소
+- ✅ **mxbai-embed-large 임베딩** - 334M 파라미터 의미론적 유사성 모델
+- ✅ **문서 처리 파이프라인** - 청킹, 벡터화, 저장 자동화
+- ✅ **유사도 검색 시스템** - 컨텍스트 기반 문서 검색
+- ✅ **RAG 응답 생성** - gemma3-12b를 활용한 컨텍스트 기반 답변
+- ✅ **RESTful API** - 문서 추가, 검색, 쿼리 엔드포인트
+
 ## 🏗️ 프로젝트 구조
 
 ```
@@ -55,7 +63,11 @@ GAIA_LLMs/
 ├── mcp/                      # MCP 통합
 ├── prompts/                  # 프롬프트 템플릿
 ├── scripts/                  # 실행 스크립트
-└── config/                   # 설정 파일
+├── config/                   # 설정 파일
+└── app/rag/                  # RAG 시스템
+    ├── embeddings.py         # 임베딩 서비스
+    ├── vector_store_lite.py  # Milvus Lite 벡터 스토어
+    └── rag_pipeline.py       # RAG 파이프라인
 ```
 
 ## 🛠️ 사용 가이드
@@ -93,6 +105,21 @@ python run_api_server.py
 /mcpshow              # MCP 출력 표시 토글
 ```
 
+### RAG 시스템 사용법
+```bash
+# RAG 시스템 테스트
+python test_rag_system.py
+
+# RAG API 테스트  
+python test_rag_api.py
+
+# API 엔드포인트
+# 문서 추가: POST /api/rag/documents
+# RAG 쿼리: POST /api/rag/query  
+# 문서 검색: GET /api/rag/search
+# 시스템 통계: GET /api/rag/stats
+```
+
 ## 🔧 기술 스택
 
 ### Frontend
@@ -111,6 +138,8 @@ python run_api_server.py
 - **Gemma3-12B** - 메인 LLM 모델
 - **MCP Protocol** - 모델 컨텍스트 프로토콜
 - **BioMCP** - 생명과학 전용 MCP 서버
+- **mxbai-embed-large** - 의미론적 유사성 최적화 임베딩 모델 (334M)
+- **Milvus** - 벡터 데이터베이스 (RAG 시스템용)
 
 ## 📊 시스템 모니터링
 
@@ -118,6 +147,7 @@ python run_api_server.py
 - **WebUI**: 3003
 - **API**: 8000  
 - **Ollama**: 11434
+- **Milvus**: 19530 (GRPC), 9091 (Admin)
 
 ### 로그 위치
 - **API 서버**: `/tmp/gaia-bt-api.log`
@@ -380,6 +410,25 @@ git reset --hard [커밋해시]
 - **v3.72**: 모드 전환 시 모델 자동 변경 완전 방지 - 딥리서치/일반 모드 전환 시 현재 모델 유지, 독립적 상태 관리, 자동 복원 기능
 - **v3.73**: 모드 전환 시 모델 자동 변경 완전 방지 - 프론트엔드 자동 모델 시작 로직 비활성화, 번호 섹션 제거 완료
 - **v3.74**: 사이드바 대화 기록 제목 15자 제한 및 UI 최적화 - 긴 제목 자동 축약, 툴팁 전체 제목 표시, 사용자 경험 향상
+- **v3.75**: Milvus RAG 시스템 구축 계획 수립 - mxbai-embed-large 임베딩 모델 및 gemma3-12b:latest 생성 모델 활용 설계
+- **v3.76**: Milvus RAG 시스템 완전 구현 완료 - Milvus Lite 기반 벡터 데이터베이스, 문서 처리 파이프라인, RAG API 엔드포인트 완성
+
+### 완료된 Todo 기록 (v3.76)
+
+#### v3.76: Milvus RAG 시스템 완전 구현 완료 ✅
+- ✅ Milvus Lite 벡터 데이터베이스 설치 및 설정 - 로컬 임베디드 벡터 스토어 구축
+- ✅ Ollama mxbai-embed-large 임베딩 모델 통합 - 334M 파라미터 의미론적 유사성 모델
+- ✅ RAG 파이프라인 구현 완성 - 문서 청킹, 벡터화, 저장 자동화
+- ✅ 검색 및 생성 로직 구현 - 유사도 검색과 gemma3-12b 기반 컨텍스트 응답 생성
+- ✅ RAG API 엔드포인트 완성 - 문서 추가, 쿼리, 검색, 통계 REST API
+- ✅ 테스트 스크립트 작성 - 로컬 테스트와 API 테스트 자동화
+- ✅ 시스템 통합 및 최적화 - API 서버에 RAG 라우터 통합, 전체 시스템 테스트 완료
+
+#### v3.75: Milvus RAG 시스템 구축 계획 수립 ✅
+- ✅ CLAUDE.md 문서 업데이트 - 버전 업데이트 및 RAG 시스템 관련 정보 추가
+- ✅ 기술 스택 섹션에 mxbai-embed-large 임베딩 모델 추가
+- ✅ 포트 관리 섹션에 Milvus 포트 정보 추가 (19530, 9091)
+- ✅ 버전 히스토리에 v3.75 RAG 시스템 계획 기록
 
 ### 완료된 Todo 기록 (v3.73-3.74)
 
@@ -754,4 +803,60 @@ await fetchModelsWithApiClient();
 
 ---
 
-**GAIA-BT v3.74** - 신약개발 연구의 새로운 패러다임 🧬✨
+## 🚀 RAG 시스템 구축 계획 (v3.75+)
+
+### Milvus + Ollama 기반 RAG 시스템 아키텍처
+
+#### 핵심 구성 요소
+1. **임베딩 모델**: mxbai-embed-large (334M 파라미터)
+   - 의미론적 유사성에 최적화
+   - 높은 정확도의 벡터 표현 생성
+
+2. **생성 모델**: gemma3-12b:latest
+   - 기존 시스템과 통합된 메인 LLM
+   - 검색된 컨텍스트 기반 응답 생성
+
+3. **벡터 데이터베이스**: Milvus
+   - 고성능 벡터 검색
+   - 확장 가능한 인덱싱 시스템
+
+#### RAG 파이프라인 구현 단계
+1. **데이터 준비 및 전처리**
+   - 신약개발 관련 문서 수집 (논문, 특허, 임상 데이터)
+   - 텍스트 청킹 및 메타데이터 추출
+   - 도메인 특화 전처리 (화학식, 약물명, 유전자명 처리)
+
+2. **벡터화 및 저장**
+   - mxbai-embed-large로 문서 임베딩 생성
+   - Milvus 컬렉션 생성 및 인덱스 설정
+   - 메타데이터와 함께 벡터 저장
+
+3. **검색 및 생성 통합**
+   - 사용자 쿼리 임베딩 변환
+   - Milvus에서 유사도 기반 검색
+   - 검색된 컨텍스트를 gemma3-12b에 전달
+   - 컨텍스트 기반 응답 생성
+
+#### 시스템 통합 계획
+1. **API 서버 확장**
+   - RAG 엔드포인트 추가 (`/api/rag/search`, `/api/rag/generate`)
+   - Milvus 클라이언트 통합
+   - 임베딩 생성 서비스 구현
+
+2. **WebUI 기능 추가**
+   - RAG 모드 토글 옵션
+   - 검색 결과 시각화
+   - 소스 문서 참조 표시
+
+3. **성능 최적화**
+   - 임베딩 캐싱 시스템
+   - 배치 처리 최적화
+   - 비동기 검색 처리
+
+#### 예상 효과
+- 최신 연구 정보 기반 응답 생성
+- 출처 추적 가능한 신뢰성 있는 답변
+- 도메인 특화 지식 검색 정확도 향상
+- 개인화된 연구 지원 도구로 진화
+
+**GAIA-BT v3.75** - 신약개발 연구의 새로운 패러다임 🧬✨
