@@ -1025,28 +1025,14 @@ class DrugDevelopmentChatbot:
             else:
                 self.interface.print_thinking("[Warning]    Database                      ")
                 
-                # Database                          
+                # Database 검색이 실패한 경우 기본 응답 제공
                 fallback_message = f"""
-[Search] **Database Deep Search      **
+딥리서치 Database 검색이 현재 사용 불가능합니다. 기본 지식을 바탕으로 답변드리겠습니다.
 
-  **      :** "{user_input}"
+질문: "{user_input}"
 
-[Warning] **      :**
-- Database             ('/database start'       )
--                            
--                  
-- Database         ("Method not implemented: tools/call")
-
-   **     :**
-1. '/database status'      Database         
-2. '/database stop'   '/database start'        
-3.                      
-4. '/debug'                      
-
-  **        :**
-- "EGFR                                "
-- "BRCA1                                  "
-- "                                     "
+⚠️ **정보 한계**: 이 응답은 일반적인 지식을 바탕으로 작성되었습니다.
+최신 연구 결과나 구체적인 데이터는 전문 데이터베이스를 확인해주세요.
 """
                 
                 return fallback_message
@@ -2011,15 +1997,6 @@ class DrugDevelopmentChatbot:
 
 [Research] **딥리서치 Database 검색 결과:**
 {deep_search_context}
-
-**[Data] Database 소스 활용 지침:**
-1. 모든 Database 소스 (Web Search 포함)를 체계적으로 활용하세요
-2. DrugBank, OpenTargets, ChEMBL, BioMCP, Web Search 결과를 통합 분석하세요
-3. 각 소스별 데이터를 명시적으로 인용하세요 (예: "DrugBank 데이터에 따르면...", "OpenTargets 분석 결과...")
-4. Sequential Thinking 방법론을 단계별로 적용하세요
-5. 시간 정보 표시는 제거되었습니다
-6. 웹 검색 결과는 최근 3-5년 리뷰 논문에 집중하세요
-7. 응답 마지막에 반드시 3가지 추천 후속 질문을 포함하세요
 
 위 Database 정보를 활용하여 종합적이고 상세한 연구 분석 보고서를 작성해주세요."""
             

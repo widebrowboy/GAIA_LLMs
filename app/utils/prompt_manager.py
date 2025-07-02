@@ -239,16 +239,33 @@ def get_prompt_manager() -> PromptManager:
     return _prompt_manager_instance
 
 
-def get_system_prompt(prompt_type: Optional[str] = None) -> str:
+def get_system_prompt(prompt_type: Optional[str] = None, model: str = "gemma3", mode: str = "normal") -> str:
     """
-    시스템 프롬프트 가져오기 (간편 함수)
+    시스템 프롬프트 가져오기 (간편 함수) - 새로운 템플릿 시스템 지원
     
     Args:
-        prompt_type: 프롬프트 타입 (None이면 기본값)
+        prompt_type: 프롬프트 타입/전문 영역 (None이면 기본값)
+        model: 모델명 (gemma3, txgemma-chat, txgemma-predict, general)
+        mode: 모드 (normal, deep_research)
         
     Returns:
         시스템 프롬프트 내용
     """
+    # 새로운 템플릿 시스템 시도
+    try:
+        from .prompt_template_manager import get_prompt_manager as get_template_manager
+        template_manager = get_template_manager()
+        
+        specialization = prompt_type if prompt_type else "default"
+        prompt = template_manager.get_prompt(model, mode, specialization)
+        if prompt:
+            return prompt
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"템플릿 시스템 오류: {e}")
+    
+    # 레거시 시스템 폴백
     manager = get_prompt_manager()
     prompt = manager.get_prompt(prompt_type)
     
