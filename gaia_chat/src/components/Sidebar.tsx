@@ -227,7 +227,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   };
 
   const handleModelChange = async (modelName: string) => {
+    console.log(`🎯 handleModelChange 호출됨: ${modelName}`);
+    
     if (!serverConnected) {
+      console.error('❌ 서버 연결되지 않음');
       alert('서버에 연결되지 않았습니다. 연결을 확인해주세요.');
       return;
     }
@@ -237,7 +240,16 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       return;
     }
     
+    // 현재 실행 중인 모델과 동일한지 확인
+    const currentRunningModel = runningModels.length > 0 ? runningModels[runningModels.length - 1]?.name : null;
+    if (currentRunningModel === modelName) {
+      console.log(`ℹ️ 이미 실행 중인 모델입니다: ${modelName}`);
+      alert(`'${modelName}' 모델이 이미 실행 중입니다.`);
+      return;
+    }
+    
     try {
+      console.log(`🔄 모델 전환 프로세스 시작: ${currentRunningModel} → ${modelName}`);
       setIsModelOperationInProgress(true);
       setModelChangeProgress('모델 전환 시작...');
       console.log(`🔄 안전한 모델 전환 요청: ${modelName}`);
@@ -247,7 +259,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         setModelChangeProgress(progress);
       });
       
-      if (result.success) {
+      console.log('📥 API 응답 받음:', result);
+      
+      if (result && result.success) {
         console.log('✅ API 안전한 모델 전환 성공:', result.data);
         
         // 내부 상태도 업데이트
@@ -280,10 +294,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         
         console.log(`✅ 모델 전환 완료: ${modelName}`);
       } else {
-        console.error('❌ API 모델 전환 실패:', result.error);
+        console.error('❌ API 모델 전환 실패:', result);
+        const errorMessage = result?.error || result?.data?.error || '알 수 없는 오류';
+        console.error('❌ 오류 상세:', errorMessage);
         setModelChangeProgress('모델 전환 실패');
         setTimeout(() => setModelChangeProgress(''), 3000);
-        alert(`모델 전환에 실패했습니다: ${result.error}`);
+        alert(`모델 전환에 실패했습니다: ${errorMessage}`);
       }
     } catch (error) {
       console.error('❌ 모델 전환 중 예외:', error);
