@@ -547,15 +547,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       console.log('🔄 실시간 시스템 상태 업데이트 시작 (5초 간격)');
       
       intervalId = setInterval(async () => {
-        if (!showModelDialog && isInitialized && serverConnected) {
+        if (isInitialized && serverConnected) {
           try {
             console.log('🔄 백그라운드 시스템 상태 업데이트');
             
             // API를 통해 현재 시스템 상태 확인
-            const result = await apiClient.xhrFetch(getApiUrl('/api/system/models/detailed'), {
-              method: 'GET',
-              headers: { 'Content-Type': 'application/json' }
-            });
+            const result = await apiClient.xhrFetch('/api/system/models/detailed', 'GET');
             
             if (result.success && result.data) {
               const data = result.data;
@@ -619,7 +616,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
         clearInterval(intervalId);
       }
     };
-  }, [isInitialized, serverConnected, showModelDialog, currentModel]); // showModelDialog이 열려있을 때는 업데이트 중지
+  }, [isInitialized, serverConnected, currentModel]); // 실시간 업데이트 계속 실행
 
   const handleNewConversation = async () => {
     if (!serverConnected) {
@@ -844,7 +841,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                   } disabled:text-gray-400`}
                   title={!serverConnected ? '서버 연결 필요' : isModelChanging ? '모델 변경 중...' : `현재 모델: ${currentModel || 'N/A'} ${ollamaRunning ? '(실행 중)' : '(중지됨)'} (클릭하여 변경)`}
                 >
-                  {isModelChanging ? '변경 중...' : (currentModel || 'N/A')}
+                  {isModelChanging ? '변경 중...' : (
+                    // 실행 중인 모델이 있으면 그것을 표시, 없으면 currentModel 표시
+                    runningModels.length > 0 
+                      ? runningModels[runningModels.length - 1]?.name || currentModel || 'N/A'
+                      : currentModel || 'N/A'
+                  )}
                 </button>
               </div>
             </div>

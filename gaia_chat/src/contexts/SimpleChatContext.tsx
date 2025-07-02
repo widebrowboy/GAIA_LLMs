@@ -456,12 +456,7 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
       console.log(`🔄 모델 변경 요청: ${modelName}`);
       
       // API를 통해 실제로 모델 변경
-      const response = await apiClient.xhrFetch(`${API_BASE_URL}/api/system/models/switch/${encodeURIComponent(modelName)}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await apiClient.xhrFetch(`/api/system/models/switch/${encodeURIComponent(modelName)}`, 'POST');
       
       if (response.data && response.data.success) {
         setCurrentModel(modelName);
