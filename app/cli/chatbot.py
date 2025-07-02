@@ -886,8 +886,8 @@ class DrugDevelopmentChatbot:
                     web_queries.append(f"{user_input} review recent advances")
                     web_queries.append(f"{user_input} systematic review")
                 
-                # 최대 3개 질의로 제한 (API 호출 최적화)
-                web_queries = web_queries[:3]
+                # 최대 2개 질의로 제한 (총 10개 결과를 위해)
+                web_queries = web_queries[:2]
                 
                 if self.settings.get("debug_mode", False):
                     self.interface.print_thinking(f"[Debug] Web Search      : {web_queries}")
@@ -900,7 +900,7 @@ class DrugDevelopmentChatbot:
                             tool_name='search',
                             arguments={
                                 'query': query,
-                                'limit': 3,  # 각 질의당 3개 결과
+                                'limit': 5,  # 각 질의당 5개 결과 (총 최대 10개)
                                 'reviewOnly': True,  # 리뷰 논문만 검색
                                 'timeRange': 'recent',  # 최근 3-5년 범위
                                 'excludePrimary': True  # 1차 연구 논문 제외

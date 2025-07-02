@@ -51,7 +51,17 @@ class ChatbotService:
         if session_id in self.sessions:
             return {"error": f"세션 {session_id}가 이미 존재합니다"}
         
-        config = Config(debug_mode=False, model="gemma3-12b:latest")
+        # 현재 실행 중인 모델 감지
+        from app.utils.ollama_manager import list_running_models
+        try:
+            running_models = await list_running_models()
+            current_model = running_models[-1] if running_models else "gemma3-12b:latest"
+            logger.info(f"세션 {session_id} 생성 시 현재 실행 중인 모델 사용: {current_model}")
+        except Exception as e:
+            logger.warning(f"실행 중인 모델 감지 실패, 기본 모델 사용: {e}")
+            current_model = "gemma3-12b:latest"
+        
+        config = Config(debug_mode=False, model=current_model)
         chatbot = DrugDevelopmentChatbot(config)
         
         # API 연결 확인
@@ -59,10 +69,30 @@ class ChatbotService:
         if not status:
             return {"error": "Ollama API를 사용할 수 없습니다"}
         
-        # 모델 확인
-        model_check = await chatbot.auto_select_model()
-        if not model_check:
-            return {"error": "사용 가능한 모델이 없습니다"}
+        # 모델이 실행 중이라면 auto_select_model 건너뛰기
+        if running_models and current_model in running_models:
+            logger.info(f"모델 {current_model}이 이미 실행 중이므로 auto_select_model 건너뛰기")
+            # 모델명만 설정
+            chatbot.client._model_name = current_model
+            # 설정 기본값 확인
+            if not hasattr(chatbot.client, 'model_name') or chatbot.client.model_name != current_model:
+                chatbot.client.model_name = current_model
+        else:
+            # 모델이 실행 중이지 않다면 현재 설정된 모델을 시작
+            logger.info(f"모델 {current_model}이 실행 중이지 않음. 시작 시도 중...")
+            try:
+                from app.utils.ollama_manager import start_model
+                await start_model(current_model)
+                chatbot.client._model_name = current_model
+                if not hasattr(chatbot.client, 'model_name') or chatbot.client.model_name != current_model:
+                    chatbot.client.model_name = current_model
+                logger.info(f"✅ 모델 {current_model} 시작 완료")
+            except Exception as e:
+                logger.error(f"❌ 모델 {current_model} 시작 실패: {e}")
+                # 폴백으로 auto_select_model 사용
+                model_check = await chatbot.auto_select_model()
+                if not model_check:
+                    return {"error": "사용 가능한 모델이 없습니다"}
         
         # 기본 프롬프트가 제대로 로드되었는지 확인하고 재로드
         chatbot.current_prompt_type = "default"
@@ -177,9 +207,34 @@ class ChatbotService:
         message: str, 
         session_id: str,
         mode: str = "normal",
-        mcp_enabled: bool = False
+        mcp_enabled: bool = False,
+        model: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         """스트리밍 응답 생성"""
+        # 모델 전환 로직 비활성화 - 사용자가 선택한 모델을 유지
+        # 자동 모델 전환을 하지 않고, 현재 실행 중인 모델을 그대로 사용
+        # if model:
+        #     from app.utils.ollama_manager import list_running_models
+        #     running_models = await list_running_models()
+        #     current_running_model = running_models[-1] if running_models else None
+        #     
+        #     if current_running_model != model:
+        #         logger.info(f"요청된 모델 {model}이 현재 실행 중인 모델 {current_running_model}과 다름. 모델 전환 시작...")
+        #         switch_result = await self.switch_model_safely(model)
+        #         if not switch_result.get("success"):
+        #             yield f"오류: 모델 전환 실패 - {switch_result.get('error', 'Unknown error')}"
+        #             return
+        
+        # 대신 현재 실행 중인 모델이 무엇인지만 로깅
+        if model:
+            from app.utils.ollama_manager import list_running_models
+            try:
+                running_models = await list_running_models()
+                current_running_model = running_models[-1] if running_models else None
+                logger.info(f"🎯 요청된 모델: {model}, 현재 실행 중인 모델: {current_running_model} (자동 전환 비활성화됨)")
+            except Exception as e:
+                logger.warning(f"실행 중인 모델 확인 실패: {e}")
+        
         chatbot = self.get_session(session_id)
         if not chatbot:
             # 세션이 없으면 자동으로 생성
@@ -433,3 +488,47 @@ class ChatbotService:
             # OllamaClient의 _model_name 속성을 직접 수정
             self.sessions["default"].client._model_name = model_name
             logger.info(f"현재 모델을 '{model_name}'로 업데이트했습니다.")
+    
+    async def switch_model_safely(self, new_model_name: str) -> Dict[str, Any]:
+        """안전한 모델 전환 - 기존 모델 중지 후 새 모델 실행"""
+        try:
+            from app.utils.ollama_manager import stop_all_models, ensure_single_model_running
+            
+            logger.info(f"🔄 안전한 모델 전환 시작: {new_model_name}")
+            
+            # 1단계: 기존 실행 중인 모든 모델 중지
+            logger.info("🛑 기존 실행 중인 모든 모델 중지...")
+            try:
+                await stop_all_models()
+                logger.info("✅ 모든 모델 중지 완료")
+            except Exception as stop_error:
+                logger.warning(f"모델 중지 중 일부 오류 발생: {stop_error}")
+            
+            # 2단계: 새 모델 시작 (단일 모델 보장)
+            logger.info(f"🚀 새 모델 시작: {new_model_name}")
+            try:
+                await ensure_single_model_running(new_model_name)
+                logger.info(f"✅ 모델 전환 완료: {new_model_name}")
+                
+                # 3단계: 챗봇 세션의 모델 정보 업데이트
+                self.update_current_model(new_model_name)
+                
+                return {
+                    "success": True,
+                    "message": f"모델이 '{new_model_name}'로 성공적으로 전환되었습니다.",
+                    "current_model": new_model_name,
+                    "previous_models_stopped": True
+                }
+            except Exception as start_error:
+                logger.error(f"❌ 새 모델 시작 실패: {start_error}")
+                return {
+                    "success": False,
+                    "error": f"새 모델 시작 실패: {str(start_error)}"
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ 모델 전환 중 오류 발생: {e}")
+            return {
+                "success": False,
+                "error": f"모델 전환 중 오류 발생: {str(e)}"
+            }

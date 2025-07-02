@@ -138,20 +138,40 @@ export class ApiClient {
         const url = getApiUrl(endpoint);
         console.log(`🔧 XHR Fetch 사용: ${method} ${url}`, data ? { data } : {});
         
-        // 연결 전 서버 상태 간단 확인 (빠른 health check)
+        // 서버 준비 대기 개선 - 더 안정적인 연결 확인
+        console.log('⏳ XHR 요청 전 서버 안정성 확인 시작...');
+        
+        // 1단계: 간단한 연결성 테스트 (더 빠른 타임아웃)
+        let serverReady = false;
         try {
-          console.log('🔍 XHR 요청 전 서버 연결 상태 확인...');
-          const quickCheck = await fetch('http://localhost:8000/health', {
-            method: 'HEAD', // HEAD 요청으로 빠른 확인
-            signal: AbortSignal.timeout(2000) // 2초 타임아웃
+          const quickPing = await fetch('http://localhost:8000/health', {
+            method: 'HEAD',
+            signal: AbortSignal.timeout(1500), // 1.5초로 단축
+            cache: 'no-cache'
           });
-          if (!quickCheck.ok) {
-            console.warn('⚠️ 사전 연결 확인 실패, 그래도 XHR 시도');
-          } else {
-            console.log('✅ 사전 연결 확인 성공');
+          serverReady = quickPing.ok;
+          console.log(`📡 연결성 테스트: ${serverReady ? '성공' : '실패'} (${quickPing.status})`);
+        } catch (pingError) {
+          console.warn('⚠️ 연결성 테스트 실패 - 서버 준비 대기 중:', pingError instanceof Error ? pingError.message : String(pingError));
+        }
+        
+        // 2단계: 서버가 준비되지 않은 경우 추가 대기
+        if (!serverReady) {
+          console.log('⏳ 서버 준비 대기 (3초 추가 대기)...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // 재확인
+          try {
+            const retryPing = await fetch('http://localhost:8000/health', {
+              method: 'HEAD',
+              signal: AbortSignal.timeout(2000),
+              cache: 'no-cache'
+            });
+            serverReady = retryPing.ok;
+            console.log(`📡 재확인 결과: ${serverReady ? '성공' : '실패'} (${retryPing.status})`);
+          } catch (retryError) {
+            console.warn('⚠️ 재확인 실패 - 그래도 XHR 계속 진행');
           }
-        } catch (quickError) {
-          console.warn('⚠️ 사전 연결 확인 실패:', quickError, '- 그래도 XHR 시도');
         }
         
         const xhr = new XMLHttpRequest();
@@ -190,12 +210,25 @@ export class ApiClient {
                 resolve({ success: false, error: `JSON 파싱 실패: ${parseError}` });
               }
             } else {
-              // HTTP 오류: 0 처리 - 네트워크 연결 실패 또는 서버 미준비 상태
+              // HTTP 오류: 0 처리 - 상세 분석 및 자세한 오류 정보 제공
               if (xhr.status === 0) {
-                console.error(`❌ XHR HTTP 오류: 0 - 네트워크 연결 실패 또는 서버 미준비`);
-                console.error(`🔍 URL: ${url}, Method: ${method}`);
-                console.error(`🔍 Ready State: ${xhr.readyState}, Status: ${xhr.status}`);
-                resolve({ success: false, error: 'Network connection failed or server not ready' });
+                console.error(`❌ XHR HTTP 오류: 0 - 상세 분석`);
+                console.error(`🔍 URL: ${url}`);
+                console.error(`🔍 Method: ${method}`);
+                console.error(`🔍 Ready State: ${xhr.readyState}`);
+                console.error(`🔍 Response Text: ${xhr.responseText || '(empty)'}`);
+                console.error(`🔍 Response Headers: ${xhr.getAllResponseHeaders() || '(none)'}`);
+                console.error(`🔍 Server Ready Status: ${serverReady}`);
+                
+                // 구체적인 오류 원인 분석
+                let errorMessage = 'HTTP Status 0 - ';
+                if (!serverReady) {
+                  errorMessage += '서버가 아직 완전히 시작되지 않았습니다. 잠시 후 다시 시도해주세요.';
+                } else {
+                  errorMessage += '네트워크 연결 문제 또는 CORS 오류입니다.';
+                }
+                
+                resolve({ success: false, error: errorMessage });
               } else {
                 console.error(`❌ XHR HTTP 오류: ${xhr.status}`, xhr.responseText);
                 resolve({ success: false, error: `HTTP ${xhr.status}: ${xhr.statusText}` });
@@ -217,7 +250,7 @@ export class ApiClient {
           resolve({ success: false, error: 'XHR 타임아웃 - 서버 응답이 너무 늦습니다' });
         };
         
-        xhr.timeout = 15000; // 15초 타임아웃으로 연장 (서버 준비 시간 고려)
+        xhr.timeout = 30000; // 30초 타임아웃으로 연장 (모델 변경 시간 고려)
         
         // 요청 전송
         if (method === 'POST' || method === 'PUT') {
@@ -303,16 +336,71 @@ export class ApiClient {
     return this.simpleFetch('/api/system/models/detailed');
   }
 
-  // 모델 시작
-  async startModel(modelName: string) {
+  // 안전한 모델 전환 (기존 모델 중지 + 새 모델 시작 + 완료 대기)
+  async switchModelSafely(modelName: string, progressCallback?: (progress: string) => void) {
+    const encodedName = encodeURIComponent(modelName);
+    console.log(`🔄 안전한 모델 전환 요청: ${modelName} -> ${encodedName}`);
+    
+    if (progressCallback) {
+      progressCallback('모델 전환 준비 중...');
+    }
+    
+    // XHR 우선 시도 (안전한 모델 전환에 특화된 로직)
+    try {
+      if (progressCallback) {
+        progressCallback('기존 모델 중지 중...');
+      }
+      
+      const xhrResult = await this.xhrFetch(`/api/system/models/switch/${encodedName}`, 'POST', {});
+      
+      if (xhrResult.success) {
+        console.log('✅ XHR 안전한 모델 전환 성공');
+        if (progressCallback) {
+          progressCallback('모델 전환 완료!');
+        }
+        return xhrResult;
+      }
+      console.warn('⚠️ XHR 안전한 모델 전환 실패:', xhrResult.error);
+    } catch (error) {
+      console.warn('⚠️ XHR 방식 예외, simpleFetch로 폴백:', error);
+    }
+    
+    if (progressCallback) {
+      progressCallback('재시도 중...');
+    }
+    
+    console.log('🔄 simpleFetch로 안전한 모델 전환 재시도');
+    const result = await this.simpleFetch(`/api/system/models/switch/${encodedName}`, 'POST');
+    
+    if (progressCallback) {
+      progressCallback(result.success ? '모델 전환 완료!' : '전환 실패');
+    }
+    
+    return result;
+  }
+
+  // 모델 시작 (진행률 콜백 포함)
+  async startModel(modelName: string, progressCallback?: (progress: string) => void) {
     const encodedName = encodeURIComponent(modelName);
     console.log(`🚀 모델 시작 요청: ${modelName} -> ${encodedName}`);
     
-    // XHR 우선 시도
+    if (progressCallback) {
+      progressCallback('모델 시작 준비 중...');
+    }
+    
+    // XHR 우선 시도 (모델 시작에 특화된 로직)
     try {
+      if (progressCallback) {
+        progressCallback('기존 모델 중지 중...');
+      }
+      
       const xhrResult = await this.xhrFetch(`/api/system/models/${encodedName}/start`, 'POST', {});
+      
       if (xhrResult.success) {
         console.log('✅ XHR 모델 시작 성공');
+        if (progressCallback) {
+          progressCallback('모델 시작 완료!');
+        }
         return xhrResult;
       }
       console.warn('⚠️ XHR 모델 시작 실패:', xhrResult.error);
@@ -320,8 +408,18 @@ export class ApiClient {
       console.warn('⚠️ XHR 방식 예외, simpleFetch로 폴백:', error);
     }
     
+    if (progressCallback) {
+      progressCallback('재시도 중...');
+    }
+    
     console.log('🔄 simpleFetch로 모델 시작 재시도');
-    return this.simpleFetch(`/api/system/models/${encodedName}/start`, 'POST');
+    const result = await this.simpleFetch(`/api/system/models/${encodedName}/start`, 'POST');
+    
+    if (progressCallback) {
+      progressCallback(result.success ? '모델 시작 완료!' : '시작 실패');
+    }
+    
+    return result;
   }
 
   // 모델 중지
@@ -407,6 +505,18 @@ export class ApiClient {
   }
 
   // 완전 독립적인 안전한 API 호출 (마지막 fallback)
+  // 모델 변경 (안전한 전환 사용)
+  async changeModel(modelName: string, progressCallback?: (progress: string) => void) {
+    console.log(`🔄 모델 변경 요청: ${modelName}`);
+    
+    if (progressCallback) {
+      progressCallback('모델 변경 시작...');
+    }
+    
+    // 안전한 모델 전환 사용
+    return this.switchModelSafely(modelName, progressCallback);
+  }
+
   async safeApiCall(endpoint: string): Promise<any> {
     console.log(`🛡️ 안전한 API 호출: ${endpoint}`);
     

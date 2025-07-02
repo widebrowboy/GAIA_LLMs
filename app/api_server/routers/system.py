@@ -496,6 +496,35 @@ async def stop_model(
             "model": model_name
         }
 
+@router.post("/models/switch/{model_name}", 
+    summary="🔄 빠른 모델 전환",
+    description="""
+## 빠른 모델 전환
+
+경로 파라미터로 모델명을 받아 빠르게 모델을 전환합니다.
+`POST /api/system/models/switch/{model_name}` 형태로 호출합니다.
+
+### 사용법
+```bash
+curl -X POST http://localhost:8000/api/system/models/switch/gemma3-12b%3Alatest
+```
+
+### 특징
+- URL 경로로 모델명 전달 (간편한 호출)
+- 안전한 모델 전환 로직 사용
+- 실시간 진행 상황 추적
+- 완전한 오류 복구 지원
+"""
+)
+async def switch_model_by_path(
+    model_name: str,
+    service: ChatbotService = Depends(get_chatbot_service)
+) -> Dict[str, Any]:
+    """경로 파라미터로 모델 전환"""
+    from urllib.parse import unquote
+    decoded_model_name = unquote(model_name)
+    return await service.switch_model_safely(decoded_model_name)
+
 @router.post("/models/{model_name}/start-multiple")
 async def start_model_multiple(
     model_name: str,

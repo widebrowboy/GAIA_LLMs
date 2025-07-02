@@ -54,6 +54,11 @@ class ChatRequest(BaseModel):
         description="전체 응답 수신 여부",
         example=True
     )
+    model: Optional[str] = Field(
+        default=None,
+        description="사용할 AI 모델",
+        example="gemma3-12b:latest"
+    )
 
     class Config:
         json_schema_extra = {
@@ -271,7 +276,8 @@ async def stream_message(
             request.message, 
             request.session_id,
             mode=request.mode or "normal",
-            mcp_enabled=request.mcp_enabled or False
+            mcp_enabled=request.mcp_enabled or False,
+            model=request.model
         ):
             # JSON으로 인코딩하여 줄바꿈과 특수 문자를 안전하게 전송
             import json

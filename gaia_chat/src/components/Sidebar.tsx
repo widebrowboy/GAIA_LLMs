@@ -57,6 +57,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
   const [detailedModels, setDetailedModels] = useState<any[]>([]);
   const [runningModels, setRunningModels] = useState<any[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [modelChangeProgress, setModelChangeProgress] = useState<string>('');
+  const [isModelOperationInProgress, setIsModelOperationInProgress] = useState(false);
 
   // 디버그용 직접 fetch 테스트
   const testDirectFetch = useCallback(async () => {
@@ -230,22 +232,62 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       return;
     }
     
+    if (isModelOperationInProgress) {
+      console.warn('⚠️ 다른 모델 작업이 진행 중입니다.');
+      return;
+    }
+    
     try {
-      console.log(`🔄 모델 변경 요청: ${modelName} (기존 모델들 자동 중지)`);
+      setIsModelOperationInProgress(true);
+      setModelChangeProgress('모델 전환 시작...');
+      console.log(`🔄 안전한 모델 전환 요청: ${modelName}`);
       
-      // changeModel은 이미 ensure_single_model_running을 사용하여
-      // 기존 모델들을 중지하고 새 모델만 실행시킵니다
-      await changeModel(modelName);
+      // 안전한 모델 전환 사용 (진행률 콜백과 함께)
+      const result = await apiClient.switchModelSafely(modelName, (progress) => {
+        setModelChangeProgress(progress);
+      });
       
-      // 상태 새로고침
-      await checkSystemStatus();
-      await fetchModelsWithApiClient();
-      
-      setShowModelDialog(false);
-      console.log(`✅ 모델 변경 완료: ${modelName}`);
+      if (result.success) {
+        console.log('✅ API 안전한 모델 전환 성공:', result.data);
+        
+        // 내부 상태도 업데이트
+        setModelChangeProgress('내부 상태 업데이트 중...');
+        
+        // Context에서 모델 전환 (추가 안전성)
+        if (changeModel) {
+          try {
+            await changeModel(modelName);
+          } catch (contextError) {
+            console.warn('⚠️ Context 모델 업데이트 실패 (무시 가능):', contextError);
+          }
+        }
+        
+        // 상태 새로고침
+        setModelChangeProgress('상태 새로고침 중...');
+        await checkSystemStatus();
+        await fetchModelsWithApiClient();
+        
+        setModelChangeProgress('모델 전환 완료!');
+        setTimeout(() => {
+          setModelChangeProgress('');
+          // 다이얼로그를 닫지 않고 유지하여 선택 상태를 볼 수 있게 함
+          // setShowModelDialog(false);
+        }, 1500);
+        
+        console.log(`✅ 모델 전환 완료: ${modelName}`);
+      } else {
+        console.error('❌ API 모델 전환 실패:', result.error);
+        setModelChangeProgress('모델 전환 실패');
+        setTimeout(() => setModelChangeProgress(''), 3000);
+        alert(`모델 전환에 실패했습니다: ${result.error}`);
+      }
     } catch (error) {
-      console.error('❌ 모델 변경 실패:', error);
-      alert(`모델 변경 중 오류가 발생했습니다: ${error}`);
+      console.error('❌ 모델 전환 중 예외:', error);
+      setModelChangeProgress('모델 전환 실패');
+      setTimeout(() => setModelChangeProgress(''), 3000);
+      alert(`모델 전환 중 오류가 발생했습니다: ${error}`);
+    } finally {
+      setIsModelOperationInProgress(false);
     }
   };
 
@@ -492,6 +534,81 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       return () => clearTimeout(timer);
     }
   }, [showModelDialog, fetchAvailableModels]);
+
+  // 실시간 시스템 상태 업데이트 - 5초마다 상태 확인
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    
+    const startRealTimeUpdates = () => {
+      console.log('🔄 실시간 시스템 상태 업데이트 시작 (5초 간격)');
+      
+      intervalId = setInterval(async () => {
+        if (!showModelDialog && isInitialized && serverConnected) {
+          try {
+            console.log('🔄 백그라운드 시스템 상태 업데이트');
+            
+            // API를 통해 현재 시스템 상태 확인
+            const result = await apiClient.xhrFetch(getApiUrl('/api/system/models/detailed'), {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (result.success && result.data) {
+              const data = result.data;
+              
+              // 실행 중인 모델이 변경되었는지 확인
+              const newRunningModels = data.running || [];
+              const currentRunningModel = newRunningModels.length > 0 ? newRunningModels[newRunningModels.length - 1]?.name : null;
+              
+              // 현재 모델이 변경되었으면 UI 업데이트
+              if (currentRunningModel && currentRunningModel !== currentModel) {
+                console.log(`🔄 실행 중인 모델 변경 감지: ${currentModel} → ${currentRunningModel}`);
+                
+                // Context의 currentModel 업데이트
+                setCurrentModel(currentRunningModel);
+                console.log(`✅ Context currentModel 업데이트: ${currentRunningModel}`);
+              }
+              
+              // 모델 목록 업데이트
+              if (data.available && data.available.length > 0) {
+                const modelNames = data.available.map((m: any) => m.name);
+                setAvailableModels(modelNames);
+                setDetailedModels(data.available);
+              }
+              
+              // 실행 중인 모델 목록 업데이트
+              setRunningModels(newRunningModels);
+              setOllamaRunning(data.current_model_running || false);
+              
+              // 서버 연결 상태 업데이트
+              if (!serverConnected) {
+                setServerConnected(true);
+                console.log('✅ 서버 연결 복구됨');
+              }
+            }
+          } catch (error) {
+            // 네트워크 오류 시 서버 연결 상태 업데이트
+            if (serverConnected) {
+              console.warn('⚠️ 백그라운드 상태 업데이트 실패 - 서버 연결 문제');
+              setServerConnected(false);
+            }
+          }
+        }
+      }, 5000); // 5초마다 업데이트
+    };
+    
+    // 초기화가 완료되면 실시간 업데이트 시작
+    if (isInitialized) {
+      startRealTimeUpdates();
+    }
+    
+    return () => {
+      if (intervalId) {
+        console.log('🏁 실시간 시스템 상태 업데이트 중지');
+        clearInterval(intervalId);
+      }
+    };
+  }, [isInitialized, serverConnected, showModelDialog, currentModel]); // showModelDialog이 열려있을 때는 업데이트 중지
 
   const handleNewConversation = async () => {
     if (!serverConnected) {
@@ -924,16 +1041,38 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
       {/* 모델 선택 다이얼로그 */}
       {showModelDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-96 overflow-y-auto">
+          <div className={`bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-96 overflow-y-auto ${isModelOperationInProgress ? 'pointer-events-none opacity-75' : ''}`}>
             <div className="flex justify-between items-center mb-4">
-              <h1 className="text-2xl font-bold text-gray-800">GAIA-GPT</h1>
+              <h1 className="text-2xl font-bold text-gray-800">GAIA-BT 모델 관리</h1>
               <button
                 onClick={() => setShowModelDialog(false)}
-                className="p-1 rounded hover:bg-gray-100 transition-colors"
+                disabled={isModelOperationInProgress}
+                className="p-1 rounded hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <X className="w-5 h-5 text-gray-600" />
               </button>
             </div>
+            
+            {/* 모델 작업 진행률 표시 */}
+            {isModelOperationInProgress && (
+              <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-emerald-50 border border-blue-200 rounded-lg shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <div className="animate-spin w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-emerald-800">🔄 안전한 모델 전환 진행 중</div>
+                    <div className="text-xs text-emerald-600">{modelChangeProgress || '대기 중...'}</div>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="w-full bg-emerald-200 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-emerald-500 to-blue-500 h-2 rounded-full animate-pulse transition-all duration-500" style={{width: modelChangeProgress.includes('완료') ? '100%' : modelChangeProgress.includes('실패') ? '0%' : '75%'}}></div>
+                  </div>
+                  <div className="mt-1 text-xs text-emerald-600 font-medium">
+                    ⚠️ 모델 전환 중에는 다른 작업을 하지 마세요
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div className="space-y-2 mb-4">
               <p className="text-sm text-gray-600">사용할 AI 모델을 선택하세요:</p>
@@ -977,7 +1116,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                       <div className="flex items-center justify-between mb-2">
                         <button
                           onClick={() => handleModelChange(model.name)}
-                          disabled={isModelChanging}
+                          disabled={isModelChanging || isModelOperationInProgress}
                           className="font-medium text-sm flex-1 text-left disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {model.name}
@@ -988,19 +1127,30 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                           )}
                           {isCurrent && (
                             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                              {isModelChanging ? '변경 중...' : '선택됨'}
+                              {isModelChanging || isModelOperationInProgress ? '변경 중...' : '선택됨'}
                             </span>
                           )}
                           <button
                             onClick={async (e) => {
                               e.stopPropagation();
+                              
+                              if (isModelOperationInProgress) {
+                                console.warn('⚠️ 다른 모델 작업이 진행 중입니다.');
+                                return;
+                              }
+                              
                               try {
+                                setIsModelOperationInProgress(true);
                                 const action = isRunning ? 'stop' : 'start';
                                 console.log(`🎯 모델 ${action} 요청: ${model.name}`);
                                 
+                                setModelChangeProgress(`모델 ${action === 'start' ? '시작' : '중지'} 중...`);
+                                
                                 const result = isRunning 
                                   ? await apiClient.stopModel(model.name)
-                                  : await apiClient.startModel(model.name);
+                                  : await apiClient.switchModelSafely(model.name, (progress) => {
+                                      setModelChangeProgress(progress);
+                                    });
                                 
                                 if (result.success) {
                                   console.log(`✅ 모델 ${action} 성공:`, result.data);
@@ -1011,29 +1161,41 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                                     setCurrentModel(model.name);
                                   }
                                   
+                                  setModelChangeProgress('상태 업데이트 중...');
+                                  
                                   // 상태 새로고침
                                   if (typeof refreshSystemStatus === 'function') {
                                     await refreshSystemStatus();
                                   }
                                   await checkSystemStatus();
                                   await fetchModelsWithApiClient();
+                                  
+                                  setModelChangeProgress(`모델 ${action === 'start' ? '시작' : '중지'} 완료!`);
+                                  setTimeout(() => setModelChangeProgress(''), 1500);
                                 } else {
                                   console.error(`❌ 모델 ${action} 실패:`, result.error);
+                                  setModelChangeProgress('작업 실패');
+                                  setTimeout(() => setModelChangeProgress(''), 2000);
                                   alert(`모델 ${action === 'start' ? '시작' : '중지'}에 실패했습니다: ${result.error}`);
                                 }
                               } catch (error) {
                                 console.error(`❌ 모델 제어 오류:`, error);
+                                setModelChangeProgress('오류 발생');
+                                setTimeout(() => setModelChangeProgress(''), 2000);
                                 alert(`모델 제어 중 오류가 발생했습니다: ${error}`);
+                              } finally {
+                                setIsModelOperationInProgress(false);
                               }
                             }}
-                            className={`text-xs px-2 py-1 rounded-md transition-colors ${
+                            className={`text-xs px-2 py-1 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                               isRunning 
-                                ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-                                : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                ? 'bg-red-100 text-red-700 hover:bg-red-200 disabled:hover:bg-red-100' 
+                                : 'bg-green-100 text-green-700 hover:bg-green-200 disabled:hover:bg-green-100'
                             }`}
-                            title={isRunning ? '모델 중지' : '모델 시작 (다른 모델들 자동 중지)'}
+                            title={isModelOperationInProgress ? '모델 작업 진행 중...' : (isRunning ? '모델 중지' : '안전한 모델 전환 (기존 모델 자동 중지)')}
+                            disabled={isModelOperationInProgress}
                           >
-                            {isRunning ? '중지' : '시작'}
+                            {isModelOperationInProgress ? '전환중' : (isRunning ? '중지' : '전환')}
                           </button>
                         </div>
                       </div>
@@ -1055,17 +1217,17 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setShowModelDialog(false)}
-                disabled={isModelChanging}
+                disabled={isModelChanging || isModelOperationInProgress}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
               >
-                취소
+                {isModelOperationInProgress ? '작업 진행 중...' : '취소'}
               </button>
               <button
                 onClick={fetchModelsWithApiClient}
-                disabled={isModelChanging}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                disabled={isModelChanging || isModelOperationInProgress}
+                className="px-4 py-2 bg-emerald-500 text-white rounded hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
               >
-                새로고침
+                {isModelOperationInProgress ? '전환 중...' : '새로고침'}
               </button>
             </div>
           </div>

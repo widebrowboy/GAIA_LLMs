@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 import logging
 from typing import Dict, Any
 import traceback
+import asyncio
 
 from app.api_server.routers import chat, system, mcp, session
 from app.api_server.services.chatbot_service import ChatbotService

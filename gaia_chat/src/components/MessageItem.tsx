@@ -101,8 +101,8 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
           </div>
         )}
 
-        {/* 메시지 텍스트 - 완료된 assistant 응답은 마크다운 렌더링 */}
-        {isCompleteResponse ? (
+        {/* 메시지 텍스트 - 모든 assistant 응답에 마크다운 렌더링 적용 */}
+        {isAssistantMessage ? (
           <div className="academic-response">
             <AcademicMarkdownRenderer 
               content={message.content} 
