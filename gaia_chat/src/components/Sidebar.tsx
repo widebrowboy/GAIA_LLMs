@@ -231,12 +231,21 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     }
     
     try {
+      console.log(`🔄 모델 변경 요청: ${modelName} (기존 모델들 자동 중지)`);
+      
+      // changeModel은 이미 ensure_single_model_running을 사용하여
+      // 기존 모델들을 중지하고 새 모델만 실행시킵니다
       await changeModel(modelName);
+      
+      // 상태 새로고침
       await checkSystemStatus();
+      await fetchModelsWithApiClient();
+      
       setShowModelDialog(false);
+      console.log(`✅ 모델 변경 완료: ${modelName}`);
     } catch (error) {
-      console.error('Failed to change model:', error);
-      alert('모델 변경 중 오류가 발생했습니다.');
+      console.error('❌ 모델 변경 실패:', error);
+      alert(`모델 변경 중 오류가 발생했습니다: ${error}`);
     }
   };
 
@@ -996,6 +1005,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                                 if (result.success) {
                                   console.log(`✅ 모델 ${action} 성공:`, result.data);
                                   
+                                  // 모델 시작 시 자동으로 현재 모델로 설정
+                                  if (action === 'start') {
+                                    console.log(`🔄 시작된 모델을 현재 모델로 설정: ${model.name}`);
+                                    setCurrentModel(model.name);
+                                  }
+                                  
                                   // 상태 새로고침
                                   if (typeof refreshSystemStatus === 'function') {
                                     await refreshSystemStatus();
@@ -1007,7 +1022,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                                   alert(`모델 ${action === 'start' ? '시작' : '중지'}에 실패했습니다: ${result.error}`);
                                 }
                               } catch (error) {
-                                console.error(`❌ 모델 ${action} 오류:`, error);
+                                console.error(`❌ 모델 제어 오류:`, error);
                                 alert(`모델 제어 중 오류가 발생했습니다: ${error}`);
                               }
                             }}
@@ -1016,7 +1031,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                                 ? 'bg-red-100 text-red-700 hover:bg-red-200' 
                                 : 'bg-green-100 text-green-700 hover:bg-green-200'
                             }`}
-                            title={isRunning ? '모델 중지' : '모델 시작'}
+                            title={isRunning ? '모델 중지' : '모델 시작 (다른 모델들 자동 중지)'}
                           >
                             {isRunning ? '중지' : '시작'}
                           </button>

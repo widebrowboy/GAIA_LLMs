@@ -10,6 +10,7 @@ from app.api_server.dependencies import get_chatbot_service
 from app.api_server.services.chatbot_service import ChatbotService
 from app.utils.config import OLLAMA_MODEL, DEBUG_MODE
 import httpx
+import asyncio
 from app.utils.ollama_manager import ensure_single_model_running
 from app.utils.prompt_manager import get_prompt_manager
 import logging
@@ -378,47 +379,49 @@ async def start_model(
     model_name: str,
     service: ChatbotService = Depends(get_chatbot_service)
 ) -> Dict[str, Any]:
-    """특정 모델 시작"""
+    """특정 모델 시작 (기존 모델들 자동 중지)"""
     try:
-        import httpx
         from urllib.parse import unquote
+        from app.utils.ollama_manager import ensure_single_model_running, list_running_models
         
         # URL 디코딩 (FastAPI가 자동으로 하지만 명시적으로 처리)
         decoded_model_name = unquote(model_name)
-        logger.info(f"모델 시작 요청: 원본={model_name}, 디코딩={decoded_model_name}")
+        logger.info(f"🚀 모델 시작 요청: 원본={model_name}, 디코딩={decoded_model_name}")
         
-        # Ollama API를 통해 모델 시작
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # 간단한 generate 요청으로 모델 시작
-            response = await client.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": decoded_model_name,  # 디코딩된 이름 사용
-                    "prompt": "Hello",
-                    "stream": False,
-                    "keep_alive": "5m"  # 5분간 메모리에 유지
-                }
-            )
+        # 시작 전 실행 중인 모델들 확인
+        running_before = await list_running_models()
+        logger.info(f"📋 시작 전 실행 중인 모델들: {running_before}")
+        
+        # 기존 모델들 중지하고 새 모델만 실행 (단일 모델 실행 보장)
+        await ensure_single_model_running(decoded_model_name)
+        
+        # 결과 확인
+        running_after = await list_running_models()
+        logger.info(f"✅ 시작 후 실행 중인 모델들: {running_after}")
+        
+        # 모델이 정상적으로 실행되었는지 확인
+        if decoded_model_name in running_after:
+            # ChatbotService의 현재 모델 업데이트
+            if hasattr(service, 'update_current_model'):
+                service.update_current_model(decoded_model_name)
             
-            if response.status_code == 200:
-                # 현재 모델로 설정
-                if hasattr(service, 'update_current_model'):
-                    service.update_current_model(decoded_model_name)
-                
-                return {
-                    "success": True,
-                    "message": f"모델 '{decoded_model_name}' 시작 완료",
-                    "model": decoded_model_name
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": f"모델 시작 실패: HTTP {response.status_code}",
-                    "model": decoded_model_name
-                }
+            return {
+                "success": True,
+                "message": f"모델 '{decoded_model_name}' 시작 완료 (기존 모델들 중지됨)",
+                "model": decoded_model_name,
+                "running_models": running_after,
+                "stopped_models": [m for m in running_before if m != decoded_model_name]
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"모델 '{decoded_model_name}' 시작되지 않음",
+                "model": decoded_model_name,
+                "running_models": running_after
+            }
                 
     except Exception as e:
-        logger.error(f"모델 시작 중 오류: {str(e)}", exc_info=True)
+        logger.error(f"❌ 모델 시작 중 오류: {str(e)}", exc_info=True)
         return {
             "success": False,
             "error": f"모델 시작 중 오류: {str(e)}",
@@ -432,26 +435,146 @@ async def stop_model(
 ) -> Dict[str, Any]:
     """특정 모델 중지"""
     try:
-        import httpx
+        from urllib.parse import unquote
+        from app.utils.ollama_manager import list_running_models
+        import subprocess
+        import shlex
         
-        # Ollama API를 통해 모델 중지
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.delete(
-                f"http://localhost:11434/api/generate",
-                json={"model": model_name}
-            )
-            
+        # URL 디코딩
+        decoded_model_name = unquote(model_name)
+        logger.info(f"🛑 모델 중지 요청: 원본={model_name}, 디코딩={decoded_model_name}")
+        
+        # 중지 전 실행 중인 모델들 확인
+        running_before = await list_running_models()
+        logger.info(f"📋 중지 전 실행 중인 모델들: {running_before}")
+        
+        if decoded_model_name not in running_before:
             return {
                 "success": True,
-                "message": f"모델 '{model_name}' 중지 요청 완료",
-                "model": model_name
+                "message": f"모델 '{decoded_model_name}'은 이미 중지된 상태입니다",
+                "model": decoded_model_name,
+                "running_models": running_before
+            }
+        
+        # Ollama CLI를 통해 모델 중지
+        cmd = f"ollama stop {shlex.quote(decoded_model_name)}"
+        logger.info(f"🔧 중지 명령 실행: {cmd}")
+        
+        process = await asyncio.create_subprocess_shell(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+        
+        # 결과 확인
+        running_after = await list_running_models()
+        logger.info(f"✅ 중지 후 실행 중인 모델들: {running_after}")
+        
+        if decoded_model_name not in running_after:
+            return {
+                "success": True,
+                "message": f"모델 '{decoded_model_name}' 중지 완료",
+                "model": decoded_model_name,
+                "running_models": running_after
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"모델 '{decoded_model_name}' 중지 실패",
+                "model": decoded_model_name,
+                "running_models": running_after,
+                "stdout": stdout.decode() if stdout else "",
+                "stderr": stderr.decode() if stderr else ""
             }
                 
     except Exception as e:
+        logger.error(f"❌ 모델 중지 중 오류: {str(e)}", exc_info=True)
         return {
             "success": False,
             "error": f"모델 중지 중 오류: {str(e)}",
             "model": model_name
+        }
+
+@router.post("/models/{model_name}/start-multiple")
+async def start_model_multiple(
+    model_name: str,
+    service: ChatbotService = Depends(get_chatbot_service)
+) -> Dict[str, Any]:
+    """특정 모델 시작 (다중 모델 실행 허용) - 향후 확장용"""
+    try:
+        from urllib.parse import unquote
+        from app.utils.ollama_manager import start_model, list_running_models
+        
+        # URL 디코딩
+        decoded_model_name = unquote(model_name)
+        logger.info(f"🚀 다중 모델 시작 요청: 원본={model_name}, 디코딩={decoded_model_name}")
+        
+        # 시작 전 실행 중인 모델들 확인
+        running_before = await list_running_models()
+        logger.info(f"📋 시작 전 실행 중인 모델들: {running_before}")
+        
+        # 기존 모델들을 중지하지 않고 새 모델만 시작
+        await start_model(decoded_model_name)
+        
+        # 결과 확인
+        running_after = await list_running_models()
+        logger.info(f"✅ 시작 후 실행 중인 모델들: {running_after}")
+        
+        # 모델이 정상적으로 실행되었는지 확인
+        if decoded_model_name in running_after:
+            return {
+                "success": True,
+                "message": f"모델 '{decoded_model_name}' 시작 완료 (기존 모델들 유지)",
+                "model": decoded_model_name,
+                "running_models": running_after,
+                "newly_started": decoded_model_name not in running_before
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"모델 '{decoded_model_name}' 시작되지 않음",
+                "model": decoded_model_name,
+                "running_models": running_after
+            }
+                
+    except Exception as e:
+        logger.error(f"❌ 다중 모델 시작 중 오류: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "error": f"다중 모델 시작 중 오류: {str(e)}",
+            "model": model_name
+        }
+
+@router.post("/models/stop-all")
+async def stop_all_models() -> Dict[str, Any]:
+    """모든 실행 중인 모델 중지"""
+    try:
+        from app.utils.ollama_manager import stop_all_models, list_running_models
+        
+        # 중지 전 실행 중인 모델들 확인
+        running_before = await list_running_models()
+        logger.info(f"📋 전체 중지 전 실행 중인 모델들: {running_before}")
+        
+        # 모든 모델 중지
+        await stop_all_models()
+        
+        # 결과 확인
+        running_after = await list_running_models()
+        logger.info(f"✅ 전체 중지 후 실행 중인 모델들: {running_after}")
+        
+        return {
+            "success": True,
+            "message": f"모든 모델 중지 완료 ({len(running_before)}개 모델 중지됨)",
+            "stopped_models": running_before,
+            "running_models": running_after
+        }
+                
+    except Exception as e:
+        logger.error(f"❌ 전체 모델 중지 중 오류: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "error": f"전체 모델 중지 중 오류: {str(e)}"
         }
 
 @router.get("/health")

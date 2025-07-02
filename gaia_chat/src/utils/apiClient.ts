@@ -345,6 +345,47 @@ export class ApiClient {
     return this.simpleFetch(`/api/system/models/${encodedName}/stop`, 'POST');
   }
 
+  // 다중 모델 시작 (향후 확장용)
+  async startModelMultiple(modelName: string) {
+    const encodedName = encodeURIComponent(modelName);
+    console.log(`🚀 다중 모델 시작 요청: ${modelName} -> ${encodedName}`);
+    
+    // XHR 우선 시도
+    try {
+      const xhrResult = await this.xhrFetch(`/api/system/models/${encodedName}/start-multiple`, 'POST', {});
+      if (xhrResult.success) {
+        console.log('✅ XHR 다중 모델 시작 성공');
+        return xhrResult;
+      }
+      console.warn('⚠️ XHR 다중 모델 시작 실패:', xhrResult.error);
+    } catch (error) {
+      console.warn('⚠️ XHR 방식 예외, simpleFetch로 폴백:', error);
+    }
+    
+    console.log('🔄 simpleFetch로 다중 모델 시작 재시도');
+    return this.simpleFetch(`/api/system/models/${encodedName}/start-multiple`, 'POST');
+  }
+
+  // 모든 모델 중지
+  async stopAllModels() {
+    console.log(`🛑 모든 모델 중지 요청`);
+    
+    // XHR 우선 시도
+    try {
+      const xhrResult = await this.xhrFetch('/api/system/models/stop-all', 'POST', {});
+      if (xhrResult.success) {
+        console.log('✅ XHR 모든 모델 중지 성공');
+        return xhrResult;
+      }
+      console.warn('⚠️ XHR 모든 모델 중지 실패:', xhrResult.error);
+    } catch (error) {
+      console.warn('⚠️ XHR 방식 예외, simpleFetch로 폴백:', error);
+    }
+    
+    console.log('🔄 simpleFetch로 모든 모델 중지 재시도');
+    return this.simpleFetch('/api/system/models/stop-all', 'POST');
+  }
+
   // 시스템 상태 확인
   async checkHealth() {
     console.log(`💊 Health 체크 요청`);
