@@ -153,9 +153,9 @@ coverage.xml
 .mcp_pids/
 *.pid
 
-# 개발 중 테스트 파일
-test_*.py
-*_test.py
+# 개발 중 테스트 파일 (주요 테스트 파일은 포함)
+# test_*.py  # 주석 처리: RAG 테스트 파일들 포함하기 위해
+# *_test.py  # 주석 처리: 테스트 파일들 포함하기 위해
 debug_*.py
 
 # 개인 설정 파일
@@ -168,6 +168,7 @@ user_settings.*
 *.json
 !config/*.json
 !examples/*.json
+!app/rag/*.md  # RAG 관련 문서 포함
 
 # 비밀 키 및 인증 정보
 secrets.txt
