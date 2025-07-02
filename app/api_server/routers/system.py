@@ -290,19 +290,114 @@ async def change_prompt(
         raise HTTPException(404, f"세션 {request.session_id}를 찾을 수 없습니다")
     
     try:
-        # 프롬프트 매니저 다시 로드하여 최신 프롬프트 파일 적용
+        # 두 가지 프롬프트 매니저 모두 리로드
+        # 1. 레거시 프롬프트 매니저 리로드
         from app.utils.prompt_manager import get_prompt_manager
         prompt_manager = get_prompt_manager()
         prompt_manager.reload_prompts()
+        
+        # 2. 신규 프롬프트 템플릿 매니저 리로드
+        from app.utils.prompt_template_manager import reload_prompt_manager
+        template_manager = reload_prompt_manager()
+        template_manager.reload_all_prompts()
         
         result = await chatbot.change_prompt(request.prompt_type)
         return {
             "success": True,
             "prompt_type": chatbot.current_prompt_type,
-            "message": result
+            "message": result,
+            "reload_status": "프롬프트 파일 리로드 완료"
         }
     except Exception as e:
         raise HTTPException(400, str(e))
+
+@router.post("/prompts/reload",
+    summary="🔄 프롬프트 파일 리로드",
+    description="""
+## 프롬프트 파일 실시간 리로드
+
+모든 프롬프트 파일을 디스크에서 다시 읽어와 변경사항을 즉시 반영합니다.
+
+### 기능
+- 레거시 프롬프트 파일 (prompt_*.txt) 리로드
+- 신규 프롬프트 템플릿 조합 파일 리로드
+- 프롬프트 캐시 무효화
+
+### 사용 시나리오
+- 프롬프트 파일을 수정한 후 서버 재시작 없이 적용하고 싶을 때
+- 새로운 전문 프롬프트를 추가한 후 즉시 사용하고 싶을 때
+- 프롬프트 변경사항이 반영되지 않을 때 수동으로 새로고침할 때
+""",
+    responses={
+        200: {
+            "description": "프롬프트 리로드 성공",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "모든 프롬프트 파일이 성공적으로 리로드되었습니다",
+                        "reloaded_files": 15,
+                        "template_manager_reloaded": True,
+                        "legacy_manager_reloaded": True
+                    }
+                }
+            }
+        }
+    }
+)
+async def reload_prompts(
+    service: ChatbotService = Depends(get_chatbot_service)
+) -> Dict[str, Any]:
+    """모든 프롬프트 파일을 실시간으로 리로드"""
+    try:
+        reload_results = {}
+        
+        # 1. 레거시 프롬프트 매니저 리로드
+        try:
+            from app.utils.prompt_manager import get_prompt_manager
+            prompt_manager = get_prompt_manager()
+            prompt_manager.reload_prompts()
+            reload_results["legacy_manager_reloaded"] = True
+            reload_results["legacy_prompts"] = len(prompt_manager.prompts)
+        except Exception as e:
+            logger.error(f"레거시 프롬프트 매니저 리로드 실패: {e}")
+            reload_results["legacy_manager_reloaded"] = False
+            reload_results["legacy_error"] = str(e)
+        
+        # 2. 신규 프롬프트 템플릿 매니저 리로드
+        try:
+            from app.utils.prompt_template_manager import reload_prompt_manager
+            template_manager = reload_prompt_manager()
+            template_manager.reload_all_prompts()
+            reload_results["template_manager_reloaded"] = True
+        except Exception as e:
+            logger.error(f"프롬프트 템플릿 매니저 리로드 실패: {e}")
+            reload_results["template_manager_reloaded"] = False
+            reload_results["template_error"] = str(e)
+        
+        # 3. ChatbotService의 프롬프트 템플릿 매니저도 업데이트
+        try:
+            service.prompt_template_manager = template_manager
+            reload_results["service_updated"] = True
+        except Exception as e:
+            logger.error(f"ChatbotService 프롬프트 매니저 업데이트 실패: {e}")
+            reload_results["service_updated"] = False
+            reload_results["service_error"] = str(e)
+        
+        success = reload_results.get("legacy_manager_reloaded", False) or reload_results.get("template_manager_reloaded", False)
+        
+        return {
+            "success": success,
+            "message": "프롬프트 파일 리로드 완료" if success else "프롬프트 파일 리로드 중 오류 발생",
+            **reload_results
+        }
+        
+    except Exception as e:
+        logger.error(f"프롬프트 리로드 API 오류: {e}")
+        return {
+            "success": False,
+            "error": f"프롬프트 리로드 실패: {str(e)}"
+        }
 
 @router.post("/debug")
 async def toggle_debug(

@@ -3,7 +3,9 @@
 import React, { memo } from 'react';
 import Image from 'next/image';
 import { Message } from '@/types/chat';
+import { formatRelativeTime } from '@/utils/helpers';
 import AcademicMarkdownRenderer from './AcademicMarkdownRenderer';
+import RelativeTime from './RelativeTime';
 
 interface MessageItemProps {
   message: Message;
@@ -16,11 +18,6 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
   const isSystemMessage = message.role === 'system';
   const isCompleteResponse = isAssistantMessage && message.isComplete;
 
-  
-  const timestamp = new Date(message.timestamp).toLocaleTimeString('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 
   // 시스템 메시지를 위한 별도 렌더링
   if (isSystemMessage) {
@@ -33,7 +30,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                 <span className="text-white text-sm font-bold">🤖</span>
               </div>
               <span className="text-blue-800 font-medium text-sm">시스템 안내</span>
-              <span className="text-blue-600 text-xs ml-auto">{timestamp}</span>
+              <RelativeTime date={message.timestamp} className="text-blue-600 text-xs ml-auto" />
             </div>
             <div className="text-blue-900 leading-relaxed whitespace-pre-wrap">
               {message.content}
@@ -46,9 +43,9 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
 
   return (
     <div className={`mb-6 ${isUserMessage ? 'flex justify-end' : 'flex justify-start'}`}>
-      <div className={`max-w-3xl w-full ${
+      <div className={`${isUserMessage ? 'max-w-2xl' : 'max-w-3xl w-full'} ${
         isUserMessage 
-          ? 'bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200' 
+          ? 'bg-gradient-to-l from-blue-50 to-cyan-50 border border-blue-200' 
           : isCompleteResponse
             ? 'bg-white border-2 border-emerald-300 shadow-lg'
             : 'bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200'
@@ -67,9 +64,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                   <p className="text-xs text-gray-600">GAIA-BT Academic Response</p>
                 </div>
               </div>
-              <div className="text-xs text-gray-500">
-                {timestamp}
-              </div>
+              <RelativeTime date={message.timestamp} className="text-xs text-gray-500" />
             </div>
             {message.userQuestion && (
               <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
@@ -85,9 +80,9 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
         
         {/* 메시지 내용 */}
         {isUserMessage ? (
-          <div className="flex items-center space-x-3 mb-3">
+          <div className="flex items-center justify-end space-x-3 mb-3">
+            <span className="text-xs font-bold text-blue-700">연구자</span>
             <span className="text-sm">🔬</span>
-            <span className="text-xs font-bold text-emerald-700">연구자</span>
           </div>
         ) : isAssistantMessage && !isCompleteResponse && (
           <div className="flex items-center space-x-3 mb-3">
@@ -110,16 +105,17 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
             />
           </div>
         ) : (
-          <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full">
+          <div className="break-words leading-relaxed text-gray-900 overflow-wrap-anywhere word-break-break-word max-w-full text-right">
             <div 
-              className="raw-text korean-text prose prose-slate max-w-none"
+              className="raw-text korean-text prose prose-slate max-w-none text-right"
               style={{ 
                 whiteSpace: 'pre-wrap', 
                 lineHeight: '1.8',
                 color: '#374151',
                 fontFamily: '"Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", "맑은 고딕", sans-serif',
                 wordBreak: 'break-word',
-                overflowWrap: 'break-word'
+                overflowWrap: 'break-word',
+                textAlign: 'right'
               }}
             >
               {message.content}
@@ -129,8 +125,8 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
         
         {/* 타임스탬프 - 완료된 응답은 헤더에 표시되므로 제외 */}
         {!isCompleteResponse && (
-          <div className="flex justify-end mt-3">
-            <span className="text-xs text-gray-500">{timestamp}</span>
+          <div className={`flex mt-3 ${isUserMessage ? 'justify-start' : 'justify-end'}`}>
+            <RelativeTime date={message.timestamp} className="text-xs text-gray-500" />
           </div>
         )}
       </div>

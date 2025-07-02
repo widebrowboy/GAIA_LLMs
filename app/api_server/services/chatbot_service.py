@@ -454,12 +454,21 @@ class ChatbotService:
             "mcp_enabled": chatbot.config.mcp_enabled,
             "debug": chatbot.config.debug_mode,
             "mcp_output_visible": chatbot.config.show_mcp_output,
-            "available_models": await self._get_available_models(),
+            "available_models": self._get_available_models_sync(),
             "available_prompts": list(self.prompt_manager.templates.keys()) if hasattr(self.prompt_manager, 'templates') and self.prompt_manager.templates else []
         }
     
+    def _get_available_models_sync(self) -> List[str]:
+        """사용 가능한 모델 목록 가져오기 (동기 버전)"""
+        try:
+            # 기본 모델 목록 반환 (비동기 호출 없이)
+            return ["gemma3-12b:latest", "txgemma-chat:latest", "txgemma-predict:latest", "Gemma3:27b-it-q4_K_M"]
+        except Exception as e:
+            logger.warning(f"모델 목록 조회 실패, 기본 목록 사용: {e}")
+            return ["gemma3-12b:latest", "txgemma-chat:latest", "txgemma-predict:latest", "Gemma3:27b-it-q4_K_M"]
+    
     async def _get_available_models(self) -> List[str]:
-        """사용 가능한 모델 목록 가져오기"""
+        """사용 가능한 모델 목록 가져오기 (비동기 버전)"""
         try:
             from app.utils.ollama_manager import list_available_models
             models = await list_available_models()

@@ -310,37 +310,37 @@ Always explicitly state which mode is active:
 - Objective and scholarly tone
 - Clear summary of contribution
 
-## 1. Introduction
+## Introduction
 - Background information and context
 - Research problem definition
 - Research objectives and hypotheses
 - Significance of the study
 
-## 2. Literature Review
+## Literature Review
 - Current state of existing research
 - Key theories and findings
 - Research gaps identification
 - Theoretical framework
 
-## 3. Methodology
+## Methodology
 - Research design and approach
 - Data collection methods
 - Analysis procedures
 - Limitations and constraints
 
-## 4. Results
+## Results
 - Key findings presentation
 - Data interpretation
 - Statistical analysis (if applicable)
 - Evidence-based conclusions
 
-## 5. Discussion
+## Discussion
 - Meaning and implications of results
 - Comparison with existing literature
 - Limitations and constraints
 - Future research directions
 
-## 6. Conclusion
+## Conclusion
 - Core contributions to the field
 - Practical implications
 - Summary of key insights
@@ -464,7 +464,7 @@ After each deep research response, include 3 strategic follow-up questions:
 
 This comprehensive guide provides systematic instructions for conducting competitive landscape analyses in pharmaceutical and biotechnology sectors, focusing on specific targets, mechanisms of action (MoA), or therapeutic indications. The guide incorporates proven data organization methodologies from radiopharmaceutical, VEGFR inhibitor, and PARP inhibitor competitive analyses, enhanced with MCP-powered data integration.
 
-## Section 1: Analysis for Specific Target or MoA
+## Analysis for Specific Target or MoA
 
 ### 1. Literature Review Search Strategy
 
@@ -529,7 +529,7 @@ This comprehensive guide provides systematic instructions for conducting competi
 - Google search (beyond news articles)
 - Maximum 20 pages of Google results (extend to 40 pages if initial results are limited)
 
-## Section 2: Analysis for Specific Therapeutic Indication
+## Analysis for Specific Therapeutic Indication
 
 ### 1. Initial Literature Review
 
@@ -559,7 +559,7 @@ This comprehensive guide provides systematic instructions for conducting competi
 
 (Use all reference sources listed in Section 1.3)
 
-## Section 3: Systematic Data Organization Framework
+## Systematic Data Organization Framework
 
 ### 3.1 Data Collection Template
 
@@ -626,7 +626,7 @@ This comprehensive guide provides systematic instructions for conducting competi
 |---------|------------------|-------------------|----------------------|-------------------|----------------------|-------|
 | [Company] | [Tech Platform] | [Product Name] | [Combination Drug] | [Phase X] | [High/Medium/Low] | [Special Notes] |
 
-## Section 4: Advanced Analysis Methods
+## Advanced Analysis Methods
 
 ### 4.1 Keyword-Based Classification System
 
@@ -682,7 +682,7 @@ This comprehensive guide provides systematic instructions for conducting competi
 - Patient population segmentation
 - Geographic market variations
 
-## Section 5: Partnership Strategy Development
+## Partnership Strategy Development
 
 ### 5.1 Partner Candidate Identification
 
@@ -738,7 +738,7 @@ This comprehensive guide provides systematic instructions for conducting competi
 - Commercial risks
 - Partner-specific risks
 
-## Section 6: Continuous Monitoring System
+## Continuous Monitoring System
 
 ### 6.1 Real-time Intelligence Updates
 

@@ -94,24 +94,15 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
           }
         }
         
-        // 기본 모델 자동 시작
-        const initializeDefaultModel = async () => {
-          console.log('🚀 페이지 로드 시 기본 모델 초기화 시작');
+        // 기본 모델 상태 설정 (자동 시작하지 않음)
+        const initializeDefaultModel = () => {
+          console.log('🚀 페이지 로드 시 기본 모델 상태 설정');
           
-          // 최신 기본 모델 설정을 가져와서 Context 상태 설정
+          // 최신 기본 모델 설정을 가져와서 Context 상태만 설정
           const currentDefault = getDefaultModel();
           setCurrentModel(currentDefault);
           console.log(`📝 currentModel 상태를 최신 기본값으로 설정: ${currentDefault}`);
-          
-          // 3초 지연 후 기본 모델 시작 (서버 안정화 대기)
-          setTimeout(async () => {
-            const success = await ensureDefaultModel();
-            if (success) {
-              console.log('✅ 기본 모델 초기화 완료');
-            } else {
-              console.warn('⚠️ 기본 모델 초기화 실패 - 수동 시작 필요');
-            }
-          }, 3000);
+          console.log('💡 모델 자동 시작은 사용자 요청 시에만 수행');
         };
         
         initializeDefaultModel();
@@ -164,24 +155,9 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
     setIsConnecting(false);
     setError(null);
     
-    // 새 연구 시작 시 기본 모델 확인 및 설정
-    console.log('🆕 새 연구 시작 - 기본 모델 확인 중...');
-    try {
-      // 최신 기본 모델 설정을 가져와서 Context 상태 재설정
-      const currentDefault = getDefaultModel();
-      setCurrentModel(currentDefault);
-      console.log(`📝 새 연구 시 currentModel 상태를 최신 기본값으로 재설정: ${currentDefault}`);
-      
-      // 기본 모델이 실행 중인지 확인하고 필요시 시작
-      const success = await ensureDefaultModel();
-      if (success) {
-        console.log('✅ 새 연구 시 기본 모델 설정 완료');
-      } else {
-        console.warn('⚠️ 새 연구 시 기본 모델 설정 실패');
-      }
-    } catch (error) {
-      console.error('❌ 새 연구 시 모델 설정 오류:', error);
-    }
+    // 새 연구 시작 시 현재 모델 유지 (자동 변경 방지)
+    console.log('🆕 새 연구 시작 - 현재 모델 유지:', currentModel);
+    // 기본 모델로 자동 변경하지 않고 현재 선택된 모델 유지
   };
 
   // 대화 선택

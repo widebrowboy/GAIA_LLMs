@@ -406,7 +406,7 @@ async def root():
         }
     }
 
-@app.get("/health",
+@app.api_route("/health", methods=["GET", "HEAD"],
     summary="서버 상태 확인",
     description="""
 API 서버의 상태를 확인합니다. 다음 정보를 포함합니다:

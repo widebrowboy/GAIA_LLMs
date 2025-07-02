@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Plus, MessageCircle, Trash2, X, Brain, Shield, Zap, ChevronDown, ChevronUp, Monitor, RefreshCw } from 'lucide-react';
 import { useChatContext } from '@/contexts/SimpleChatContext';
-import { formatDate } from '../utils/helpers';
+import { formatRelativeTime, formatAbsoluteDateTime } from '../utils/helpers';
+import RelativeTime from './RelativeTime';
 import { useResponsive } from '@/hooks/useResponsive';
 import { getApiUrl } from '@/config/api';
 import { apiClient } from '@/utils/apiClient';
@@ -14,10 +15,11 @@ interface SidebarProps {
   onClose?: () => void;
   isMobileSidebarOpen?: boolean;
   onToggle?: () => void;
+  isSidebarOpen?: boolean;
 }
 
 
-const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
+const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle, isSidebarOpen = false }) => {
   console.log('💡 Sidebar 컴포넌트 렌더링 시작');
   
   const { 
@@ -46,7 +48,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     getCurrentDefaultModel
   } = useChatContext();
   
-  const { isDesktop } = useResponsive();
+  const { isDesktop, isMobile } = useResponsive();
 
   const [showSystemStatus, setShowSystemStatus] = useState(false);
   const [showExpertPrompts, setShowExpertPrompts] = useState(false);
@@ -644,8 +646,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
     
     try {
       startNewConversation();
-      if (onClose) {
-        onClose();
+      // 모바일이거나 데스크톱에서 사이드바가 열려있을 때 닫기
+      if (isMobile || (isDesktop && isSidebarOpen)) {
+        if (onClose) {
+          onClose();
+        }
       }
     } catch (error) {
       console.error('Failed to create conversation:', error);
@@ -669,8 +674,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
 
   const handleConversationSelect = (conversationId: string) => {
     selectConversation(conversationId);
-    if (onClose) {
-      onClose();
+    // 모바일이거나 데스크톱에서 사이드바가 열려있을 때 닫기
+    if (isMobile || (isDesktop && isSidebarOpen)) {
+      if (onClose) {
+        onClose();
+      }
     }
   };
 
@@ -720,11 +728,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
               // 환영 페이지로 이동(현재 대화 선택 해제)
               selectConversation('');
               
-              // 사이드바 열림 상태로 설정 (로컬스토리지에도 저장)
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('gaia-gpt-sidebar-open', JSON.stringify(true));
-                // 부모 컴포넌트에서 onToggle 호출 시 사이드바가 열릴 수 있도록 설정
-                if (onToggle) onToggle();
+              // 모바일이거나 데스크톱에서 사이드바가 열려있을 때 닫기
+              if (isMobile || (isDesktop && isSidebarOpen)) {
+                if (onClose) {
+                  onClose();
+                }
               }
             }}
             title="홈으로 이동 - 환영 페이지로 돌아가기"
@@ -992,8 +1000,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                       currentConversation?.id === conversation.id
                         ? 'bg-gradient-to-r from-emerald-700 to-blue-700 bg-clip-text text-transparent'
                         : 'text-gray-800'
-                    }`}>
-                      {conversation.title || '새 연구'}
+                    }`}
+                    title={conversation.title || '새 연구'}>
+                      {(() => {
+                        const title = conversation.title || '새 연구';
+                        return title.length > 15 ? title.substring(0, 15) + '...' : title;
+                      })()}
                     </h4>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -1001,8 +1013,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle }) => {
                       currentConversation?.id === conversation.id
                         ? 'text-emerald-600'
                         : 'text-gray-500'
-                    }`}>
-                      {formatDate(conversation.updatedAt)}
+                    }`} title={`연구 시작: ${formatAbsoluteDateTime(conversation.createdAt)}`}>
+                      {formatAbsoluteDateTime(conversation.createdAt)}
                     </span>
                     {currentConversation?.id !== conversation.id && (
                       <button

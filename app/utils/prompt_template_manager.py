@@ -314,6 +314,57 @@ class PromptTemplateManager:
                 results[f"{model}_{mode}_{spec}"] = False
         
         return results
+    
+    def reload_all_prompts(self) -> bool:
+        """모든 프롬프트 파일을 다시 로드 (실시간 반영)"""
+        try:
+            logger.info("프롬프트 파일 실시간 리로드 시작...")
+            
+            # 기존 캐시 초기화
+            self._prompt_cache = {}
+            
+            # 조합 파일들의 수정 시간 체크 (필요시 추가)
+            reloaded_count = 0
+            
+            # 조합 파일 디렉토리가 존재하면 확인
+            if self.combinations_dir.exists():
+                for combo_file in self.combinations_dir.glob("*.txt"):
+                    reloaded_count += 1
+                    
+            logger.info(f"프롬프트 파일 리로드 완료: {reloaded_count}개 파일 확인")
+            return True
+            
+        except Exception as e:
+            logger.error(f"프롬프트 리로드 실패: {e}")
+            return False
+    
+    def invalidate_cache(self):
+        """프롬프트 캐시 무효화"""
+        if hasattr(self, '_prompt_cache'):
+            self._prompt_cache.clear()
+            logger.info("프롬프트 캐시 무효화 완료")
+    
+    def reload_specific_prompt(self, model: str, mode: str, specialization: str) -> bool:
+        """특정 프롬프트 조합만 리로드"""
+        try:
+            combo_key = f"{model}_{mode}_{specialization}"
+            
+            # 캐시에서 해당 조합 제거
+            if hasattr(self, '_prompt_cache'):
+                self._prompt_cache.pop(combo_key, None)
+            
+            # 조합 파일이 존재하는지 확인
+            combo_file = self.combinations_dir / f"{combo_key}.txt"
+            if combo_file.exists():
+                logger.info(f"프롬프트 조합 리로드: {combo_key}")
+                return True
+            else:
+                logger.warning(f"프롬프트 조합 파일이 없습니다: {combo_file}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"특정 프롬프트 리로드 실패 ({model}_{mode}_{specialization}): {e}")
+            return False
 
 
 # 글로벌 인스턴스
@@ -324,6 +375,14 @@ def get_prompt_manager() -> PromptTemplateManager:
     global _prompt_manager
     if _prompt_manager is None:
         _prompt_manager = PromptTemplateManager()
+    return _prompt_manager
+
+def reload_prompt_manager() -> PromptTemplateManager:
+    """프롬프트 관리자를 완전히 다시 생성 (실시간 리로드)"""
+    global _prompt_manager
+    _prompt_manager = None  # 기존 인스턴스 제거
+    _prompt_manager = PromptTemplateManager()  # 새 인스턴스 생성
+    logger.info("프롬프트 관리자 완전 리로드 완료")
     return _prompt_manager
 
 
