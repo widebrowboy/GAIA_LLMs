@@ -630,6 +630,25 @@ enhanced_feedback_schema = {
 - 추론 모드별 별도 중복 검사
 - 추론 품질 고려한 중복 판단
 
+## 📚 시스템 문서
+
+### 포괄적 문서 세트
+- **📋 [문서 개요](./docs/README.md)** - 전체 문서 가이드 및 빠른 시작
+- **🏗️ [시스템 아키텍처](./docs/System_Architecture_Documentation.md)** - 마이크로서비스 구조 및 컴포넌트 설계
+- **🔗 [API 문서](./docs/API_Documentation.md)** - 완전한 REST API 레퍼런스 (7개 API 그룹)
+- **🧠 [Reasoning RAG 설계서](./docs/Reasoning_RAG_API_Specification.md)** - v3.84+ 고급 추론 시스템 명세
+
+### 문서 활용법
+- **개발자**: 시스템 아키텍처 → API 문서 → Reasoning RAG 설계서
+- **연구자**: 프로젝트 메인 문서 → API 문서 → 고급 기능
+- **관리자**: 시스템 아키텍처 → 메인 문서 (설정/모니터링)
+
+### API 문서 하이라이트
+- **7개 주요 API 그룹**: Chat, System, RAG, Feedback, MCP, Session
+- **완전한 예제 코드**: cURL, JavaScript, Python
+- **WebSocket 지원**: 실시간 스트리밍
+- **고급 기능**: 2단계 리랭킹, 피드백 시스템, MCP 통합
+
 ## 📈 향후 확장
 
 ### 완료된 기능 (v3.79-v3.83) ✅
