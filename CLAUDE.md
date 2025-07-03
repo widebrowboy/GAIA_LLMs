@@ -1,4 +1,4 @@
-# GAIA-BT v3.78 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.80 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 
@@ -55,6 +55,16 @@ GAIA-BT는 Ollama LLM과 MCP(Model Context Protocol)를 활용한 신약개발 �
 - ✅ **API 확장** - 리랭킹 기능 포함 고급 검색 엔드포인트
 - ✅ **완전한 Swagger 문서** - 상세한 예시 및 사용법 포함
 
+### 🧠 AI 학습 및 피드백 시스템 (v3.80 완성) ✅
+- ✅ **피드백 벡터 저장소** - 썸업/썸다운 데이터 임베딩 기반 저장
+- ✅ **질문-응답-피드백 관계 매핑** - 사용자 평가 데이터 구조화
+- ✅ **실시간 피드백 알림** - 저장 완료 및 학습 기여도 표시
+- ✅ **피드백 API 시스템** - RESTful API로 피드백 수집 및 분석
+- ✅ **Milvus 웹 UI 통합** - 벡터 데이터베이스 시각적 관리
+- 🚧 **피드백 기반 RAG 개선** - 부정 피드백 패턴 학습 및 회피
+- 🚧 **Gemma 파인튜닝 데이터셋** - 고품질 응답 우선 학습 데이터 구축
+- 🚧 **자동 품질 평가 시스템** - 피드백 패턴 기반 응답 품질 예측
+
 ## 🏗️ 프로젝트 구조
 
 ```
@@ -68,6 +78,8 @@ GAIA_LLMs/
 │   │   ├── embeddings.py     # 임베딩 서비스
 │   │   ├── vector_store_lite.py  # Milvus Lite 벡터 스토어
 │   │   ├── rag_pipeline.py   # RAG 파이프라인
+│   │   ├── feedback_store.py # 피드백 벡터 저장소 (신규)
+│   │   ├── feedback_rag.py   # 피드백 기반 RAG 개선 (신규)
 │   │   └── rule_1.md         # Reranker 구현 가이드
 │   └── utils/                # 유틸리티
 ├── gaia_chat/                # Next.js WebUI
@@ -99,6 +111,25 @@ GAIA_LLMs/
 
 # 서버 중지
 ./scripts/server_manager.sh stop
+```
+
+### Milvus 웹 UI 사용 (v3.80 신규)
+```bash
+# Milvus 서버 및 웹 UI 시작
+./scripts/milvus_manager.sh start
+
+# 웹 UI 접속 (브라우저)
+./scripts/milvus_manager.sh webui
+
+# Milvus 서버 상태 확인
+./scripts/milvus_manager.sh status
+
+# 서버 중지
+./scripts/milvus_manager.sh stop
+
+# 웹 UI 직접 접속
+# http://localhost:9091/webui (Milvus 관리)
+# http://localhost:9001 (MinIO 콘솔 - 스토리지)
 ```
 
 ### CLI 실행
@@ -162,7 +193,9 @@ python test_reranking_api.py
 - **WebUI**: 3003
 - **API**: 8000  
 - **Ollama**: 11434
-- **Milvus**: 19530 (GRPC), 9091 (Admin)
+- **Milvus Lite**: 파일 기반 (./milvus_lite.db)
+- **Milvus 서버**: 19530 (gRPC), 9091 (웹 UI)
+- **MinIO**: 9000 (API), 9001 (콘솔)
 
 ### 로그 위치
 - **API 서버**: `/tmp/gaia-bt-api.log`
@@ -302,9 +335,121 @@ git reset --hard [커밋해시]
 - **학술 논문 포맷** - APA 인용, Sequential Thinking
 - **다국어 지원** - 한국어/영어 자동 감지
 
+## 🧠 AI 학습 및 피드백 시스템 상세 계획
+
+### 벡터 데이터베이스 스키마 설계
+
+#### 피드백 컬렉션 (feedback_collection)
+```python
+{
+    "id": "unique_feedback_id",
+    "question_embedding": [768차원 벡터],  # 사용자 질문 임베딩
+    "answer_embedding": [768차원 벡터],    # AI 응답 임베딩  
+    "feedback_type": "positive|negative",  # 썸업/썸다운
+    "question_text": "원본 질문 텍스트",
+    "answer_text": "원본 응답 텍스트",
+    "timestamp": "2025-01-03T12:00:00Z",
+    "session_id": "대화_세션_ID",
+    "user_id": "사용자_ID_해시",
+    "context_sources": ["참조된 RAG 소스들"],
+    "model_version": "gemma3-12b",
+    "response_time": 3.2,  # 응답 생성 시간
+    "confidence_score": 0.85  # 모델 자신감 점수
+}
+```
+
+#### 질문-응답 쌍 컬렉션 (qa_pairs_collection)
+```python
+{
+    "id": "unique_qa_id", 
+    "question_embedding": [768차원 벡터],
+    "answer_embedding": [768차원 벡터],
+    "question_text": "원본 질문",
+    "answer_text": "원본 응답",
+    "positive_feedback_count": 5,
+    "negative_feedback_count": 1,
+    "quality_score": 0.83,  # 계산된 품질 점수
+    "is_training_candidate": true,  # 파인튜닝 후보 여부
+    "domain_tags": ["EGFR", "oncology", "clinical_trial"]
+}
+```
+
+### 피드백 기반 RAG 개선 전략
+
+#### 1. 부정 피드백 패턴 학습
+- **벡터 유사성 분석**: 부정 피드백이 많은 질문들의 임베딩 클러스터 식별
+- **응답 품질 예측**: 새로운 질문이 부정 패턴과 유사한지 사전 검증
+- **동적 리랭킹**: 부정 피드백 패턴과 유사한 검색 결과는 우선순위 하향 조정
+
+#### 2. 긍정 피드백 강화
+- **고품질 응답 우선**: 썸업이 많은 응답과 유사한 패턴 우선 검색
+- **컨텍스트 최적화**: 긍정 피드백이 많은 RAG 소스 조합 학습
+- **응답 템플릿 개선**: 높은 평가를 받은 응답 구조 분석 및 적용
+
+#### 3. 실시간 피드백 적용
+- **즉시 반영**: 피드백 받은 질문-응답 쌍을 벡터 DB에 즉시 저장
+- **세션 내 학습**: 같은 대화 세션 내에서 이전 피드백 패턴 고려
+- **점진적 개선**: 피드백 누적에 따른 응답 품질 지속적 향상
+
+### Gemma 파인튜닝 데이터셋 구축
+
+#### 데이터 필터링 기준
+1. **긍정 피드백 비율**: 80% 이상 썸업을 받은 응답만 선별
+2. **응답 품질 점수**: 0.8 이상의 계산된 품질 점수
+3. **도메인 다양성**: 신약개발 전 영역의 균형 잡힌 분포
+4. **응답 완성도**: 완전한 문장과 구조를 가진 응답
+
+#### 파인튜닝 데이터 포맷
+```json
+{
+  "instruction": "신약개발 전문 AI로서 다음 질문에 답변하세요.",
+  "input": "EGFR 돌연변이 폐암의 1차 치료제는 무엇인가요?",
+  "output": "EGFR 돌연변이 폐암의 1차 치료제로는...",
+  "quality_score": 0.92,
+  "feedback_count": 8,
+  "domain": "oncology"
+}
+```
+
+### 자동 품질 평가 시스템
+
+#### 품질 점수 계산 알고리즘
+```python
+quality_score = (
+    positive_feedback_ratio * 0.4 +
+    response_coherence_score * 0.3 +
+    domain_accuracy_score * 0.2 +
+    user_engagement_score * 0.1
+)
+```
+
+#### 실시간 평가 지표
+- **피드백 비율**: 긍정/부정 피드백 비율
+- **응답 일관성**: 임베딩 기반 의미적 일관성 점수
+- **도메인 정확성**: 신약개발 전문 용어 및 내용 정확도
+- **사용자 참여도**: 후속 질문, 복사 횟수 등
+
 ## 📈 향후 확장
 
-### 계획된 기능
+### 단기 목표 (v3.79-v3.82)
+- 피드백 벡터 저장소 구현
+- 실시간 피드백 수집 및 알림 시스템
+- 피드백 기반 RAG 개선 프로토타입
+- 데이터 품질 평가 시스템
+
+### 중기 목표 (v3.83-v3.90)
+- Gemma 파인튜닝 파이프라인 구축
+- 자동 품질 평가 시스템 완성
+- A/B 테스트를 통한 개선 효과 검증
+- 피드백 분석 대시보드
+
+### 장기 목표 (v3.91+)
+- 완전 자동화된 모델 개선 시스템
+- 다중 모델 앙상블 및 동적 선택
+- 개인화된 응답 생성
+- 연구 도메인별 전문화
+
+### 기존 계획된 기능
 - 실제 DrugBank/OpenTargets API 연결
 - 캐싱 시스템 구현
 - 실시간 분석 대시보드
@@ -320,10 +465,12 @@ git reset --hard [커밋해시]
 
 ### 버전 히스토리
 
+- **v3.80**: Milvus 웹 UI 통합 및 피드백 시스템 완성 - Docker Compose Milvus 서버, 웹 UI 관리 시스템, 피드백 벡터 저장소, 실시간 알림 완성
+- **v3.79**: AI 학습 및 피드백 시스템 설계 완성 - 벡터 데이터베이스 스키마, Gemma 파인튜닝 계획, 피드백 기반 RAG 개선 전략 수립
 - **v3.78**: WebUI 사용자 경험 대폭 개선 - 응답 피드백 시스템(썸업/썸다운), 클립보드 복사 기능, 인터랙티브 액션 버튼 추가
 - **v3.77**: PyMilvus 통합 Reranker 완성 - BGE Reranker 2단계 검색 아키텍처, API 테스트 시스템, Swagger 문서 완전 업데이트
 - **v3.76**: CLAUDE.md 구조 최적화 및 중복 제거 완료
 
 ---
 
-**GAIA-BT v3.78** - 신약개발 연구의 새로운 패러다임 🧬✨
+**GAIA-BT v3.80** - 신약개발 연구의 새로운 패러다임 🧬✨

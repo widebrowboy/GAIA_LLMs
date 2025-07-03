@@ -22,6 +22,8 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
   // 피드백 및 복사 상태 관리
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const [copied, setCopied] = useState(false);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string>('');
 
   // 복사 기능
   const handleCopy = async () => {
@@ -44,13 +46,59 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
   };
 
   // 피드백 처리
-  const handleFeedback = (type: 'up' | 'down') => {
+  const handleFeedback = async (type: 'up' | 'down') => {
     if (feedback === type) {
       setFeedback(null); // 같은 버튼 클릭 시 취소
-    } else {
-      setFeedback(type);
-      // 여기에 서버로 피드백 전송 로직 추가 가능
-      console.log(`피드백: ${type}, 메시지 ID: ${message.id || 'unknown'}`);
+      setFeedbackMessage('');
+      return;
+    }
+
+    setFeedbackSubmitting(true);
+    setFeedback(type);
+
+    try {
+      // 피드백을 서버에 전송
+      const response = await fetch('/api/feedback/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question: message.userQuestion || "사용자 질문 정보 없음",
+          answer: message.content,
+          feedback_type: type === 'up' ? 'positive' : 'negative',
+          session_id: `session_${Date.now()}`,
+          user_id: 'anonymous',
+          model_version: 'gemma3-12b',
+          response_time: 0,
+          confidence_score: 0.8
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setFeedbackMessage(result.message || '피드백이 저장되었습니다.');
+        
+        // 3초 후 메시지 숨김
+        setTimeout(() => {
+          setFeedbackMessage('');
+        }, 3000);
+      } else {
+        throw new Error('피드백 저장 실패');
+      }
+    } catch (error) {
+      console.error('피드백 전송 오류:', error);
+      setFeedbackMessage('피드백 저장에 실패했습니다. 나중에 다시 시도해주세요.');
+      
+      // 오류 시 피드백 상태 복원
+      setFeedback(null);
+      
+      // 5초 후 오류 메시지 숨김
+      setTimeout(() => {
+        setFeedbackMessage('');
+      }, 5000);
+    } finally {
+      setFeedbackSubmitting(false);
     }
   };
 
@@ -105,22 +153,24 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => handleFeedback('up')}
+                    disabled={feedbackSubmitting}
                     className={`p-2 rounded-lg transition-all duration-200 hover:bg-green-50 ${
                       feedback === 'up' 
                         ? 'bg-green-100 text-green-600' 
                         : 'text-gray-400 hover:text-green-500'
-                    }`}
+                    } ${feedbackSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                     title="도움이 되었습니다"
                   >
                     <ThumbsUp size={16} />
                   </button>
                   <button
                     onClick={() => handleFeedback('down')}
+                    disabled={feedbackSubmitting}
                     className={`p-2 rounded-lg transition-all duration-200 hover:bg-red-50 ${
                       feedback === 'down' 
                         ? 'bg-red-100 text-red-600' 
                         : 'text-gray-400 hover:text-red-500'
-                    }`}
+                    } ${feedbackSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                     title="개선이 필요합니다"
                   >
                     <ThumbsDown size={16} />
@@ -137,6 +187,17 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                     {copied ? <Check size={16} /> : <Copy size={16} />}
                   </button>
                 </div>
+                
+                {/* 피드백 메시지 표시 */}
+                {feedbackMessage && (
+                  <div className={`mt-2 p-2 rounded-lg text-xs transition-all duration-300 ${
+                    feedbackMessage.includes('실패') || feedbackMessage.includes('오류')
+                      ? 'bg-red-50 text-red-700 border border-red-200'
+                      : 'bg-green-50 text-green-700 border border-green-200'
+                  }`}>
+                    {feedbackMessage}
+                  </div>
+                )}
                 <RelativeTime date={message.timestamp} className="text-xs text-gray-500" />
               </div>
             </div>
@@ -202,40 +263,55 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
           <div className={`flex mt-3 ${isUserMessage ? 'justify-start' : 'justify-between'}`}>
             {/* Assistant 메시지의 경우 왼쪽에 액션 버튼, 오른쪽에 타임스탬프 */}
             {isAssistantMessage && (
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => handleFeedback('up')}
-                  className={`p-1.5 rounded-md transition-all duration-200 hover:bg-green-50 ${
-                    feedback === 'up' 
-                      ? 'bg-green-100 text-green-600' 
-                      : 'text-gray-400 hover:text-green-500'
-                  }`}
-                  title="도움이 되었습니다"
-                >
-                  <ThumbsUp size={14} />
-                </button>
-                <button
-                  onClick={() => handleFeedback('down')}
-                  className={`p-1.5 rounded-md transition-all duration-200 hover:bg-red-50 ${
-                    feedback === 'down' 
-                      ? 'bg-red-100 text-red-600' 
-                      : 'text-gray-400 hover:text-red-500'
-                  }`}
-                  title="개선이 필요합니다"
-                >
-                  <ThumbsDown size={14} />
-                </button>
-                <button
-                  onClick={handleCopy}
-                  className={`p-1.5 rounded-md transition-all duration-200 hover:bg-blue-50 ${
-                    copied 
-                      ? 'bg-blue-100 text-blue-600' 
-                      : 'text-gray-400 hover:text-blue-500'
-                  }`}
-                  title={copied ? '복사 완료!' : '응답 복사'}
-                >
-                  {copied ? <Check size={14} /> : <Copy size={14} />}
-                </button>
+              <div className="flex flex-col">
+                <div className="flex items-center space-x-2 mb-2">
+                  <button
+                    onClick={() => handleFeedback('up')}
+                    disabled={feedbackSubmitting}
+                    className={`p-1.5 rounded-md transition-all duration-200 hover:bg-green-50 ${
+                      feedback === 'up' 
+                        ? 'bg-green-100 text-green-600' 
+                        : 'text-gray-400 hover:text-green-500'
+                    } ${feedbackSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title="도움이 되었습니다"
+                  >
+                    <ThumbsUp size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleFeedback('down')}
+                    disabled={feedbackSubmitting}
+                    className={`p-1.5 rounded-md transition-all duration-200 hover:bg-red-50 ${
+                      feedback === 'down' 
+                        ? 'bg-red-100 text-red-600' 
+                        : 'text-gray-400 hover:text-red-500'
+                    } ${feedbackSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title="개선이 필요합니다"
+                  >
+                    <ThumbsDown size={14} />
+                  </button>
+                  <button
+                    onClick={handleCopy}
+                    className={`p-1.5 rounded-md transition-all duration-200 hover:bg-blue-50 ${
+                      copied 
+                        ? 'bg-blue-100 text-blue-600' 
+                        : 'text-gray-400 hover:text-blue-500'
+                    }`}
+                    title={copied ? '복사 완료!' : '응답 복사'}
+                  >
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                </div>
+                
+                {/* 피드백 메시지 표시 (스트리밍용) */}
+                {feedbackMessage && (
+                  <div className={`p-2 rounded-lg text-xs transition-all duration-300 mb-2 ${
+                    feedbackMessage.includes('실패') || feedbackMessage.includes('오류')
+                      ? 'bg-red-50 text-red-700 border border-red-200'
+                      : 'bg-green-50 text-green-700 border border-green-200'
+                  }`}>
+                    {feedbackMessage}
+                  </div>
+                )}
               </div>
             )}
             <RelativeTime date={message.timestamp} className="text-xs text-gray-500" />
