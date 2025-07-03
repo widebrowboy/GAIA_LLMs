@@ -355,6 +355,53 @@ start_webui_server() {
     return 1
 }
 
+# 벡터 데이터베이스 상태 확인
+check_vector_database() {
+    echo -e "${PURPLE}🗃️ 벡터 데이터베이스 상태 확인${NC}"
+    
+    # Milvus Lite 데이터베이스 파일 확인
+    local milvus_db_file="/home/gaia-bt/workspace/GAIA_LLMs/milvus_lite.db"
+    if [ -f "$milvus_db_file" ]; then
+        local db_size=$(du -h "$milvus_db_file" | cut -f1)
+        echo -e "   📊 Milvus Lite DB: 존재 (크기: $db_size)"
+    else
+        echo -e "   📊 Milvus Lite DB: 없음 (초기화 필요)"
+    fi
+    
+    # 피드백 데이터베이스 파일 확인
+    local feedback_db_file="/home/gaia-bt/workspace/GAIA_LLMs/feedback_milvus.db"
+    if [ -f "$feedback_db_file" ]; then
+        local feedback_db_size=$(du -h "$feedback_db_file" | cut -f1)
+        echo -e "   💬 피드백 DB: 존재 (크기: $feedback_db_size)"
+    else
+        echo -e "   💬 피드백 DB: 없음 (초기화 필요)"
+    fi
+    
+    # RAG API 엔드포인트 확인
+    if command -v curl >/dev/null 2>&1; then
+        local rag_stats_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/rag/stats 2>/dev/null)
+        if [ "$rag_stats_status" = "200" ]; then
+            echo -e "   🔍 RAG API: 정상 동작"
+            
+            # RAG 통계 정보 가져오기
+            local rag_stats=$(curl -s http://localhost:8000/api/rag/stats 2>/dev/null)
+            if [ ! -z "$rag_stats" ]; then
+                echo -e "   📈 RAG 통계: $rag_stats"
+            fi
+        else
+            echo -e "   🔍 RAG API: 확인 필요 ($rag_stats_status)"
+        fi
+        
+        # 피드백 API 엔드포인트 확인
+        local feedback_stats_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/feedback/stats 2>/dev/null)
+        if [ "$feedback_stats_status" = "200" ]; then
+            echo -e "   💭 피드백 API: 정상 동작"
+        else
+            echo -e "   💭 피드백 API: 확인 필요 ($feedback_stats_status)"
+        fi
+    fi
+}
+
 # 서버 상태 확인
 check_server_status() {
     echo -e "${CYAN}📊 서버 상태 확인${NC}"
@@ -365,7 +412,8 @@ check_server_status() {
     if [ ! -z "$api_pids" ]; then
         echo -e "${GREEN}✅ FastAPI 서버: 실행 중 (PID: $api_pids)${NC}"
         echo -e "   🔗 API: http://localhost:8000"
-        echo -e "   📖 문서: http://localhost:8000/docs"
+        echo -e "   📖 API 문서: http://localhost:8000/docs"
+        echo -e "   🔬 Swagger UI: http://localhost:8000/docs"
         
         # Health check
         if command -v curl >/dev/null 2>&1; then
@@ -387,6 +435,7 @@ check_server_status() {
     if [ ! -z "$webui_pids" ]; then
         echo -e "${GREEN}✅ Next.js WebUI: 실행 중 (PID: $webui_pids)${NC}"
         echo -e "   🌐 WebUI: http://localhost:3003"
+        echo -e "   💻 웹 인터페이스: http://localhost:3003"
         
         # Health check
         if command -v curl >/dev/null 2>&1; then
@@ -400,6 +449,11 @@ check_server_status() {
     else
         echo -e "${RED}❌ Next.js WebUI: 중지됨${NC}"
     fi
+    
+    echo ""
+    
+    # 벡터 데이터베이스 상태 확인
+    check_vector_database
     
     echo "=================================================="
 }

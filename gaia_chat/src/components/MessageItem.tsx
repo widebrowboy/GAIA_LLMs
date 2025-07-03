@@ -58,7 +58,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
 
     try {
       // 피드백을 서버에 전송
-      const response = await fetch('/api/feedback/submit', {
+      const response = await fetch('http://localhost:8000/api/feedback/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -77,14 +77,30 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
 
       if (response.ok) {
         const result = await response.json();
-        setFeedbackMessage(result.message || '피드백이 저장되었습니다.');
+        
+        // 새로운 API 응답 구조 처리 (v3.81)
+        if (result.status === 'success') {
+          setFeedbackMessage(result.message || '피드백이 저장되었습니다.');
+        } else if (result.status === 'duplicate') {
+          setFeedbackMessage(result.message || '🔄 유사한 피드백이 이미 존재합니다.');
+          // 중복인 경우 피드백 상태 복원
+          setFeedback(null);
+        } else if (result.status === 'error') {
+          setFeedbackMessage(result.message || '❌ 피드백 저장에 실패했습니다.');
+          setFeedback(null);
+        } else {
+          setFeedbackMessage(result.message || '피드백이 저장되었습니다.');
+        }
         
         // 3초 후 메시지 숨김
         setTimeout(() => {
           setFeedbackMessage('');
         }, 3000);
       } else {
-        throw new Error('피드백 저장 실패');
+        // HTTP 오류 응답 처리
+        const errorResult = await response.json().catch(() => ({}));
+        setFeedbackMessage(errorResult.detail || '피드백 저장에 실패했습니다.');
+        setFeedback(null);
       }
     } catch (error) {
       console.error('피드백 전송 오류:', error);
