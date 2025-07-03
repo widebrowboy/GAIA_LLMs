@@ -1,11 +1,12 @@
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import Image from 'next/image';
 import { Message } from '@/types/chat';
 import { formatRelativeTime } from '@/utils/helpers';
 import AcademicMarkdownRenderer from './AcademicMarkdownRenderer';
 import RelativeTime from './RelativeTime';
+import { Copy, ThumbsUp, ThumbsDown, Check } from 'lucide-react';
 
 interface MessageItemProps {
   message: Message;
@@ -17,6 +18,41 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
   const isAssistantMessage = message.role === 'assistant';
   const isSystemMessage = message.role === 'system';
   const isCompleteResponse = isAssistantMessage && message.isComplete;
+  
+  // 피드백 및 복사 상태 관리
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // 복사 기능
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000); // 2초 후 아이콘 복원
+    } catch (error) {
+      console.error('복사 실패:', error);
+      // 폴백: 텍스트 선택 방식
+      const textArea = document.createElement('textarea');
+      textArea.value = message.content;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // 피드백 처리
+  const handleFeedback = (type: 'up' | 'down') => {
+    if (feedback === type) {
+      setFeedback(null); // 같은 버튼 클릭 시 취소
+    } else {
+      setFeedback(type);
+      // 여기에 서버로 피드백 전송 로직 추가 가능
+      console.log(`피드백: ${type}, 메시지 ID: ${message.id || 'unknown'}`);
+    }
+  };
 
 
   // 시스템 메시지를 위한 별도 렌더링
@@ -64,7 +100,45 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                   <p className="text-xs text-gray-600">GAIA-BT Academic Response</p>
                 </div>
               </div>
-              <RelativeTime date={message.timestamp} className="text-xs text-gray-500" />
+              <div className="flex items-center space-x-3">
+                {/* 피드백 및 복사 버튼 */}
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleFeedback('up')}
+                    className={`p-2 rounded-lg transition-all duration-200 hover:bg-green-50 ${
+                      feedback === 'up' 
+                        ? 'bg-green-100 text-green-600' 
+                        : 'text-gray-400 hover:text-green-500'
+                    }`}
+                    title="도움이 되었습니다"
+                  >
+                    <ThumbsUp size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleFeedback('down')}
+                    className={`p-2 rounded-lg transition-all duration-200 hover:bg-red-50 ${
+                      feedback === 'down' 
+                        ? 'bg-red-100 text-red-600' 
+                        : 'text-gray-400 hover:text-red-500'
+                    }`}
+                    title="개선이 필요합니다"
+                  >
+                    <ThumbsDown size={16} />
+                  </button>
+                  <button
+                    onClick={handleCopy}
+                    className={`p-2 rounded-lg transition-all duration-200 hover:bg-blue-50 ${
+                      copied 
+                        ? 'bg-blue-100 text-blue-600' 
+                        : 'text-gray-400 hover:text-blue-500'
+                    }`}
+                    title={copied ? '복사 완료!' : '응답 복사'}
+                  >
+                    {copied ? <Check size={16} /> : <Copy size={16} />}
+                  </button>
+                </div>
+                <RelativeTime date={message.timestamp} className="text-xs text-gray-500" />
+              </div>
             </div>
             {message.userQuestion && (
               <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
@@ -123,9 +197,47 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
           </div>
         )}
         
-        {/* 타임스탬프 - 완료된 응답은 헤더에 표시되므로 제외 */}
+        {/* 타임스탬프 및 액션 버튼 - 완료된 응답은 헤더에 표시되므로 제외 */}
         {!isCompleteResponse && (
-          <div className={`flex mt-3 ${isUserMessage ? 'justify-start' : 'justify-end'}`}>
+          <div className={`flex mt-3 ${isUserMessage ? 'justify-start' : 'justify-between'}`}>
+            {/* Assistant 메시지의 경우 왼쪽에 액션 버튼, 오른쪽에 타임스탬프 */}
+            {isAssistantMessage && (
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleFeedback('up')}
+                  className={`p-1.5 rounded-md transition-all duration-200 hover:bg-green-50 ${
+                    feedback === 'up' 
+                      ? 'bg-green-100 text-green-600' 
+                      : 'text-gray-400 hover:text-green-500'
+                  }`}
+                  title="도움이 되었습니다"
+                >
+                  <ThumbsUp size={14} />
+                </button>
+                <button
+                  onClick={() => handleFeedback('down')}
+                  className={`p-1.5 rounded-md transition-all duration-200 hover:bg-red-50 ${
+                    feedback === 'down' 
+                      ? 'bg-red-100 text-red-600' 
+                      : 'text-gray-400 hover:text-red-500'
+                  }`}
+                  title="개선이 필요합니다"
+                >
+                  <ThumbsDown size={14} />
+                </button>
+                <button
+                  onClick={handleCopy}
+                  className={`p-1.5 rounded-md transition-all duration-200 hover:bg-blue-50 ${
+                    copied 
+                      ? 'bg-blue-100 text-blue-600' 
+                      : 'text-gray-400 hover:text-blue-500'
+                  }`}
+                  title={copied ? '복사 완료!' : '응답 복사'}
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                </button>
+              </div>
+            )}
             <RelativeTime date={message.timestamp} className="text-xs text-gray-500" />
           </div>
         )}
