@@ -35,14 +35,17 @@ class FeedbackRequest(BaseModel):
     model_version: Optional[str] = Field(default="gemma3-12b", description="모델 버전")
     response_time: Optional[float] = Field(default=0.0, description="응답 생성 시간")
     confidence_score: Optional[float] = Field(default=0.0, description="모델 자신감 점수")
+    check_duplicates: Optional[bool] = Field(default=True, description="중복 검사 수행 여부")
+    similarity_threshold: Optional[float] = Field(default=0.95, description="유사도 임계값 (0.95 이상이면 중복)")
 
 
 class FeedbackResponse(BaseModel):
     """피드백 응답 모델"""
-    feedback_id: str = Field(..., description="피드백 ID")
-    status: str = Field(..., description="저장 상태")
+    feedback_id: Optional[str] = Field(description="피드백 ID (중복인 경우 None)")
+    status: str = Field(..., description="저장 상태 (success/duplicate/error)")
     message: str = Field(..., description="응답 메시지")
-    learning_contribution: str = Field(..., description="학습 기여도 설명")
+    learning_contribution: Optional[str] = Field(description="학습 기여도 설명")
+    duplicate_info: Optional[Dict[str, Any]] = Field(description="중복 정보 (중복인 경우만)")
 
 
 class FeedbackSearchRequest(BaseModel):
@@ -67,8 +70,12 @@ def initialize_feedback_store():
         return False
     
     try:
-        feedback_store = FeedbackVectorStore()
-        logger.info("Feedback store initialized successfully")
+        feedback_store = FeedbackVectorStore(
+            use_server=True,  # Milvus 서버 모드 사용
+            host="localhost",
+            port=19530
+        )
+        logger.info("Feedback store initialized successfully (server mode)")
         return True
     except Exception as e:
         logger.error(f"Failed to initialize feedback store: {e}")
@@ -130,43 +137,58 @@ async def submit_feedback(request: FeedbackRequest, background_tasks: Background
                 detail="feedback_type must be 'positive' or 'negative'"
             )
         
-        # 백그라운드에서 피드백 저장
-        def store_feedback_task():
-            try:
-                feedback_id = feedback_store.store_feedback(
-                    question=request.question,
-                    answer=request.answer,
-                    feedback_type=request.feedback_type,
-                    session_id=request.session_id,
-                    user_id=request.user_id,
-                    context_sources=request.context_sources,
-                    model_version=request.model_version,
-                    response_time=request.response_time,
-                    confidence_score=request.confidence_score
-                )
-                logger.info(f"Background task completed: stored feedback {feedback_id}")
-            except Exception as e:
-                logger.error(f"Background feedback storage failed: {e}")
-        
-        background_tasks.add_task(store_feedback_task)
-        
-        # 즉시 응답 (실제 저장은 백그라운드에서)
-        feedback_id = f"fb_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
-        # 학습 기여도 메시지 생성
-        if request.feedback_type == "positive":
-            learning_msg = "이 긍정적 피드백으로 신약개발 AI의 응답 품질이 향상됩니다. 고품질 응답으로 분류되어 향후 모델 학습에 활용됩니다."
-            success_msg = "👍 피드백 감사합니다! 고품질 응답으로 분류되어 AI 학습에 활용됩니다."
-        else:
-            learning_msg = "이 부정적 피드백을 통해 유사한 응답 패턴을 개선하고, 더 정확한 신약개발 정보를 제공하도록 학습합니다."
-            success_msg = "👎 피드백 감사합니다! 응답 품질 개선에 활용하겠습니다."
-        
-        return FeedbackResponse(
-            feedback_id=feedback_id,
-            status="success",
-            message=success_msg,
-            learning_contribution=learning_msg
+        # 피드백 저장 (중복 검사 포함)
+        result = feedback_store.store_feedback(
+            question=request.question,
+            answer=request.answer,
+            feedback_type=request.feedback_type,
+            session_id=request.session_id,
+            user_id=request.user_id,
+            context_sources=request.context_sources,
+            model_version=request.model_version,
+            response_time=request.response_time,
+            confidence_score=request.confidence_score,
+            check_duplicates=request.check_duplicates,
+            similarity_threshold=request.similarity_threshold
         )
+        
+        feedback_id = result.get("feedback_id")
+        status = result.get("status")
+        duplicate_info = result.get("duplicate_info")
+        
+        # 상태별 응답 메시지 생성
+        if status == "duplicate":
+            return FeedbackResponse(
+                feedback_id=None,
+                status="duplicate",
+                message=f"🔄 유사한 피드백이 이미 존재합니다 (유사도: {duplicate_info['similarity']:.3f})",
+                learning_contribution="중복 피드백으로 인해 저장되지 않았습니다. 기존 피드백이 이미 학습에 활용되고 있습니다.",
+                duplicate_info=duplicate_info
+            )
+        elif status == "error":
+            return FeedbackResponse(
+                feedback_id=None,
+                status="error",
+                message=f"❌ 피드백 저장 실패: {result.get('message', '알 수 없는 오류')}",
+                learning_contribution=None,
+                duplicate_info=None
+            )
+        else:
+            # 성공한 경우
+            if request.feedback_type == "positive":
+                learning_msg = "이 긍정적 피드백으로 신약개발 AI의 응답 품질이 향상됩니다. 고품질 응답으로 분류되어 향후 모델 학습에 활용됩니다."
+                success_msg = "👍 피드백 감사합니다! 고품질 응답으로 분류되어 AI 학습에 활용됩니다."
+            else:
+                learning_msg = "이 부정적 피드백을 통해 유사한 응답 패턴을 개선하고, 더 정확한 신약개발 정보를 제공하도록 학습합니다."
+                success_msg = "👎 피드백 감사합니다! 응답 품질 개선에 활용하겠습니다."
+            
+            return FeedbackResponse(
+                feedback_id=feedback_id,
+                status="success",
+                message=success_msg,
+                learning_contribution=learning_msg,
+                duplicate_info=None
+            )
         
     except Exception as e:
         logger.error(f"Error submitting feedback: {e}")

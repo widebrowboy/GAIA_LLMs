@@ -1,4 +1,4 @@
-# GAIA-BT v3.80 - 신약개발 AI 연구 어시스턴트
+# GAIA-BT v3.81 - 신약개발 AI 연구 어시스턴트
 
 ## 📋 프로젝트 개요
 
@@ -154,6 +154,58 @@ python test_reranking_api.py
 # RAG 쿼리: POST /api/rag/query  
 # 문서 검색: GET /api/rag/search
 # 시스템 통계: GET /api/rag/stats
+```
+
+### 피드백 시스템 사용법 (v3.81 업데이트)
+```bash
+# 중복 검사 포함 피드백 API 테스트 (v3.81 신규)
+curl -X POST "http://localhost:8000/api/feedback/submit" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "EGFR 돌연변이 폐암의 1차 치료제는 무엇인가요?",
+    "answer": "EGFR 돌연변이 폐암의 1차 치료제로는 게피티닙...",
+    "feedback_type": "positive",
+    "check_duplicates": true,
+    "similarity_threshold": 0.95
+  }'
+
+# 중복 검사 비활성화 (기존 동작)
+curl -X POST "http://localhost:8000/api/feedback/submit" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "질문 내용",
+    "answer": "응답 내용", 
+    "feedback_type": "positive",
+    "check_duplicates": false
+  }'
+
+# 피드백 통계 조회
+curl http://localhost:8000/api/feedback/stats
+
+# 유사 피드백 검색
+curl -X POST "http://localhost:8000/api/feedback/search" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "EGFR 치료제", "limit": 5}'
+
+# 파인튜닝 데이터 추출
+curl -X POST "http://localhost:8000/api/feedback/training-data" \
+  -H "Content-Type: application/json" \
+  -d '{"min_quality_score": 0.8, "limit": 100}'
+
+# Milvus 웹 UI에서 데이터 시각화 (v3.81 신규)
+# 1. Milvus 서버 시작
+./scripts/milvus_manager.sh start
+
+# 2. 웹 UI 접속 (자동으로 브라우저에서 열림)
+./scripts/milvus_manager.sh webui
+
+# 3. 직접 URL 접속
+# - Milvus 웹 UI: http://localhost:9091/webui  
+# - MinIO 콘솔: http://localhost:9001 (minioadmin/minioadmin)
+
+# 4. 저장된 컬렉션 확인
+# - feedback_collection: 피드백 데이터
+# - qa_pairs_collection: 질문-응답 쌍 및 품질 데이터
 ```
 
 ### 주요 명령어
@@ -391,6 +443,12 @@ git reset --hard [커밋해시]
 - **세션 내 학습**: 같은 대화 세션 내에서 이전 피드백 패턴 고려
 - **점진적 개선**: 피드백 누적에 따른 응답 품질 지속적 향상
 
+#### 4. 중복 피드백 방지 시스템 (v3.81 신규)
+- **벡터 유사도 검사**: 질문 및 답변 임베딩 기반 중복 감지
+- **유사도 임계값**: 0.95 이상 유사도 시 중복으로 판단하여 저장 방지
+- **자동 중복 제거**: 중복 피드백 시도 시 기존 데이터 정보와 함께 안내 메시지 제공
+- **데이터 품질 보장**: 고유한 피드백만 저장하여 학습 데이터 품질 향상
+
 ### Gemma 파인튜닝 데이터셋 구축
 
 #### 데이터 필터링 기준
@@ -465,6 +523,7 @@ quality_score = (
 
 ### 버전 히스토리
 
+- **v3.81**: 피드백 중복 검사 시스템 완성 - 벡터 유사도 기반 중복 피드백 자동 감지, 중복 저장 방지, Milvus 웹 UI 데이터 시각화 확인 완료
 - **v3.80**: Milvus 웹 UI 통합 및 피드백 시스템 완성 - Docker Compose Milvus 서버, 웹 UI 관리 시스템, 피드백 벡터 저장소, 실시간 알림 완성
 - **v3.79**: AI 학습 및 피드백 시스템 설계 완성 - 벡터 데이터베이스 스키마, Gemma 파인튜닝 계획, 피드백 기반 RAG 개선 전략 수립
 - **v3.78**: WebUI 사용자 경험 대폭 개선 - 응답 피드백 시스템(썸업/썸다운), 클립보드 복사 기능, 인터랙티브 액션 버튼 추가

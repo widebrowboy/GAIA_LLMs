@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
-from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection
+from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility
 from app.rag.embeddings import EmbeddingService
 
 logger = logging.getLogger(__name__)
@@ -132,7 +132,7 @@ class FeedbackVectorStore:
         )
         
         # 컬렉션 생성 (존재하지 않는 경우)
-        if not Collection.exists(self.feedback_collection_name):
+        if not utility.has_collection(self.feedback_collection_name):
             self.feedback_collection = Collection(
                 name=self.feedback_collection_name,
                 schema=schema
@@ -182,7 +182,7 @@ class FeedbackVectorStore:
             description="질문-응답 쌍 및 품질 데이터"
         )
         
-        if not Collection.exists(self.qa_pairs_collection_name):
+        if not utility.has_collection(self.qa_pairs_collection_name):
             self.qa_pairs_collection = Collection(
                 name=self.qa_pairs_collection_name,
                 schema=schema
@@ -197,10 +197,88 @@ class FeedbackVectorStore:
                 }
             )
             
+            self.qa_pairs_collection.create_index(
+                field_name="answer_embedding",
+                index_params={
+                    "metric_type": "IP",
+                    "index_type": "FLAT"
+                }
+            )
+            
             logger.info(f"Created QA pairs collection: {self.qa_pairs_collection_name}")
         else:
             self.qa_pairs_collection = Collection(self.qa_pairs_collection_name)
             logger.info(f"Loaded existing QA pairs collection: {self.qa_pairs_collection_name}")
+    
+    def check_duplicate_feedback(self, 
+                                question: str, 
+                                answer: str, 
+                                similarity_threshold: float = 0.95) -> Optional[Dict[str, Any]]:
+        """
+        유사한 피드백이 이미 존재하는지 확인
+        
+        Args:
+            question: 사용자 질문
+            answer: AI 응답
+            similarity_threshold: 유사도 임계값 (0.95 이상이면 중복으로 판단)
+            
+        Returns:
+            중복된 피드백 정보 또는 None
+        """
+        try:
+            # 질문 임베딩 생성
+            question_embedding = self.embedding_service.embed_text(question)
+            answer_embedding = self.embedding_service.embed_text(answer)
+            
+            # 피드백 컬렉션 로드
+            self.feedback_collection.load()
+            
+            search_params = {
+                "metric_type": "IP",
+                "params": {"nprobe": 10}
+            }
+            
+            # 질문 기준 유사 피드백 검색
+            question_results = self.feedback_collection.search(
+                data=[question_embedding],
+                anns_field="question_embedding",
+                param=search_params,
+                limit=5,
+                expr=None,
+                output_fields=["id", "question_text", "answer_text", "feedback_type", "timestamp"]
+            )
+            
+            # 답변 기준 유사 피드백 검색
+            answer_results = self.feedback_collection.search(
+                data=[answer_embedding],
+                anns_field="answer_embedding",
+                param=search_params,
+                limit=5,
+                expr=None,
+                output_fields=["id", "question_text", "answer_text", "feedback_type", "timestamp"]
+            )
+            
+            # 유사도 임계값 이상인 항목 확인
+            for results, search_type in [(question_results, "질문"), (answer_results, "답변")]:
+                if results and len(results[0]) > 0:
+                    for hit in results[0]:
+                        if hit.distance >= similarity_threshold:
+                            logger.info(f"중복 피드백 발견 ({search_type} 기준): 유사도 {hit.distance:.3f}")
+                            return {
+                                "duplicate_id": hit.id,
+                                "similarity": hit.distance,
+                                "search_type": search_type,
+                                "existing_question": hit.entity.get("question_text"),
+                                "existing_answer": hit.entity.get("answer_text"),
+                                "existing_feedback": hit.entity.get("feedback_type"),
+                                "existing_timestamp": hit.entity.get("timestamp")
+                            }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"중복 검사 실패: {e}")
+            return None
     
     def store_feedback(self, 
                       question: str,
@@ -211,7 +289,9 @@ class FeedbackVectorStore:
                       context_sources: List[str] = None,
                       model_version: str = "gemma3-12b",
                       response_time: float = 0.0,
-                      confidence_score: float = 0.0) -> str:
+                      confidence_score: float = 0.0,
+                      check_duplicates: bool = True,
+                      similarity_threshold: float = 0.95) -> Dict[str, Any]:
         """
         피드백 데이터 저장
         
@@ -225,11 +305,27 @@ class FeedbackVectorStore:
             model_version: 모델 버전
             response_time: 응답 생성 시간
             confidence_score: 모델 자신감 점수
+            check_duplicates: 중복 검사 여부
+            similarity_threshold: 유사도 임계값
             
         Returns:
-            피드백 ID
+            저장 결과 정보 (Dict)
         """
         try:
+            # 중복 검사 수행
+            if check_duplicates:
+                duplicate_info = self.check_duplicate_feedback(
+                    question, answer, similarity_threshold
+                )
+                if duplicate_info:
+                    logger.info(f"중복 피드백으로 인해 저장 건너뜀: {duplicate_info['duplicate_id']}")
+                    return {
+                        "status": "duplicate",
+                        "message": f"유사한 피드백이 이미 존재합니다 (유사도: {duplicate_info['similarity']:.3f})",
+                        "duplicate_info": duplicate_info,
+                        "feedback_id": None
+                    }
+            
             # 임베딩 생성
             question_embedding = self.embedding_service.embed_text(question)
             answer_embedding = self.embedding_service.embed_text(answer)
@@ -277,11 +373,21 @@ class FeedbackVectorStore:
             self._update_qa_pair(question, answer, feedback_type, question_embedding, answer_embedding)
             
             logger.info(f"Stored feedback: {feedback_id} ({feedback_type})")
-            return feedback_id
+            return {
+                "status": "success",
+                "message": "피드백이 성공적으로 저장되었습니다.",
+                "feedback_id": feedback_id,
+                "duplicate_info": None
+            }
             
         except Exception as e:
             logger.error(f"Failed to store feedback: {e}")
-            raise
+            return {
+                "status": "error",
+                "message": f"피드백 저장 실패: {str(e)}",
+                "feedback_id": None,
+                "duplicate_info": None
+            }
     
     def _update_qa_pair(self, 
                        question: str, 

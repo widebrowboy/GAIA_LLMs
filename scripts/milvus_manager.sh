@@ -74,7 +74,7 @@ start_milvus() {
     cd "$PROJECT_ROOT"
     
     # Docker Compose로 서비스 시작
-    if docker compose -f docker-compose.milvus.yml up -d; then
+    if docker-compose -f docker-compose.milvus.yml up -d; then
         echo -e "${GREEN}✅ Milvus 서버가 시작되었습니다.${NC}"
         echo ""
         echo -e "${CYAN}서비스 정보:${NC}"
@@ -100,7 +100,7 @@ stop_milvus() {
     
     cd "$PROJECT_ROOT"
     
-    if docker compose -f docker-compose.milvus.yml down; then
+    if docker-compose -f docker-compose.milvus.yml down; then
         echo -e "${GREEN}✅ Milvus 서버가 중지되었습니다.${NC}"
     else
         echo -e "${RED}❌ Milvus 서버 중지에 실패했습니다.${NC}"
@@ -124,7 +124,7 @@ check_status() {
     cd "$PROJECT_ROOT"
     
     # Docker Compose 상태 확인
-    if docker compose -f docker-compose.milvus.yml ps; then
+    if docker-compose -f docker-compose.milvus.yml ps; then
         echo ""
         echo -e "${CYAN}포트 상태:${NC}"
         
@@ -169,16 +169,16 @@ show_logs() {
     
     case $choice in
         1)
-            docker compose -f docker-compose.milvus.yml logs -f standalone
+            docker-compose -f docker-compose.milvus.yml logs -f standalone
             ;;
         2)
-            docker compose -f docker-compose.milvus.yml logs -f minio
+            docker-compose -f docker-compose.milvus.yml logs -f minio
             ;;
         3)
-            docker compose -f docker-compose.milvus.yml logs -f etcd
+            docker-compose -f docker-compose.milvus.yml logs -f etcd
             ;;
         4)
-            docker compose -f docker-compose.milvus.yml logs -f
+            docker-compose -f docker-compose.milvus.yml logs -f
             ;;
         *)
             echo -e "${RED}잘못된 선택입니다.${NC}"
@@ -199,7 +199,7 @@ clean_data() {
         cd "$PROJECT_ROOT"
         
         # 서비스 중지
-        docker compose -f docker-compose.milvus.yml down
+        docker-compose -f docker-compose.milvus.yml down
         
         # 볼륨 데이터 삭제
         sudo rm -rf volumes/
