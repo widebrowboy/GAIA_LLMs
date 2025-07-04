@@ -51,19 +51,47 @@ class ChatbotService:
         if session_id in self.sessions:
             return {"error": f"세션 {session_id}가 이미 존재합니다"}
         
-        # 현재 실행 중인 모델 감지 또는 사용자 설정 기본 모델 사용
+        # 현재 실행 중인 생성 모델 감지 (임베딩 모델 제외) - v3.87 업데이트
         from app.utils.ollama_manager import list_running_models
         try:
             running_models = await list_running_models()
+            generation_models = []
+            
+            logger.info(f"🔍 현재 실행 중인 모든 모델: {running_models}")
+            
+            # 임베딩 모델 필터링 (embed, embedding, mxbai 키워드 포함 모델 제외)
             if running_models:
-                # 실행 중인 모델이 있으면 그것을 사용 (모델 변경 방지)
-                current_model = running_models[-1]
-                logger.info(f"세션 {session_id} 생성 시 현재 실행 중인 모델 유지: {current_model}")
+                for model in running_models:
+                    model_lower = model.lower()
+                    if not any(keyword in model_lower for keyword in ['embed', 'embedding', 'mxbai']):
+                        generation_models.append(model)
+                        logger.info(f"✅ 생성 모델 감지: {model}")
+                    else:
+                        logger.info(f"🚫 임베딩 모델 제외: {model}")
+                        
+            logger.info(f"🎯 감지된 생성 모델들: {generation_models}")
+                        
+            if generation_models:
+                # 실행 중인 생성 모델이 있으면 그것을 사용
+                current_model = generation_models[-1]
+                logger.info(f"세션 {session_id} 생성 시 현재 실행 중인 생성 모델 유지: {current_model}")
             else:
-                # 실행 중인 모델이 없으면 기본 모델 사용 (자동 변경 방지)
+                # 실행 중인 생성 모델이 없으면 기본 모델 자동 시작
                 from app.utils.config import OLLAMA_MODEL
-                current_model = OLLAMA_MODEL  # 설정된 기본 모델 사용
-                logger.info(f"세션 {session_id} 생성 시 실행 중인 모델이 없어 설정된 기본 모델 사용: {current_model}")
+                current_model = OLLAMA_MODEL
+                logger.info(f"세션 {session_id} 생성 시 실행 중인 생성 모델이 없어 기본 모델 자동 시작: {current_model}")
+                
+                # 기본 생성 모델 자동 시작 시도
+                try:
+                    from app.utils.ollama_manager import start_model
+                    start_result = await start_model(current_model)
+                    if start_result:
+                        logger.info(f"✅ 기본 생성 모델 자동 시작 성공: {current_model}")
+                    else:
+                        logger.warning(f"⚠️ 기본 생성 모델 자동 시작 실패: {current_model}")
+                except Exception as start_error:
+                    logger.warning(f"기본 생성 모델 시작 중 오류: {start_error}")
+                    
         except Exception as e:
             logger.warning(f"실행 중인 모델 감지 실패, 설정된 기본 모델 사용: {e}")
             from app.utils.config import OLLAMA_MODEL

@@ -27,7 +27,18 @@ async def _get_ollama_models() -> List[str]:
             response = await client.get("http://localhost:11434/api/tags")
             response.raise_for_status()
             data = response.json()
-            return [model["name"] for model in data.get("models", [])]
+            
+            # 임베딩 모델 필터링 추가
+            filtered_models = []
+            for model in data.get("models", []):
+                model_name = model["name"]
+                model_lower = model_name.lower()
+                
+                # 임베딩 모델 필터링 (embed, embedding, mxbai 키워드 포함 모델 제외)
+                if not any(keyword in model_lower for keyword in ['embed', 'embedding', 'mxbai']):
+                    filtered_models.append(model_name)
+            
+            return filtered_models
     except Exception:
         # 기본 모델 목록으로 폴백
         return ["gemma3:latest", "llama3.2:latest", "mistral:latest"]
@@ -48,6 +59,13 @@ async def _get_ollama_model_details() -> Dict[str, Any]:
     try:
         available_models = []
         running_models = []
+        available_embedding_models = []
+        running_embedding_models = []
+        
+        # 임베딩 모델 판별 함수
+        def is_embedding_model(model_name: str) -> bool:
+            model_lower = model_name.lower()
+            return any(keyword in model_lower for keyword in ['embed', 'embedding', 'mxbai'])
         
         # 설치된 모델 목록
         async with httpx.AsyncClient(timeout=3.0) as client:
@@ -56,37 +74,69 @@ async def _get_ollama_model_details() -> Dict[str, Any]:
             if tags_response.status_code == 200:
                 tags_data = tags_response.json()
                 for model in tags_data.get("models", []):
-                    available_models.append({
-                        "name": model["name"],
+                    model_name = model["name"]
+                    
+                    model_info = {
+                        "name": model_name,
                         "size": model.get("size", 0),
                         "modified_at": model.get("modified_at", ""),
                         "digest": model.get("digest", "")[:12] + "...",
                         "parameter_size": model.get("details", {}).get("parameter_size", "Unknown")
-                    })
+                    }
+                    
+                    # 임베딩 모델과 채팅 모델 분리하여 저장
+                    if is_embedding_model(model_name):
+                        available_embedding_models.append(model_info)
+                    else:
+                        available_models.append(model_info)
             
             # 실행 중인 모델
             ps_response = await client.get("http://localhost:11434/api/ps")
             if ps_response.status_code == 200:
                 ps_data = ps_response.json()
                 for model in ps_data.get("models", []):
-                    running_models.append({
-                        "name": model["name"],
+                    model_name = model["name"]
+                    
+                    model_info = {
+                        "name": model_name,
                         "size_vram": model.get("size_vram", 0),
                         "expires_at": model.get("expires_at", ""),
                         "is_running": True
-                    })
+                    }
+                    
+                    # 임베딩 모델과 채팅 모델 분리하여 저장
+                    if is_embedding_model(model_name):
+                        running_embedding_models.append(model_info)
+                    else:
+                        running_models.append(model_info)
         
         return {
             "available": available_models,
             "running": running_models,
-            "status": "success"
+            "available_embedding_models": available_embedding_models,
+            "running_embedding_models": running_embedding_models,
+            "status": "success",
+            "available_models": available_models,  # 호환성 유지
+            "running_models": running_models,  # 호환성 유지
+            "total_available": len(available_models) + len(available_embedding_models),
+            "total_running": len(running_models) + len(running_embedding_models),
+            "chat_models_running": len(running_models),
+            "embedding_models_running": len(running_embedding_models)
         }
     except Exception as e:
         return {
             "available": [],
             "running": [],
+            "available_embedding_models": [],
+            "running_embedding_models": [],
             "status": "error",
-            "error": str(e)
+            "error": str(e),
+            "available_models": [],  # 호환성 유지
+            "running_models": [],  # 호환성 유지
+            "total_available": 0,
+            "total_running": 0,
+            "chat_models_running": 0,
+            "embedding_models_running": 0
         }
 
 class SystemInfo(BaseModel):
@@ -256,11 +306,23 @@ async def change_model(
         if request.model not in available_models:
             raise HTTPException(400, f"모델 '{request.model}'이 Ollama에 설치되어 있지 않습니다. 설치된 모델: {available_models}")
         
-        # 1) Ollama에서 모델 실행 보장 (먼저 실행)
+        # 1) Ollama에서 모델 실행 보장 (기존 모델 유지)
         try:
-            from app.utils.ollama_manager import ensure_single_model_running
-            await ensure_single_model_running(request.model)
+            from app.utils.ollama_manager import start_model, list_running_models
+            
+            # 현재 실행 중인 모델 확인
+            running_models = await list_running_models()
+            logger.info(f"현재 실행 중인 모델들: {running_models}")
+            
+            # 요청된 모델이 이미 실행 중인지 확인
+            if request.model not in running_models:
+                logger.info(f"모델 '{request.model}' 시작 중... (다른 모델은 유지)")
+                await start_model(request.model)
+            else:
+                logger.info(f"모델 '{request.model}' 이미 실행 중")
+                
         except Exception as proc_err:
+            logger.error(f"모델 시작 실패: {proc_err}")
             raise HTTPException(500, f"Ollama 모델 실행 실패: {proc_err}")
         
         # 2) Chatbot 내부 모델 교체
@@ -408,6 +470,120 @@ async def toggle_debug(
     result = await service.process_command("/debug", session_id)
     return result
 
+@router.get("/models/detailed",
+    summary="🤖 모델 상태 상세 조회 및 자동 시작",
+    description="""
+## Ollama 모델 상태 상세 조회
+
+설치된 모델과 실행 중인 모델의 상세 정보를 조회합니다.
+실행 중인 모델이 없는 경우 기본 모델을 자동으로 시작합니다.
+
+### 반환 정보
+- **available_models**: 설치된 모델 목록 (이름, 크기, 파라미터 수 등)
+- **running_models**: 현재 실행 중인 모델 목록
+- **default_model**: 기본 설정 모델
+- **auto_started**: 자동으로 시작된 모델 정보
+- **error**: 오류 발생 시 오류 메시지
+""",
+    responses={
+        200: {
+            "description": "모델 정보 조회 성공",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "available_models": [
+                            {
+                                "name": "gemma3-12b:latest",
+                                "size": 7825332736,
+                                "modified_at": "2024-11-20T08:15:00Z",
+                                "digest": "e7cdf2014791...",
+                                "parameter_size": "12B"
+                            }
+                        ],
+                        "running_models": [
+                            {
+                                "name": "gemma3-12b:latest",
+                                "size_vram": 7825332736,
+                                "expires_at": "2024-12-30T10:00:00Z"
+                            }
+                        ],
+                        "default_model": "gemma3-12b:latest",
+                        "auto_started": "gemma3-12b:latest"
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_models_detailed(
+    service: ChatbotService = Depends(get_chatbot_service)
+) -> Dict[str, Any]:
+    """모델 상태 상세 조회 및 자동 시작"""
+    try:
+        # 모델 상세 정보 조회
+        model_info = await _get_ollama_model_details()
+        logger.info(f"_get_ollama_model_details 반환값: {model_info}")
+        
+        # apiClient가 사용하는 키로 변환
+        available_models = model_info.get("available_models", model_info.get("available", []))
+        running_models = model_info.get("running_models", model_info.get("running", []))
+        available_embedding_models = model_info.get("available_embedding_models", [])
+        running_embedding_models = model_info.get("running_embedding_models", [])
+        
+        response = {
+            "available": available_models,
+            "running": running_models,
+            "available_embedding_models": available_embedding_models,
+            "running_embedding_models": running_embedding_models,
+            "default_model": OLLAMA_MODEL,
+            "total_available": model_info.get("total_available", len(available_models)),
+            "total_running": model_info.get("total_running", len(running_models)),
+            "chat_models_running": model_info.get("chat_models_running", len(running_models)),
+            "embedding_models_running": model_info.get("embedding_models_running", len(running_embedding_models)),
+            "current_model_running": any(m["name"] == OLLAMA_MODEL for m in running_models)
+        }
+        
+        # 실행 중인 모델이 없으면 기본 모델 자동 시작
+        if not response["running"]:
+            logger.info(f"실행 중인 모델이 없음. 기본 모델 '{OLLAMA_MODEL}' 자동 시작")
+            try:
+                # Ollama 모델 시작
+                from app.utils.ollama_manager import start_model
+                await start_model(OLLAMA_MODEL)
+                
+                # 잠시 대기 후 다시 확인
+                await asyncio.sleep(2)
+                updated_info = await _get_ollama_model_details()
+                updated_running = updated_info.get("running_models", updated_info.get("running", []))
+                response["running"] = updated_running
+                response["total_running"] = len(updated_running)
+                response["current_model_running"] = any(m["name"] == OLLAMA_MODEL for m in updated_running)
+                response["auto_started"] = OLLAMA_MODEL
+                
+                logger.info(f"모델 '{OLLAMA_MODEL}' 자동 시작 완료")
+            except Exception as e:
+                logger.error(f"모델 자동 시작 실패: {e}")
+                response["auto_start_error"] = str(e)
+        
+        logger.info(f"최종 반환 response: {response}")
+        return response
+        
+    except Exception as e:
+        import traceback
+        logger.error(f"모델 정보 조회 실패: {e}")
+        logger.error(f"상세 오류: {traceback.format_exc()}")
+        return {
+            "available": [],
+            "running": [],
+            "default_model": OLLAMA_MODEL,
+            "total_available": 0,
+            "total_running": 0,
+            "current_model_running": False,
+            "error": str(e),
+            "available_models": [],  # 호환성
+            "running_models": []  # 호환성
+        }
+
 @router.post("/mode/{mode}")
 async def change_mode(
     mode: str,
@@ -438,25 +614,7 @@ async def get_available_models(
         "status": "success"
     }
 
-@router.get("/models/detailed")
-async def get_detailed_models(
-    service: ChatbotService = Depends(get_chatbot_service)
-) -> Dict[str, Any]:
-    """상세한 모델 정보 가져오기 (설치된 모델 + 실행 중인 모델)"""
-    model_details = await _get_ollama_model_details()
-    current_model = service.current_model
-    
-    # 현재 선택된 모델이 실행 중인지 확인
-    current_model_running = any(
-        model["name"] == current_model 
-        for model in model_details.get("running", [])
-    )
-    
-    return {
-        **model_details,
-        "current_model": current_model,
-        "current_model_running": current_model_running
-    }
+# 중복 엔드포인트 제거됨 - 위의 get_models_detailed 함수가 동일한 기능을 수행합니다.
 
 @router.get("/models/running")
 async def get_running_models() -> Dict[str, Any]:

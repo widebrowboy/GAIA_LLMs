@@ -15,7 +15,7 @@ from typing import Dict, Any
 import traceback
 import asyncio
 
-from app.api_server.routers import chat, system, mcp, session, rag, feedback
+from app.api_server.routers import chat, system, mcp, session, rag, feedback, reasoning_rag
 from app.api_server.services.chatbot_service import ChatbotService
 from app.api_server.websocket_manager import WebSocketManager
 from app.utils.config import OLLAMA_MODEL
@@ -298,13 +298,37 @@ class UTF8EncodingMiddleware(BaseHTTPMiddleware):
         
         return response
 
-# CORS 설정
+# CORS 설정 - WebUI HTTP Status 0 오류 해결
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 모든 오리진 허용 (개발용)
+    allow_origins=[
+        "http://localhost:3003",    # WebUI
+        "http://127.0.0.1:3003",   # WebUI 대체
+        "http://localhost:3000",    # 기타 개발 포트
+        "http://127.0.0.1:3000",   # 기타 개발 포트 대체
+        "*"  # 모든 오리진 허용 (개발용)
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
+    allow_headers=[
+        "Content-Type", 
+        "Accept", 
+        "Authorization", 
+        "X-Requested-With",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Headers",
+        "Access-Control-Allow-Methods",
+        "Cache-Control",
+        "Pragma",
+        "User-Agent",
+        "DNT",
+        "If-Modified-Since",
+        "Keep-Alive",
+        "Origin",
+        "X-Requested-With",
+        "*"
+    ],
+    expose_headers=["*"]
 )
 
 # UTF-8 인코딩 미들웨어 추가
@@ -362,6 +386,7 @@ app.include_router(mcp.router, prefix="/api/mcp", tags=["mcp"])
 app.include_router(session.router, prefix="/api/session", tags=["session"])
 app.include_router(rag.router, tags=["rag"])
 app.include_router(feedback.router, tags=["feedback"])
+app.include_router(reasoning_rag.router, prefix="/api/reasoning-rag", tags=["reasoning-rag"])
 
 @app.get("/", 
     summary="API 루트 정보",
@@ -519,14 +544,20 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 async def test_ollama_model_response(model_name: str = "gemma3-12b:latest") -> dict:
     """Ollama 모델과 실제 대화 테스트를 통한 연결 상태 확인"""
     try:
-        from app.utils.ollama_manager import list_running_models, start_model
+        from app.utils.ollama_manager import list_running_models, start_model, _is_embedding_model
         
         # 1. 모델이 실행 중인지 확인
-        running_models = await list_running_models()
-        if model_name not in running_models:
+        all_running_models = await list_running_models()
+        
+        # 임베딩 모델과 채팅 모델 분리
+        chat_models = [m for m in all_running_models if not _is_embedding_model(m)]
+        embedding_models = [m for m in all_running_models if _is_embedding_model(m)]
+        
+        if model_name not in all_running_models:
             logger.info(f"모델 '{model_name}' 실행되지 않음, 시작 시도 중...")
             await start_model(model_name)
-            running_models = await list_running_models()
+            all_running_models = await list_running_models()
+            chat_models = [m for m in all_running_models if not _is_embedding_model(m)]
         
         # 2. 실제 모델 응답 테스트
         service = app.state.chatbot_service
@@ -548,7 +579,9 @@ async def test_ollama_model_response(model_name: str = "gemma3-12b:latest") -> d
                         return {
                             "model_ready": True,
                             "model_name": model_name,
-                            "running_models": running_models,
+                            "running_models": chat_models,
+                            "embedding_models": embedding_models,
+                            "all_models": all_running_models,
                             "test_success": True,
                             "response_length": len(response)
                         }
@@ -556,7 +589,9 @@ async def test_ollama_model_response(model_name: str = "gemma3-12b:latest") -> d
                         return {
                             "model_ready": False,
                             "model_name": model_name,
-                            "running_models": running_models,
+                            "running_models": chat_models,
+                            "embedding_models": embedding_models,
+                            "all_models": all_running_models,
                             "test_success": False,
                             "error": "Empty response from model"
                         }
@@ -565,7 +600,9 @@ async def test_ollama_model_response(model_name: str = "gemma3-12b:latest") -> d
                     return {
                         "model_ready": False,
                         "model_name": model_name,
-                        "running_models": running_models,
+                        "running_models": chat_models,
+                        "embedding_models": embedding_models,
+                        "all_models": all_running_models,
                         "test_success": False,
                         "error": "Model response timeout"
                     }
@@ -574,7 +611,9 @@ async def test_ollama_model_response(model_name: str = "gemma3-12b:latest") -> d
                 return {
                     "model_ready": False,
                     "model_name": model_name,
-                    "running_models": running_models,
+                    "running_models": chat_models,
+                    "embedding_models": embedding_models,
+                    "all_models": all_running_models,
                     "test_success": False,
                     "error": "Default session client not available"
                 }
@@ -583,17 +622,33 @@ async def test_ollama_model_response(model_name: str = "gemma3-12b:latest") -> d
             return {
                 "model_ready": False,
                 "model_name": model_name,
-                "running_models": running_models,
+                "running_models": chat_models,
+                "embedding_models": embedding_models,
+                "all_models": all_running_models,
                 "test_success": False,
                 "error": "ChatbotService not available"
             }
             
     except Exception as e:
         logger.error(f"Ollama 모델 테스트 오류: {e}")
+        
+        # 오류 발생 시에도 모델 목록을 가져오려고 시도
+        try:
+            from app.utils.ollama_manager import list_running_models, _is_embedding_model
+            all_running_models = await list_running_models()
+            chat_models = [m for m in all_running_models if not _is_embedding_model(m)]
+            embedding_models = [m for m in all_running_models if _is_embedding_model(m)]
+        except Exception:
+            all_running_models = []
+            chat_models = []
+            embedding_models = []
+        
         return {
             "model_ready": False,
             "model_name": model_name,
-            "running_models": [],
+            "running_models": chat_models,
+            "embedding_models": embedding_models,
+            "all_models": all_running_models,
             "test_success": False,
             "error": str(e)
         }
@@ -621,6 +676,8 @@ async def status_websocket_endpoint(websocket: WebSocket, session_id: str):
                     "server_healthy": True,
                     "model_ready": model_test_result.get("model_ready", False),
                     "ollama_models": model_test_result.get("running_models", []),
+                    "embedding_models": model_test_result.get("embedding_models", []),
+                    "all_models": model_test_result.get("all_models", []),
                     "current_model": model_test_result.get("model_name"),
                     "mode": service.current_mode if service else "normal",
                     "mcp_enabled": service.mcp_enabled if service else False,
@@ -672,9 +729,9 @@ async def status_websocket_endpoint(websocket: WebSocket, session_id: str):
                     connected = False
                     break
             
-            # 10초마다 상태 업데이트 (모델 테스트 포함으로 간격 증가)
+            # 30초마다 상태 업데이트 (WebSocket 부하 감소)
             try:
-                await asyncio.sleep(10)
+                await asyncio.sleep(30)
             except asyncio.CancelledError:
                 connected = False
                 break
@@ -685,6 +742,155 @@ async def status_websocket_endpoint(websocket: WebSocket, session_id: str):
     except Exception as e:
         logger.error(f"Status WebSocket 오류: {e}")
         connected = False
+
+
+@app.websocket("/ws/reasoning/{session_id}")
+async def reasoning_websocket_endpoint(websocket: WebSocket, session_id: str):
+    """
+    Reasoning RAG 전용 WebSocket 엔드포인트
+    실시간 추론 과정 스트리밍 지원
+    """
+    manager = app.state.websocket_manager
+    
+    await manager.connect(websocket, session_id)
+    logger.info(f"Reasoning WebSocket 연결: {session_id}")
+    
+    try:
+        while True:
+            # 클라이언트로부터 메시지 수신
+            data = await websocket.receive_json()
+            
+            message_type = data.get("type", "reasoning_query")
+            
+            if message_type == "reasoning_query":
+                # Reasoning RAG 쿼리 처리
+                query = data.get("query", "")
+                mode = data.get("mode", "self_rag")
+                max_iterations = data.get("max_iterations", 3)
+                
+                if not query.strip():
+                    await manager.send_reasoning_error(session_id, "Empty query provided")
+                    continue
+                
+                # Reasoning RAG 파이프라인 가져오기
+                from app.api_server.routers.reasoning_rag import get_reasoning_pipeline
+                reasoning_pipeline = get_reasoning_pipeline()
+                
+                if not reasoning_pipeline:
+                    await manager.send_reasoning_error(session_id, "Reasoning pipeline not initialized")
+                    continue
+                
+                try:
+                    # 추론 시작 알림
+                    await manager.send_reasoning_start(session_id, query, mode)
+                    
+                    # 스트리밍 콜백 정의
+                    async def stream_callback(callback_data):
+                        """추론 과정 실시간 전송"""
+                        callback_type = callback_data.get("type")
+                        
+                        if callback_type == "iteration_start":
+                            await manager.send_iteration_start(
+                                session_id,
+                                callback_data.get("iteration", 0),
+                                callback_data.get("max_iterations", max_iterations)
+                            )
+                        
+                        elif callback_type == "query_refined":
+                            await manager.send_query_refined(
+                                session_id,
+                                callback_data.get("original", ""),
+                                callback_data.get("refined", "")
+                            )
+                        
+                        elif callback_type == "documents_retrieved":
+                            await manager.send_documents_retrieved(
+                                session_id,
+                                callback_data.get("count", 0),
+                                callback_data.get("top_score", 0.0)
+                            )
+                        
+                        elif callback_type == "partial_answer":
+                            await manager.send_partial_answer(
+                                session_id,
+                                callback_data.get("answer", ""),
+                                callback_data.get("iteration", 0)
+                            )
+                        
+                        elif callback_type == "skip_retrieval":
+                            await manager.send_message(session_id, {
+                                "type": "skip_retrieval",
+                                "reason": callback_data.get("reason", ""),
+                                "timestamp": manager._get_timestamp()
+                            })
+                    
+                    # Reasoning RAG 실행
+                    result = await reasoning_pipeline.reasoning_search(
+                        query=query,
+                        mode=mode,
+                        stream_callback=stream_callback
+                    )
+                    
+                    # 최종 결과 전송
+                    await manager.send_reasoning_complete(
+                        session_id,
+                        result.final_answer,
+                        result.confidence_score,
+                        result.elapsed_time
+                    )
+                    
+                    # 상세 결과도 함께 전송
+                    await manager.send_message(session_id, {
+                        "type": "reasoning_result",
+                        "query": result.query,
+                        "mode": result.mode,
+                        "total_iterations": result.total_iterations,
+                        "sources": result.sources[:3],  # 상위 3개 소스
+                        "reasoning_steps": [
+                            {
+                                "iteration": step.iteration,
+                                "support_score": step.support_score,
+                                "documents_count": len(step.documents),
+                                "should_continue": step.should_continue
+                            }
+                            for step in result.reasoning_steps
+                        ],
+                        "timestamp": manager._get_timestamp()
+                    })
+                    
+                except NotImplementedError as e:
+                    await manager.send_reasoning_error(
+                        session_id, 
+                        f"Mode '{mode}' not yet implemented: {str(e)}"
+                    )
+                    
+                except Exception as e:
+                    logger.error(f"Reasoning RAG 실행 오류: {str(e)}")
+                    await manager.send_reasoning_error(session_id, str(e))
+            
+            elif message_type == "ping":
+                # 연결 상태 확인
+                await manager.send_message(session_id, {
+                    "type": "pong",
+                    "timestamp": manager._get_timestamp()
+                })
+            
+            else:
+                await manager.send_message(session_id, {
+                    "type": "error",
+                    "message": f"Unknown message type: {message_type}",
+                    "timestamp": manager._get_timestamp()
+                })
+                
+    except WebSocketDisconnect:
+        logger.info(f"Reasoning WebSocket 연결 해제: {session_id}")
+    except Exception as e:
+        logger.error(f"Reasoning WebSocket 연결 오류: {e}")
+        await manager.send_reasoning_error(session_id, f"Connection error: {str(e)}")
+    finally:
+        manager.disconnect(session_id)
+        logger.info(f"Reasoning WebSocket 연결 종료: {session_id}")
+
 
 if __name__ == "__main__":
     import uvicorn

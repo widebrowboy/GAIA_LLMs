@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 import logging
 
 from app.rag import RAGPipeline
+from app.rag.reasoning_rag_pipeline import ReasoningRAGPipeline, ReasoningResult
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/api/rag", tags=["RAG"])
 
 # 전역 RAG 파이프라인 인스턴스
 rag_pipeline = None
+reasoning_pipeline = None
 
 
 class DocumentInput(BaseModel):
@@ -46,6 +48,37 @@ class RAGResponse(BaseModel):
     context: List[str] = Field(..., description="사용된 컨텍스트")
 
 
+class ReasoningQueryRequest(BaseModel):
+    """Reasoning RAG 쿼리 요청 모델"""
+    query: str = Field(..., description="검색 쿼리")
+    mode: str = Field(default="self_rag", description="추론 모드 (self_rag, cot_rag, mcts_rag)")
+    max_iterations: int = Field(default=3, description="최대 추론 반복 횟수")
+    stream: bool = Field(default=False, description="스트리밍 여부")
+
+
+class ReasoningStepResponse(BaseModel):
+    """추론 단계 응답 모델"""
+    iteration: int
+    refined_query: Optional[str]
+    documents_count: int
+    relevance_score: float
+    partial_answer: str
+    support_score: float
+    should_continue: bool
+
+
+class ReasoningRAGResponse(BaseModel):
+    """Reasoning RAG 응답 모델"""
+    query: str = Field(..., description="원본 쿼리")
+    mode: str = Field(..., description="사용된 추론 모드")
+    final_answer: str = Field(..., description="최종 답변")
+    reasoning_steps: List[ReasoningStepResponse] = Field(..., description="추론 단계들")
+    total_iterations: int = Field(..., description="총 반복 횟수")
+    confidence_score: float = Field(..., description="신뢰도 점수")
+    sources: List[Dict[str, Any]] = Field(..., description="참조 소스")
+    elapsed_time: float = Field(..., description="처리 시간 (초)")
+
+
 # RAG 파이프라인 초기화
 try:
     rag_pipeline = RAGPipeline()
@@ -53,6 +86,14 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize RAG pipeline: {str(e)}")
     rag_pipeline = None
+
+# Reasoning RAG 파이프라인 초기화
+try:
+    reasoning_pipeline = ReasoningRAGPipeline()
+    logger.info("Reasoning RAG pipeline initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize Reasoning RAG pipeline: {str(e)}")
+    reasoning_pipeline = None
 
 
 @router.post("/documents", response_model=Dict[str, Any])
@@ -314,3 +355,193 @@ async def clear_documents():
     except Exception as e:
         logger.error(f"Error clearing documents: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/reasoning-query", response_model=ReasoningRAGResponse)
+async def reasoning_rag_query(request: ReasoningQueryRequest):
+    """
+    Reasoning RAG 쿼리 실행 (Self-RAG, CoT-RAG, MCTS-RAG)
+    
+    **다단계 추론 검색 시스템:**
+    - **Self-RAG**: 반성 토큰 기반 반복적 검색 및 평가
+    - **CoT-RAG**: Chain-of-Thought 기반 단계별 추론 (v3.86)
+    - **MCTS-RAG**: Monte Carlo Tree Search 기반 최적 경로 탐색 (v3.87)
+    
+    **Request Body 예시:**
+    ```json
+    {
+        "query": "EGFR 억제제의 내성 메커니즘과 차세대 치료제 개발 전략은?",
+        "mode": "self_rag",
+        "max_iterations": 3,
+        "stream": false
+    }
+    ```
+    
+    **Self-RAG 추론 프로세스:**
+    1. **[Retrieve]**: 검색 필요성 판단
+    2. **쿼리 개선**: 컨텍스트 기반 쿼리 최적화
+    3. **2단계 검색**: Milvus (k=20) → BGE Reranking (k=5)
+    4. **[Relevant]**: 문서 관련성 평가
+    5. **부분 답변 생성**: 점진적 답변 구축
+    6. **[Support]**: 답변 지지도 평가
+    7. **[Continue]**: 계속 여부 결정
+    
+    **Response 예시:**
+    ```json
+    {
+        "query": "EGFR 억제제의 내성 메커니즘과 차세대 치료제 개발 전략은?",
+        "mode": "self_rag",
+        "final_answer": "EGFR 억제제 내성은 주로 T790M 돌연변이를 통해 발생하며...",
+        "reasoning_steps": [
+            {
+                "iteration": 0,
+                "refined_query": "EGFR T790M 내성 돌연변이 메커니즘",
+                "documents_count": 5,
+                "relevance_score": 0.85,
+                "partial_answer": "T790M 돌연변이는 EGFR의 790번 위치에서...",
+                "support_score": 0.78,
+                "should_continue": true
+            }
+        ],
+        "total_iterations": 3,
+        "confidence_score": 0.89,
+        "sources": [...],
+        "elapsed_time": 8.5
+    }
+    ```
+    
+    **Parameters:**
+    - **query**: 복잡한 연구 질문
+    - **mode**: 추론 모드 선택
+    - **max_iterations**: 최대 반복 횟수 (Self-RAG)
+    - **stream**: 실시간 스트리밍 여부
+    """
+    if not reasoning_pipeline:
+        raise HTTPException(status_code=503, detail="Reasoning RAG pipeline not initialized")
+    
+    try:
+        # 스트리밍 콜백 정의 (향후 WebSocket 연동용)
+        async def stream_callback(data):
+            # TODO: WebSocket으로 실시간 전송
+            logger.info(f"Reasoning step: {data}")
+        
+        # Reasoning RAG 실행
+        result = await reasoning_pipeline.reasoning_search(
+            query=request.query,
+            mode=request.mode,
+            stream_callback=stream_callback if request.stream else None
+        )
+        
+        # 응답 변환
+        reasoning_steps = []
+        for step in result.reasoning_steps:
+            reasoning_steps.append(ReasoningStepResponse(
+                iteration=step.iteration,
+                refined_query=step.refined_query,
+                documents_count=len(step.documents),
+                relevance_score=step.relevance_scores[0] if step.relevance_scores else 0.0,
+                partial_answer=step.partial_answer,
+                support_score=step.support_score,
+                should_continue=step.should_continue
+            ))
+        
+        return ReasoningRAGResponse(
+            query=result.query,
+            mode=result.mode,
+            final_answer=result.final_answer,
+            reasoning_steps=reasoning_steps,
+            total_iterations=result.total_iterations,
+            confidence_score=result.confidence_score,
+            sources=result.sources[:5],  # 상위 5개 소스만
+            elapsed_time=result.elapsed_time
+        )
+        
+    except NotImplementedError as e:
+        raise HTTPException(
+            status_code=501,
+            detail=f"Mode '{request.mode}' not yet implemented: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error in reasoning RAG query: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reasoning-stats", response_model=Dict[str, Any])
+async def get_reasoning_stats():
+    """
+    Reasoning RAG 시스템 통계 조회
+    
+    **반환 정보:**
+    - **pipeline_status**: 파이프라인 상태
+    - **milvus_connection**: Milvus 연결 상태
+    - **reranker_info**: BGE Reranker 정보
+    - **model_info**: LLM 및 임베딩 모델 정보
+    - **configuration**: 현재 설정값
+    
+    **Response 예시:**
+    ```json
+    {
+        "pipeline_status": "ready",
+        "milvus_connection": {
+            "uri": "tcp://localhost:19530",
+            "collection": "documents",
+            "connected": true
+        },
+        "reranker_info": {
+            "model": "BAAI/bge-reranker-v2-m3",
+            "device": "cpu",
+            "fp16": false
+        },
+        "model_info": {
+            "llm": "gemma3-12b",
+            "embedding": "mxbai-embed-large"
+        },
+        "configuration": {
+            "search_top_k": 20,
+            "rerank_top_k": 5,
+            "max_iterations": 3
+        }
+    }
+    ```
+    """
+    if not reasoning_pipeline:
+        return {
+            "pipeline_status": "not_initialized",
+            "error": "Reasoning RAG pipeline not initialized"
+        }
+    
+    try:
+        # 디바이스 정보 가져오기
+        device_info = reasoning_pipeline.reranker.get_device_info() if hasattr(reasoning_pipeline.reranker, 'get_device_info') else {}
+        
+        stats = {
+            "pipeline_status": "ready",
+            "milvus_connection": {
+                "uri": reasoning_pipeline.milvus_client._uri,
+                "collection": reasoning_pipeline.collection_name,
+                "connected": True  # 연결 상태 확인 로직 추가 가능
+            },
+            "reranker_info": {
+                "model": "BAAI/bge-reranker-v2-m3",
+                "device": device_info.get("device", "unknown"),
+                "fp16": device_info.get("device", "").startswith("cuda")
+            },
+            "model_info": {
+                "llm": reasoning_pipeline.llm.model,
+                "embedding": reasoning_pipeline.embedder.model
+            },
+            "configuration": {
+                "search_top_k": reasoning_pipeline.search_top_k,
+                "rerank_top_k": reasoning_pipeline.rerank_top_k,
+                "max_iterations": reasoning_pipeline.max_iterations
+            }
+        }
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Error getting reasoning stats: {str(e)}")
+        return {
+            "pipeline_status": "error",
+            "error": str(e)
+        }

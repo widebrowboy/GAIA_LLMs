@@ -68,3 +68,97 @@ class WebSocketManager:
     def is_connected(self, session_id: str) -> bool:
         """세션 연결 상태 확인"""
         return session_id in self.active_connections
+    
+    # Reasoning RAG 전용 메시지 전송 메서드들
+    async def send_reasoning_start(self, session_id: str, query: str, mode: str):
+        """추론 시작 알림"""
+        await self.send_message(session_id, {
+            "type": "reasoning_start",
+            "query": query,
+            "mode": mode,
+            "timestamp": self._get_timestamp()
+        })
+    
+    async def send_iteration_start(self, session_id: str, iteration: int, max_iterations: int):
+        """반복 시작 알림"""
+        await self.send_message(session_id, {
+            "type": "iteration_start",
+            "iteration": iteration,
+            "max_iterations": max_iterations,
+            "timestamp": self._get_timestamp()
+        })
+    
+    async def send_query_refined(self, session_id: str, original: str, refined: str):
+        """쿼리 개선 알림"""
+        await self.send_message(session_id, {
+            "type": "query_refined",
+            "original_query": original,
+            "refined_query": refined,
+            "timestamp": self._get_timestamp()
+        })
+    
+    async def send_documents_retrieved(self, session_id: str, count: int, top_score: float):
+        """문서 검색 완료 알림"""
+        await self.send_message(session_id, {
+            "type": "documents_retrieved",
+            "document_count": count,
+            "top_score": top_score,
+            "timestamp": self._get_timestamp()
+        })
+    
+    async def send_relevance_evaluated(self, session_id: str, score: float):
+        """관련성 평가 완료 알림"""
+        await self.send_message(session_id, {
+            "type": "relevance_evaluated",
+            "relevance_score": score,
+            "timestamp": self._get_timestamp()
+        })
+    
+    async def send_partial_answer(self, session_id: str, answer: str, iteration: int):
+        """부분 답변 생성 알림"""
+        await self.send_message(session_id, {
+            "type": "partial_answer",
+            "answer": answer,
+            "iteration": iteration,
+            "timestamp": self._get_timestamp()
+        })
+    
+    async def send_support_evaluated(self, session_id: str, score: float):
+        """지지도 평가 완료 알림"""
+        await self.send_message(session_id, {
+            "type": "support_evaluated",
+            "support_score": score,
+            "timestamp": self._get_timestamp()
+        })
+    
+    async def send_iteration_complete(self, session_id: str, iteration: int, should_continue: bool):
+        """반복 완료 알림"""
+        await self.send_message(session_id, {
+            "type": "iteration_complete",
+            "iteration": iteration,
+            "should_continue": should_continue,
+            "timestamp": self._get_timestamp()
+        })
+    
+    async def send_reasoning_complete(self, session_id: str, final_answer: str, confidence: float, total_time: float):
+        """추론 완료 알림"""
+        await self.send_message(session_id, {
+            "type": "reasoning_complete",
+            "final_answer": final_answer,
+            "confidence_score": confidence,
+            "elapsed_time": total_time,
+            "timestamp": self._get_timestamp()
+        })
+    
+    async def send_reasoning_error(self, session_id: str, error: str):
+        """추론 오류 알림"""
+        await self.send_message(session_id, {
+            "type": "reasoning_error",
+            "error": error,
+            "timestamp": self._get_timestamp()
+        })
+    
+    def _get_timestamp(self) -> str:
+        """현재 타임스탬프 반환"""
+        from datetime import datetime
+        return datetime.now().isoformat()

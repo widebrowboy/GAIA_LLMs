@@ -87,22 +87,21 @@ export const SimpleChatProvider = ({ children }: ChatProviderProps) => {
           if (Array.isArray(parsed)) {
             setConversations(parsed);
             
-            // 가장 최근 대화를 현재 대화로 설정
-            if (parsed.length > 0) {
-              setCurrentConversation(parsed[0]);
-            }
+            // 현재 대화는 null로 유지 (환영 페이지 표시)
+            // 사용자가 명시적으로 대화를 선택하거나 새 대화를 시작할 때만 설정
+            setCurrentConversation(null);
           }
         }
         
-        // 기본 모델 상태 설정 (자동 시작하지 않음)
+        // 기본 모델 상태 설정 (서버에서 자동 시작 처리)
         const initializeDefaultModel = () => {
-          console.log('🚀 페이지 로드 시 기본 모델 상태 설정');
+          console.log('📝 페이지 로드 시 기본 모델 상태 설정');
           
           // 최신 기본 모델 설정을 가져와서 Context 상태만 설정
           const currentDefault = getDefaultModel();
           setCurrentModel(currentDefault);
           console.log(`📝 currentModel 상태를 최신 기본값으로 설정: ${currentDefault}`);
-          console.log('💡 모델 자동 시작은 사용자 요청 시에만 수행');
+          console.log('💡 모델 자동 시작은 서버에서 처리됩니다');
         };
         
         initializeDefaultModel();

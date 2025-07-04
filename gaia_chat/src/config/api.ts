@@ -24,14 +24,14 @@ export const API_BASE_URL = (() => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  // CORS 우회를 위해 현재 호스트 사용
+  // CORS 우회를 위해 현재 호스트 사용 (IPv4 강제)
   if (typeof window !== 'undefined') {
-    const currentHost = window.location.hostname;
+    const currentHost = window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname;
     const currentProtocol = window.location.protocol;
     return `${currentProtocol}//${currentHost}:${getApiPort()}`;
   }
-  // 서버 사이드 렌더링 시
-  return `http://localhost:8000`;
+  // 서버 사이드 렌더링 시 (IPv4 강제)
+  return `http://127.0.0.1:8000`;
 })();
 
 // API 관련 유틸리티 함수
@@ -52,7 +52,7 @@ export const checkApiHealth = async (): Promise<boolean> => {
     });
     return response.ok;
   } catch (error) {
-    console.error('API 상태 체크 실패:', error);
+    console.warn('⚠️ API 상태 체크 실패:', error);
     return false;
   }
 };

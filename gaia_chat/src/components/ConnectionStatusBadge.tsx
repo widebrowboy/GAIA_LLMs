@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 interface ConnectionStatus {
   server_healthy: boolean;
   model_ready: boolean;
   ollama_models: string[];
+  embedding_models?: string[];
+  all_models?: string[];
   current_model: string | null;
   mode: string;
   mcp_enabled: boolean;
@@ -20,9 +22,10 @@ interface ConnectionStatus {
 
 interface ConnectionStatusBadgeProps {
   onConnectionChange?: (connected: boolean) => void;
+  onStatusUpdate?: (status: ConnectionStatus | null) => void;
 }
 
-export default function ConnectionStatusBadge({ onConnectionChange }: ConnectionStatusBadgeProps) {
+export default function ConnectionStatusBadge({ onConnectionChange, onStatusUpdate }: ConnectionStatusBadgeProps) {
   const [isConnected, setIsConnected] = useState(true); // 초기값을 true로 설정
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
@@ -30,10 +33,10 @@ export default function ConnectionStatusBadge({ onConnectionChange }: Connection
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const maxReconnectAttempts = 10;
-  const reconnectDelay = 3000; // 3초
+  const reconnectDelay = 10000; // 10초
   const [hasReceivedStatus, setHasReceivedStatus] = useState(false);
 
-  const connect = () => {
+  const connect = useCallback(() => {
     // 기존 연결이 있으면 먼저 정리
     if (wsRef.current) {
       try {
@@ -48,7 +51,7 @@ export default function ConnectionStatusBadge({ onConnectionChange }: Connection
     }
 
     const sessionId = `status_${Date.now()}`;
-    const wsUrl = `ws://localhost:8000/ws/status/${sessionId}`;
+    const wsUrl = `ws://127.0.0.1:8000/ws/status/${sessionId}`;
     
     try {
       const ws = new WebSocket(wsUrl);
@@ -75,11 +78,14 @@ export default function ConnectionStatusBadge({ onConnectionChange }: Connection
               server_healthy: data.server_healthy,
               model_ready: data.model_ready,
               test_success: data.test_result?.success,
-              final_connected: modelReady
+              final_connected: modelReady,
+              ollama_models: data.ollama_models,
+              embedding_models: data.embedding_models
             });
             
             setIsConnected(modelReady);
             onConnectionChange?.(modelReady);
+            onStatusUpdate?.(data);
           }
         } catch (error) {
           console.error('Status message parsing error:', error);
@@ -91,37 +97,29 @@ export default function ConnectionStatusBadge({ onConnectionChange }: Connection
         setIsConnected(false);
         setStatus(null);
         onConnectionChange?.(false);
+        onStatusUpdate?.(null);
         
-        // 자동 재연결 로직
-        if (reconnectAttempts < maxReconnectAttempts && !isReconnecting) {
+        // 자동 재연결 로직 - 더 보수적으로 수정
+        if (reconnectAttempts < 3 && !isReconnecting) {  // 최대 3회로 제한
           setIsReconnecting(true);
           setReconnectAttempts(prev => prev + 1);
           
           reconnectTimeoutRef.current = setTimeout(() => {
-            console.log(`재연결 시도 ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
+            console.log(`재연결 시도 ${reconnectAttempts + 1}/3`);
             connect();
-          }, reconnectDelay);
+          }, reconnectDelay);  // 10초 후 재연결
         }
       };
 
       ws.onerror = (_event) => {
-        // WebSocket 에러는 보안상의 이유로 상세 정보를 제공하지 않음
-        // 대신 일반적인 메시지와 연결 상태만 기록
         console.error('Status WebSocket 연결 오류 발생. 서버가 실행 중인지 확인하세요.');
         setIsConnected(false);
         setStatus(null);
         onConnectionChange?.(false);
+        onStatusUpdate?.(null);
         
-        // 자동 재연결 로직 추가 (onclose와 유사하게)
-        if (reconnectAttempts < maxReconnectAttempts && !isReconnecting) {
-          setIsReconnecting(true);
-          setReconnectAttempts(prev => prev + 1);
-          
-          reconnectTimeoutRef.current = setTimeout(() => {
-            console.log(`WebSocket 오류 후 재연결 시도 ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
-            connect();
-          }, reconnectDelay);
-        }
+        // 자동 재연결 로직 제거 - 오류 시에는 재연결하지 않음
+        // 사용자가 수동으로 재연결 버튼을 클릭해야 함
       };
 
     } catch (error) {
@@ -129,7 +127,7 @@ export default function ConnectionStatusBadge({ onConnectionChange }: Connection
       setIsConnected(false);
       onConnectionChange?.(false);
     }
-  };
+  }, [reconnectAttempts, isReconnecting, onConnectionChange]);
 
   const disconnect = () => {
     if (reconnectTimeoutRef.current) {
@@ -160,7 +158,7 @@ export default function ConnectionStatusBadge({ onConnectionChange }: Connection
     return () => {
       disconnect();
     };
-  }, [connect]);
+  }, []); // 빈 의존성 배열로 한 번만 실행
 
   const getStatusColor = () => {
     if (isReconnecting) return 'bg-yellow-500';
@@ -184,8 +182,20 @@ export default function ConnectionStatusBadge({ onConnectionChange }: Connection
   };
 
   const getModelInfo = () => {
-    if (!status?.current_model) return '';
-    return status.current_model;
+    if (!status) return '';
+    
+    const chatModels = status.ollama_models || [];
+    const embeddingModels = status.embedding_models || [];
+    const totalModels = chatModels.length + embeddingModels.length;
+    
+    if (totalModels === 0) return '모델 없음';
+    
+    let info = `채팅 모델: ${chatModels.length}개`;
+    if (embeddingModels.length > 0) {
+      info += `, 임베딩 모델: ${embeddingModels.length}개`;
+    }
+    
+    return info;
   };
 
   const getModeInfo = () => {

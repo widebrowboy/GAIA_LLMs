@@ -194,38 +194,120 @@ cd webui/nextjs-webui && npm run dev &
 ./scripts/server_manager.sh logs
 ```
 
-### 🌐 WebUI 사용법
+### 🌐 WebUI 사용 가이드
+
+#### 1. WebUI 접속
 ```bash
+# 서버 시작 (자동으로 모든 필요 서비스 시작)
+./scripts/server_manager.sh start
+
 # 브라우저에서 접속
 http://localhost:3001
+```
 
-# 지원되는 명령어 (WebUI에서)
+#### 2. WebUI 주요 기능
+- **채팅 인터페이스**: 실시간 스트리밍으로 응답 표시
+- **모드 전환**: 사이드바에서 일반 모드 ↔ Deep Research 모드 원클릭 전환
+- **프롬프트 선택**: clinical, research, chemistry, regulatory 중 선택
+- **모델 변경**: gemma2:9b, gemma2:27b 등 모델 선택
+- **대화 기록**: 사이드바에서 이전 대화 기록 확인 및 관리
+
+#### 3. WebUI에서 사용 가능한 명령어
+```
 /help                    # 도움말 표시
 /mcp start              # Deep Research 모드 시작  
 /normal                 # 일반 모드로 전환
 /prompt clinical        # 임상시험 전문 모드
 /model gemma2:27b       # AI 모델 변경
 /debug                  # 디버그 모드 토글
+/mcpshow                # MCP 검색 과정 표시 토글
 ```
 
-### 🖥️ CLI 사용법
-```bash
-# 기본 실행
-python run_chatbot.py
+#### 4. Deep Research 모드 사용법
+1. 사이드바의 "Deep Research" 버튼 클릭 또는 `/mcp start` 명령어 입력
+2. 연구 관련 질문 입력 (예: "EGFR 억제제의 최신 연구 동향")
+3. MCP 서버가 자동으로 다음 데이터베이스 검색:
+   - PubMed: 최신 논문
+   - ClinicalTrials: 진행 중인 임상시험
+   - DrugBank: 약물 정보
+   - ChEMBL: 화학 구조 및 생물활성
+   - OpenTargets: 타겟-질병 연관성
 
-# 디버그 모드
+### 🖥️ CLI 사용 가이드
+
+#### 1. CLI 시작
+```bash
+# 가상환경 활성화
+source venv/bin/activate
+
+# CLI 챗봇 실행
+python run_chatbot.py
+```
+
+#### 2. CLI 명령어
+```
+/help                    # 도움말 표시
+/mcp start              # Deep Research 모드 시작
+/normal                 # 일반 모드로 전환
+/prompt [type]          # 프롬프트 타입 변경
+/model [name]           # AI 모델 변경
+/mcpshow                # MCP 출력 표시 토글
+/debug                  # 디버그 모드 토글
+/exit                   # 프로그램 종료
+```
+
+#### 3. CLI 고급 옵션
+```bash
+# 디버그 모드로 실행
 python main.py --debug
 
-# MCP 포함 실행
+# MCP 활성화하여 실행
 python main.py --enable-mcp
+
+# 특정 모델로 실행
+python main.py --model gemma2:27b
 ```
 
-### 🔗 API 사용법
+#### 4. CLI Deep Research 예제
+```bash
+# CLI 시작
+python run_chatbot.py
+
+# Deep Research 모드 시작
+> /mcp start
+
+# 연구 질문 입력
+> 알츠하이머병의 최신 치료 타겟과 임상시험 현황을 분석해주세요
+
+# 결과는 다음 형식으로 제공:
+# 1. PubMed 최신 논문 요약
+# 2. ClinicalTrials 진행 중인 시험
+# 3. DrugBank 관련 약물 정보
+# 4. 통합 분석 및 권장사항
+```
+
+### 🔗 API 사용 가이드
+
+#### 1. API 서버 접속
+```bash
+# API 문서 (Swagger UI)
+http://localhost:8000/docs
+
+# 대안 문서 (ReDoc)
+http://localhost:8000/redoc
+```
+
+#### 2. 주요 API 엔드포인트
 ```bash
 # 채팅 메시지 전송
 curl -X POST "http://localhost:8000/api/chat/message" \
   -H "Content-Type: application/json" \
   -d '{"message": "아스피린의 작용 메커니즘은?", "session_id": "default"}'
+
+# 스트리밍 채팅 (Server-Sent Events)
+curl -X POST "http://localhost:8000/api/chat/stream" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "EGFR 억제제 연구 동향", "session_id": "default"}'
 
 # Deep Research 모드 시작
 curl -X POST "http://localhost:8000/api/mcp/start" \
@@ -234,6 +316,66 @@ curl -X POST "http://localhost:8000/api/mcp/start" \
 
 # 시스템 정보 조회
 curl -X GET "http://localhost:8000/api/system/info"
+
+# 모델 변경
+curl -X POST "http://localhost:8000/api/system/model" \
+  -H "Content-Type: application/json" \
+  -d '{"model_name": "gemma2:27b", "session_id": "default"}'
+```
+
+#### 3. WebSocket 실시간 통신
+```javascript
+// JavaScript 예제
+const ws = new WebSocket('ws://localhost:8000/ws/my_session_id');
+
+ws.onopen = () => {
+    console.log('Connected to WebSocket');
+};
+
+ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    console.log('Received:', data);
+};
+
+// 메시지 전송
+ws.send(JSON.stringify({
+    type: 'chat',
+    message: 'EGFR 억제제의 부작용은?'
+}));
+
+// MCP 명령
+ws.send(JSON.stringify({
+    type: 'command',
+    command: '/mcp start'
+}));
+```
+
+#### 4. Python API 클라이언트 예제
+```python
+import requests
+import json
+
+# API 기본 URL
+BASE_URL = "http://localhost:8000"
+
+# 세션 생성
+response = requests.post(f"{BASE_URL}/api/session/create")
+session_id = response.json()["session_id"]
+
+# Deep Research 모드 시작
+requests.post(f"{BASE_URL}/api/mcp/start", 
+              json={"session_id": session_id})
+
+# 연구 질문 전송
+response = requests.post(
+    f"{BASE_URL}/api/chat/message",
+    json={
+        "message": "최신 CAR-T 세포치료제 연구 동향",
+        "session_id": session_id
+    }
+)
+
+print(response.json()["response"])
 ```
 
 ## 📖 API 문서

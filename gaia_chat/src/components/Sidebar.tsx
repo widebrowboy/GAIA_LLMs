@@ -60,9 +60,16 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle, isSidebarOpen = fa
   const [ollamaRunning, setOllamaRunning] = useState(false);
   const [detailedModels, setDetailedModels] = useState<any[]>([]);
   const [runningModels, setRunningModels] = useState<any[]>([]);
+  const [embeddingModels, setEmbeddingModels] = useState<any[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [modelChangeProgress, setModelChangeProgress] = useState<string>('');
   const [isModelOperationInProgress, setIsModelOperationInProgress] = useState(false);
+
+  // 임베딩 모델 판별 함수
+  const isEmbeddingModel = (modelName: string) => {
+    const modelLower = modelName.toLowerCase();
+    return ['embed', 'embedding', 'mxbai'].some(keyword => modelLower.includes(keyword));
+  };
 
   // 디버그용 직접 fetch 테스트
   const testDirectFetch = useCallback(async () => {
@@ -147,6 +154,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle, isSidebarOpen = fa
         setDetailedModels(result.data.available || []);
         setRunningModels(result.data.running || []);
         
+        // 임베딩 모델 정보 저장
+        setEmbeddingModels(result.data.running_embedding_models || []);
+        
         // 실행 상태도 업데이트
         setOllamaRunning(result.data.current_model_running || false);
         if (result.data.current_model && setCurrentModel) {
@@ -162,6 +172,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle, isSidebarOpen = fa
           setAvailableModels(modelNames);
           setDetailedModels(directResult.available || []);
           setRunningModels(directResult.running || []);
+          setEmbeddingModels(directResult.running_embedding_models || []);
           setOllamaRunning(directResult.current_model_running || false);
           if (directResult.current_model && setCurrentModel) {
             setCurrentModel(directResult.current_model);
@@ -373,35 +384,52 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle, isSidebarOpen = fa
             
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
               try {
-                console.log(`🎯 시도 ${attempt}/${maxRetries}: Health check 먼저 확인`);
+                console.log(`🎯 시도 ${attempt}/${maxRetries}: apiClient.getModelsDetailed() 직접 호출`);
                 
-                // 1단계: Health check로 서버 기본 상태 확인
-                try {
-                  const healthResponse = await fetch('http://localhost:8000/health', {
-                    method: 'GET',
-                    headers: {
-                      'Accept': 'application/json',
-                      'Cache-Control': 'no-cache'
-                    },
-                    cache: 'no-cache',
-                    signal: AbortSignal.timeout(3000) // 3초 타임아웃
+                // Health check 건너뛰고 바로 API 호출 (apiClient에 이미 강력한 재시도 로직 존재)
+                const result = await apiClient.getModelsDetailed();
+                console.log(`✅ 시도 ${attempt}: API 호출 성공`, result);
+                
+                // 3단계: 모델 자동 시작 확인 및 처리
+                if (result.success && result.data) {
+                  const { running, current_model_running } = result.data;
+                  const runningModels = running || [];
+                  
+                  console.log('🔍 모델 실행 상태 확인:', { 
+                    runningModels: runningModels.length, 
+                    current_model_running 
                   });
                   
-                  if (!healthResponse.ok) {
-                    throw new Error(`Health check failed: ${healthResponse.status}`);
+                  // 실행 중인 모델이 없거나 현재 모델이 실행되지 않은 경우
+                  if (runningModels.length === 0 || !current_model_running) {
+                    console.log('⚠️ 실행 중인 모델이 없음 - 자동 기본 모델 시작 시도');
+                    
+                    try {
+                      // 기본 모델 시작 시도
+                      const defaultModel = 'gemma3-12b:latest';
+                      console.log(`🚀 기본 모델 '${defaultModel}' 자동 시작 중...`);
+                      
+                      const startResult = await apiClient.startModel(defaultModel, (progress) => {
+                        console.log('🔄 모델 시작 진행:', progress);
+                      });
+                      
+                      if (startResult.success) {
+                        console.log('✅ 기본 모델 자동 시작 성공:', startResult);
+                        // 업데이트된 상태를 다시 가져옴
+                        const updatedResult = await apiClient.getModelsDetailed();
+                        if (updatedResult.success) {
+                          console.log('✅ 모델 시작 후 상태 업데이트 완료');
+                          return updatedResult;
+                        }
+                      } else {
+                        console.warn('⚠️ 기본 모델 자동 시작 실패:', startResult.error);
+                      }
+                    } catch (startError) {
+                      console.warn('⚠️ 모델 자동 시작 중 오류:', startError);
+                    }
                   }
-                  
-                  const healthData = await healthResponse.json();
-                  console.log(`✅ Health check 성공 (시도 ${attempt}):`, healthData);
-                } catch (healthError) {
-                  console.warn(`⚠️ Health check 실패 (시도 ${attempt}):`, healthError);
-                  throw healthError; // health check 실패시 재시도
                 }
                 
-                // 2단계: 실제 API 호출
-                console.log(`🎯 시도 ${attempt}/${maxRetries}: apiClient.getModelsDetailed() 호출`);
-                const result = await apiClient.getModelsDetailed();
-                console.log(`✅ 시도 ${attempt}: API 호출 완전 성공`, result);
                 return result;
                 
               } catch (error) {
@@ -577,8 +605,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle, isSidebarOpen = fa
             if (result.success && result.data) {
               const data = result.data;
               
-              // 실행 중인 모델이 변경되었는지 확인
+              // 실행 중인 모델이 변경되었는지 확인 - API에서 분리된 데이터 사용
               const newRunningModels = data.running || [];
+              const newEmbeddingModels = data.running_embedding_models || [];
+              
               const currentRunningModel = newRunningModels.length > 0 ? newRunningModels[newRunningModels.length - 1]?.name : null;
               
               // 현재 실행 중인 모델 감지 및 Context 동기화
@@ -606,6 +636,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle, isSidebarOpen = fa
               
               // 실행 중인 모델 목록 업데이트
               setRunningModels(newRunningModels);
+              setEmbeddingModels(newEmbeddingModels);
               setOllamaRunning(data.current_model_running || false);
               
               // 서버 연결 상태 업데이트
@@ -636,7 +667,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle, isSidebarOpen = fa
         clearInterval(intervalId);
       }
     };
-  }, [isInitialized, serverConnected, currentModel]); // 실시간 업데이트 계속 실행
+  }, [isInitialized, serverConnected]); // currentModel 제거하여 무한 렌더링 방지
 
   const handleNewConversation = async () => {
     if (!serverConnected) {
@@ -903,13 +934,23 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose, onToggle, isSidebarOpen = fa
                 {/* 테스트 버튼들 숨김 처리 */}
               </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-black">실행 중인 모델:</span>
-              <span className={`font-medium ${
-                runningModels.length > 0 ? 'text-green-600' : 'text-gray-600'
-              }`}>
-                {runningModels.length}개
-              </span>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-black">채팅 모델:</span>
+                <span className={`font-medium ${
+                  runningModels.length > 0 ? 'text-green-600' : 'text-gray-600'
+                }`}>
+                  {runningModels.length}개
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-black">임베딩 모델:</span>
+                <span className={`font-medium ${
+                  embeddingModels.length > 0 ? 'text-blue-600' : 'text-gray-600'
+                }`}>
+                  {embeddingModels.length}개
+                </span>
+              </div>
             </div>
           </div>
         )}

@@ -18,24 +18,56 @@ export class ApiClient {
   private static instance: ApiClient;
   private retryCount = 3;
   private retryDelay = 1000; // 1초
+  private serverReady = true; // 서버 준비 상태 추적
+
+  constructor() {
+    // this 바인딩 보장 - 모든 메서드를 바인딩하여 this 참조 문제 해결
+    this.sleep = this.sleep.bind(this);
+    this.fetchWithRetry = this.fetchWithRetry.bind(this);
+    this.xhrFetch = this.xhrFetch.bind(this);
+    this.simpleFetch = this.simpleFetch.bind(this);
+    this.getModelsDetailed = this.getModelsDetailed.bind(this);
+    this.switchModelSafely = this.switchModelSafely.bind(this);
+    this.startModel = this.startModel.bind(this);
+    this.stopModel = this.stopModel.bind(this);
+    this.startModelMultiple = this.startModelMultiple.bind(this);
+    this.stopAllModels = this.stopAllModels.bind(this);
+    this.checkHealth = this.checkHealth.bind(this);
+    this.changeModel = this.changeModel.bind(this);
+    this.safeApiCall = this.safeApiCall.bind(this);
+  }
 
   static getInstance(): ApiClient {
     if (!ApiClient.instance) {
       ApiClient.instance = new ApiClient();
+      
+      // 인스턴스 검증 강화
+      if (typeof ApiClient.instance.xhrFetch !== 'function') {
+        console.error('❌ xhrFetch 메서드 바인딩 실패');
+        throw new Error('ApiClient 인스턴스 생성 실패: xhrFetch 메서드가 함수가 아닙니다');
+      } else {
+        console.log('✅ ApiClient 인스턴스 생성 완료');
+      }
     }
     return ApiClient.instance;
   }
 
+  // 안전한 정적 메서드 (this 바인딩 문제 완전 해결)
+  static async safeXhrFetch(endpoint: string, method: string = 'GET', data?: any): Promise<any> {
+    const instance = ApiClient.getInstance();
+    const boundMethod = instance.xhrFetch.bind(instance);
+    return boundMethod(endpoint, method, data);
+  }
 
-  private async sleep(ms: number): Promise<void> {
+  private sleep = async (ms: number): Promise<void> => {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async fetchWithRetry<T = any>(
+  fetchWithRetry = async <T = any>(
     endpoint: string,
     options: RequestInit = {},
     retries = this.retryCount
-  ): Promise<ApiResponse<T>> {
+  ): Promise<ApiResponse<T>> => {
     const fullUrl = getApiUrl(endpoint);
     console.log(`🌐 API 요청 시작: ${fullUrl}`, { 
       method: options.method || 'GET',
@@ -45,9 +77,9 @@ export class ApiClient {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.warn(`⏰ API 요청 타임아웃 (10초): ${fullUrl}`);
+      console.warn(`⏰ API 요청 타임아웃 (30초): ${fullUrl}`);
       controller.abort();
-    }, 10000); // 10초로 단축
+    }, 30000); // 30초로 증가 (모델 작업 고려)
 
     try {
       const fetchOptions: RequestInit = {
@@ -76,7 +108,7 @@ export class ApiClient {
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
-        console.error(`❌ HTTP 오류: ${response.status} ${response.statusText}`, {
+        console.warn(`⚠️ HTTP 오류: ${response.status} ${response.statusText}`, {
           url: fullUrl,
           errorText,
           retries
@@ -99,7 +131,7 @@ export class ApiClient {
         data = JSON.parse(responseText);
         console.log(`✅ JSON 파싱 성공: ${fullUrl}`, data);
       } catch (parseError) {
-        console.error(`❌ JSON 파싱 실패: ${fullUrl}`, parseError, responseText);
+        console.warn(`⚠️ JSON 파싱 실패: ${fullUrl}`, parseError, responseText);
         throw new Error(`JSON 파싱 오류: ${parseError}`);
       }
 
@@ -108,7 +140,7 @@ export class ApiClient {
     } catch (error) {
       clearTimeout(timeoutId);
       
-      console.error(`💥 API 요청 예외: ${fullUrl}`, {
+      console.warn(`⚠️ API 요청 예외: ${fullUrl}`, {
         error,
         name: error instanceof Error ? error.name : 'Unknown',
         message: error instanceof Error ? error.message : error,
@@ -131,48 +163,15 @@ export class ApiClient {
     }
   }
 
-  // XMLHttpRequest 기반 fetch 대체 (fetch 문제 해결용)
-  async xhrFetch(endpoint: string, method: string = 'GET', data?: any): Promise<any> {
-    return new Promise(async (resolve) => {
+  // XMLHttpRequest 기반 fetch 대체 (fetch 문제 해결용) - 재시도 로직 포함
+  xhrFetch = async (endpoint: string, method: string = 'GET', data?: any, retryCount: number = 5): Promise<any> => {
+    return new Promise((resolve) => {
       try {
         const url = getApiUrl(endpoint);
         console.log(`🔧 XHR Fetch 사용: ${method} ${url}`, data ? { data } : {});
         
-        // 서버 준비 대기 개선 - 더 안정적인 연결 확인
-        console.log('⏳ XHR 요청 전 서버 안정성 확인 시작...');
-        
-        // 1단계: 간단한 연결성 테스트 (더 빠른 타임아웃)
-        let serverReady = false;
-        try {
-          const quickPing = await fetch('http://localhost:8000/health', {
-            method: 'HEAD',
-            signal: AbortSignal.timeout(1500), // 1.5초로 단축
-            cache: 'no-cache'
-          });
-          serverReady = quickPing.ok;
-          console.log(`📡 연결성 테스트: ${serverReady ? '성공' : '실패'} (${quickPing.status})`);
-        } catch (pingError) {
-          console.warn('⚠️ 연결성 테스트 실패 - 서버 준비 대기 중:', pingError instanceof Error ? pingError.message : String(pingError));
-        }
-        
-        // 2단계: 서버가 준비되지 않은 경우 추가 대기
-        if (!serverReady) {
-          console.log('⏳ 서버 준비 대기 (3초 추가 대기)...');
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          
-          // 재확인
-          try {
-            const retryPing = await fetch('http://localhost:8000/health', {
-              method: 'HEAD',
-              signal: AbortSignal.timeout(2000),
-              cache: 'no-cache'
-            });
-            serverReady = retryPing.ok;
-            console.log(`📡 재확인 결과: ${serverReady ? '성공' : '실패'} (${retryPing.status})`);
-          } catch (retryError) {
-            console.warn('⚠️ 재확인 실패 - 그래도 XHR 계속 진행');
-          }
-        }
+        // XHR 요청 바로 시작 (서버 준비 대기 제거)
+        console.log('🔧 XHR 요청 시작...');
         
         const xhr = new XMLHttpRequest();
         xhr.open(method, url, true);
@@ -185,7 +184,7 @@ export class ApiClient {
         // CORS credentials 설정
         xhr.withCredentials = false;
         
-        xhr.onreadystatechange = function() {
+        xhr.onreadystatechange = () => {
           if (xhr.readyState === 4) {
             console.log(`📋 XHR 응답: ${xhr.status} ${xhr.statusText}`);
             console.log(`📋 XHR 응답 헤더:`, xhr.getAllResponseHeaders());
@@ -195,9 +194,9 @@ export class ApiClient {
                 const responseText = xhr.responseText;
                 console.log(`📄 XHR 응답 텍스트 (처음 200자):`, responseText.substring(0, 200));
                 
-                if (!responseText.trim()) {
-                  console.warn('⚠️ 빈 응답 텍스트');
-                  resolve({ success: false, error: '서버에서 빈 응답을 받았습니다' });
+                if (!responseText || !responseText.trim()) {
+                  console.warn('⚠️ 빈 응답 텍스트 - 서버 연결 문제일 수 있음');
+                  resolve({ success: false, error: '서버에서 빈 응답을 받았습니다. 서버 상태를 확인해주세요.' });
                   return;
                 }
                 
@@ -205,71 +204,188 @@ export class ApiClient {
                 console.log('✅ XHR 성공:', data);
                 resolve({ success: true, data });
               } catch (parseError) {
-                console.error('❌ XHR JSON 파싱 오류:', parseError);
-                console.error('❌ 원본 응답:', xhr.responseText);
+                console.warn('⚠️ XHR JSON 파싱 오류:', parseError);
+                console.log('📄 원본 응답:', xhr.responseText);
                 resolve({ success: false, error: `JSON 파싱 실패: ${parseError}` });
               }
             } else {
               // HTTP 오류: 0 처리 - 상세 분석 및 자세한 오류 정보 제공
               if (xhr.status === 0) {
-                console.error(`❌ XHR HTTP 오류: 0 - 상세 분석`);
-                console.error(`🔍 URL: ${url}`);
-                console.error(`🔍 Method: ${method}`);
-                console.error(`🔍 Ready State: ${xhr.readyState}`);
-                console.error(`🔍 Response Text: ${xhr.responseText || '(empty)'}`);
-                console.error(`🔍 Response Headers: ${xhr.getAllResponseHeaders() || '(none)'}`);
-                console.error(`🔍 Server Ready Status: ${serverReady}`);
+                console.warn(`⚠️ XHR HTTP Status 0 - 연결 문제 감지`);
+                console.log(`🔍 URL: ${url}`);
+                console.log(`🔍 Method: ${method}`);
+                console.log(`🔍 Ready State: ${xhr.readyState}`);
+                console.log(`🔍 Response Text: ${xhr.responseText || '(empty)'}`);
+                console.log(`🔍 Response Headers: ${xhr.getAllResponseHeaders() || '(none)'}`);
+                console.log(`🔍 Server Ready Status: ${this.serverReady}`);
                 
-                // 구체적인 오류 원인 분석
-                let errorMessage = 'HTTP Status 0 - ';
-                if (!serverReady) {
-                  errorMessage += '서버가 아직 완전히 시작되지 않았습니다. 잠시 후 다시 시도해주세요.';
+                // 구체적인 오류 원인 분석 및 해결책 제안
+                let errorMessage = 'HTTP Status 0 오류 - ';
+                let troubleshootingTips = [];
+                
+                if (!this.serverReady) {
+                  errorMessage += '서버가 완전히 준비되지 않았습니다.';
+                  troubleshootingTips.push('서버 시작 완료 대기 중...');
+                  troubleshootingTips.push('잠시 후 자동으로 재시도됩니다.');
                 } else {
-                  errorMessage += '네트워크 연결 문제 또는 CORS 오류입니다.';
+                  errorMessage += '네트워크 연결 또는 CORS 문제입니다.';
+                  troubleshootingTips.push('브라우저 새로고침을 시도해보세요.');
+                  troubleshootingTips.push('서버가 http://localhost:8000에서 실행 중인지 확인하세요.');
                 }
                 
-                resolve({ success: false, error: errorMessage });
+                console.log('💡 문제 해결 방법:', troubleshootingTips);
+                
+                // HTTP Status 0 오류에 대한 자동 재시도 로직
+                if (retryCount > 0) {
+                  console.warn(`🔄 HTTP Status 0 오류 재시도 (${retryCount}회 남음)`);
+                  
+                  // 1초 대기 후 재시도 (빠른 재시도) - this 바인딩 보장
+                  setTimeout(() => {
+                    const boundXhrFetch = this.xhrFetch.bind(this);
+                    boundXhrFetch(endpoint, method, data, retryCount - 1)
+                      .then((result: any) => resolve(result))
+                      .catch((error: any) => resolve({ success: false, error: error.message }));
+                  }, 1000);
+                  return;
+                }
+                
+                resolve({ 
+                  success: false, 
+                  error: errorMessage,
+                  troubleshooting: troubleshootingTips,
+                  serverReady: this.serverReady
+                });
               } else {
-                console.error(`❌ XHR HTTP 오류: ${xhr.status}`, xhr.responseText);
+                console.warn(`⚠️ XHR HTTP 오류: ${xhr.status}`, xhr.responseText);
                 resolve({ success: false, error: `HTTP ${xhr.status}: ${xhr.statusText}` });
               }
             }
           }
         };
         
-        xhr.onerror = function() {
-          console.error('💥 XHR 네트워크 오류');
-          console.error(`🔍 오류 발생 URL: ${url}`);
-          console.error(`🔍 XHR Status: ${xhr.status}, ReadyState: ${xhr.readyState}`);
-          console.error(`🔍 StatusText: ${xhr.statusText}`);
+        xhr.onerror = () => {
+          console.warn('⚠️ XHR 네트워크 오류');
+          console.log(`🔍 오류 발생 URL: ${url}`);
+          console.log(`🔍 XHR Status: ${xhr.status}, ReadyState: ${xhr.readyState}`);
+          console.log(`🔍 StatusText: ${xhr.statusText}`);
+          
+          // 네트워크 오류에 대한 재시도 로직
+          if (retryCount > 0) {
+            console.warn(`🔄 네트워크 오류 재시도 (${retryCount}회 남음)`);
+            
+            // 2초 대기 후 재시도 - this 바인딩 보장
+            setTimeout(() => {
+              const boundXhrFetch = this.xhrFetch.bind(this);
+              boundXhrFetch(endpoint, method, data, retryCount - 1)
+                .then((result: any) => resolve(result))
+                .catch((error: any) => resolve({ success: false, error: error.message }));
+            }, 2000);
+            return;
+          }
+          
           resolve({ success: false, error: 'Network error - 서버에 연결할 수 없습니다 (서버가 시작 중이거나 네트워크 문제)' });
         };
         
-        xhr.ontimeout = function() {
-          console.error('⏰ XHR 타임아웃');
+        xhr.ontimeout = () => {
+          console.warn('⏰ XHR 타임아웃');
           resolve({ success: false, error: 'XHR 타임아웃 - 서버 응답이 너무 늦습니다' });
         };
         
-        xhr.timeout = 30000; // 30초 타임아웃으로 연장 (모델 변경 시간 고려)
+        xhr.timeout = 20000; // 20초 타임아웃 (더 안정적인 API 호출)
         
-        // 요청 전송
+        // 요청 전송 - JSON 인코딩 문제 해결
         if (method === 'POST' || method === 'PUT') {
-          const payload = data ? JSON.stringify(data) : JSON.stringify({});
+          const payload = data ? JSON.stringify(data, null, 0) : JSON.stringify({});
           console.log(`📤 XHR 요청 데이터:`, payload);
+          
+          // Content-Length 명시적 설정
+          xhr.setRequestHeader('Content-Length', new Blob([payload]).size.toString());
           xhr.send(payload);
         } else {
           xhr.send();
         }
         
       } catch (error) {
-        console.error('💥 XHR 설정 오류:', error);
+        console.warn('⚠️ XHR 설정 오류:', error);
         resolve({ success: false, error: error instanceof Error ? error.message : '알 수 없는 오류' });
       }
     });
   }
 
+  // 모델 자동 시작 확인 및 처리
+  checkAndStartModel = async (modelData: any): Promise<any> => {
+    try {
+      if (!modelData) {
+        console.log('🔍 모델 데이터 없음 - 자동 시작 건너뛰기');
+        return null;
+      }
+
+      const { running = [], current_model_running = false, available = [] } = modelData;
+      
+      console.log('🔍 모델 자동 시작 확인:', { 
+        runningCount: running.length, 
+        currentModelRunning: current_model_running,
+        availableCount: available.length
+      });
+
+      // 실행 중인 모델이 없거나 현재 모델이 실행되지 않은 경우
+      if (running.length === 0 || !current_model_running) {
+        console.log('⚠️ 실행 중인 모델이 없음 - 자동 기본 모델 시작 시도');
+        
+        // 기본 모델 선택 (우선순위 순)
+        const defaultModels = ['gemma3-12b:latest', 'txgemma-chat:latest', 'Gemma3:27b-it-q4_K_M'];
+        let selectedModel = null;
+        
+        for (const model of defaultModels) {
+          if (available.some((m: any) => m.name === model)) {
+            selectedModel = model;
+            break;
+          }
+        }
+        
+        if (!selectedModel && available.length > 0) {
+          selectedModel = available[0].name;
+        }
+        
+        if (selectedModel) {
+          console.log(`🚀 자동 모델 시작 시도: ${selectedModel}`);
+          
+          try {
+            const startResult = await this.startModel(selectedModel, (progress) => {
+              console.log('🔄 자동 모델 시작 진행:', progress);
+            });
+            
+            if (startResult.success) {
+              console.log('✅ 자동 모델 시작 성공:', startResult);
+              
+              // 업데이트된 모델 상태 다시 가져오기
+              const updatedResult = await this.xhrFetch('/api/system/models/detailed');
+              if (updatedResult.success) {
+                console.log('✅ 모델 시작 후 상태 업데이트 완료');
+                return updatedResult;
+              }
+            } else {
+              console.warn('⚠️ 자동 모델 시작 실패:', startResult.error);
+            }
+          } catch (startError) {
+            console.warn('⚠️ 자동 모델 시작 중 오류:', startError);
+          }
+        } else {
+          console.warn('⚠️ 시작할 수 있는 모델을 찾을 수 없음');
+        }
+      } else {
+        console.log('✅ 실행 중인 모델이 있음 - 자동 시작 불필요');
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('⚠️ 모델 자동 시작 확인 중 오류:', error);
+      return null;
+    }
+  }
+
   // 간단한 fallback fetch (타입 오류 우회)
-  async simpleFetch(endpoint: string, method: string = 'GET'): Promise<any> {
+  simpleFetch = async (endpoint: string, method: string = 'GET'): Promise<any> => {
     try {
       const url = getApiUrl(endpoint);
       console.log(`🔧 SimpleFetch 사용: ${method} ${url}`);
@@ -292,18 +408,18 @@ export class ApiClient {
         return { success: true, data };
       } else {
         const errorText = await response.text().catch(() => 'Unknown error');
-        console.error(`❌ SimpleFetch HTTP 오류: ${response.status}`, errorText);
+        console.warn(`⚠️ SimpleFetch HTTP 오류: ${response.status}`, errorText);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
     } catch (error) {
-      console.error('💥 SimpleFetch 예외:', error);
+      console.warn('⚠️ SimpleFetch 예외:', error);
       return { success: false, error: error instanceof Error ? error.message : '알 수 없는 오류' };
     }
   }
 
-  // 모델 상세 정보 가져오기
-  async getModelsDetailed() {
-    console.log('🎯 getModelsDetailed 호출');
+  // 모델 상세 정보 가져오기 + 자동 모델 시작
+  getModelsDetailed = async () => {
+    console.log('🎯 getModelsDetailed 호출 (자동 모델 시작 포함)');
     
     // 1차: XMLHttpRequest 시도 (fetch 문제 우회)
     try {
@@ -311,7 +427,10 @@ export class ApiClient {
       const xhrResult = await this.xhrFetch('/api/system/models/detailed');
       if (xhrResult.success) {
         console.log('✅ XHR 방식 성공!');
-        return xhrResult;
+        
+        // 모델 자동 시작 확인 및 처리
+        const autoStartResult = await this.checkAndStartModel(xhrResult.data);
+        return autoStartResult || xhrResult;
       }
       console.warn('⚠️ XHR 방식 실패, fetchWithRetry로 폴백');
     } catch (error) {
@@ -324,7 +443,10 @@ export class ApiClient {
       const result = await this.fetchWithRetry('/api/system/models/detailed');
       if (result.success) {
         console.log('✅ fetchWithRetry 성공!');
-        return result;
+        
+        // 모델 자동 시작 확인 및 처리
+        const autoStartResult = await this.checkAndStartModel(result.data);
+        return autoStartResult || result;
       }
       console.warn('⚠️ fetchWithRetry 실패, simpleFetch로 폴백');
     } catch (error) {
@@ -333,11 +455,24 @@ export class ApiClient {
     
     // 3차: 간단한 fetch로 최종 폴백
     console.log('🥉 simpleFetch 최종 시도');
-    return this.simpleFetch('/api/system/models/detailed');
+    try {
+      const result = await this.simpleFetch('/api/system/models/detailed');
+      if (result.success) {
+        console.log('✅ simpleFetch 성공!');
+        
+        // 모델 자동 시작 확인 및 처리
+        const autoStartResult = await this.checkAndStartModel(result.data);
+        return autoStartResult || result;
+      }
+      return result;
+    } catch (error) {
+      console.warn('⚠️ simpleFetch 최종 실패:', error);
+      return { success: false, error: '모든 연결 방법 실패' };
+    }
   }
 
   // 안전한 모델 전환 (기존 모델 중지 + 새 모델 시작 + 완료 대기)
-  async switchModelSafely(modelName: string, progressCallback?: (progress: string) => void) {
+  switchModelSafely = async (modelName: string, progressCallback?: (progress: string) => void) => {
     const encodedName = encodeURIComponent(modelName);
     console.log(`🔄 안전한 모델 전환 요청: ${modelName} -> ${encodedName}`);
     
@@ -380,7 +515,7 @@ export class ApiClient {
   }
 
   // 모델 시작 (진행률 콜백 포함)
-  async startModel(modelName: string, progressCallback?: (progress: string) => void) {
+  startModel = async (modelName: string, progressCallback?: (progress: string) => void) => {
     const encodedName = encodeURIComponent(modelName);
     console.log(`🚀 모델 시작 요청: ${modelName} -> ${encodedName}`);
     
@@ -423,7 +558,7 @@ export class ApiClient {
   }
 
   // 모델 중지
-  async stopModel(modelName: string) {
+  stopModel = async (modelName: string) => {
     const encodedName = encodeURIComponent(modelName);
     console.log(`🛑 모델 중지 요청: ${modelName} -> ${encodedName}`);
     
@@ -444,7 +579,7 @@ export class ApiClient {
   }
 
   // 다중 모델 시작 (향후 확장용)
-  async startModelMultiple(modelName: string) {
+  startModelMultiple = async (modelName: string) => {
     const encodedName = encodeURIComponent(modelName);
     console.log(`🚀 다중 모델 시작 요청: ${modelName} -> ${encodedName}`);
     
@@ -465,7 +600,7 @@ export class ApiClient {
   }
 
   // 모든 모델 중지
-  async stopAllModels() {
+  stopAllModels = async () => {
     console.log(`🛑 모든 모델 중지 요청`);
     
     // XHR 우선 시도
@@ -485,7 +620,7 @@ export class ApiClient {
   }
 
   // 시스템 상태 확인
-  async checkHealth() {
+  checkHealth = async () => {
     console.log(`💊 Health 체크 요청`);
     
     // XHR 우선 시도
@@ -506,7 +641,7 @@ export class ApiClient {
 
   // 완전 독립적인 안전한 API 호출 (마지막 fallback)
   // 모델 변경 (안전한 전환 사용)
-  async changeModel(modelName: string, progressCallback?: (progress: string) => void) {
+  changeModel = async (modelName: string, progressCallback?: (progress: string) => void) => {
     console.log(`🔄 모델 변경 요청: ${modelName}`);
     
     if (progressCallback) {
@@ -517,7 +652,7 @@ export class ApiClient {
     return this.switchModelSafely(modelName, progressCallback);
   }
 
-  async safeApiCall(endpoint: string): Promise<any> {
+  safeApiCall = async (endpoint: string): Promise<any> => {
     console.log(`🛡️ 안전한 API 호출: ${endpoint}`);
     
     try {
@@ -546,10 +681,20 @@ export class ApiClient {
       });
       
     } catch (error) {
-      console.error('💥 안전한 API 호출 예외:', error);
+      console.warn('⚠️ 안전한 API 호출 예외:', error);
       return { success: false, error: error instanceof Error ? error.message : '알 수 없는 오류' };
     }
   }
 }
 
-export const apiClient = ApiClient.getInstance();
+// 싱글톤 인스턴스 생성 및 메서드 바인딩 확인
+const instance = ApiClient.getInstance();
+
+// 메서드 바인딩 검증
+if (typeof instance.xhrFetch !== 'function') {
+  console.error('❌ xhrFetch 메서드 바인딩 실패');
+} else {
+  console.log('✅ ApiClient 인스턴스 생성 완료');
+}
+
+export const apiClient = instance;
